@@ -25,6 +25,7 @@ enum AuthViewModelLogs: SpotLog {
     case changeEmailVerifySent
     case emailChangeRequiresReauth
     case changeEmailError
+    case usernameAvailabilityCheckFailed
     case userBlocked
     case userUnblocked
 
@@ -48,6 +49,7 @@ enum AuthViewModelLogs: SpotLog {
         case .changeEmailVerifySent: return .info
         case .emailChangeRequiresReauth: return .debug
         case .changeEmailError: return .error
+        case .usernameAvailabilityCheckFailed: return .error
         case .userBlocked: return .info
         case .userUnblocked: return .info
         }
@@ -71,6 +73,7 @@ enum AuthViewModelLogs: SpotLog {
         case .changeEmailVerifySent: return "Change email verification sent"
         case .emailChangeRequiresReauth: return "Email change requires reauthentication"
         case .changeEmailError: return "Email change error"
+        case .usernameAvailabilityCheckFailed: return "Username availability check failed"
         case .userBlocked: return "User blocked"
         case .userUnblocked: return "User unblocked"
         }

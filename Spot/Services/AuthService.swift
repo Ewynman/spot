@@ -84,7 +84,7 @@ class AuthService {
     // MARK: - Sign Out
 
     func signOut() async throws {
-        try await supabase.auth.signOut()
+        try await supabase.auth.signOut(scope: .local)
     }
 
     // MARK: - Legacy/Callback API (to satisfy existing callers)
@@ -114,7 +114,7 @@ class AuthService {
                 let exists = !rows.isEmpty
                 if !exists {
                     SpotLogger.log(AuthServiceLogs.missingUserProfileRow, details: ["userId": uid])
-                    try? await supabase.auth.signOut()
+                    try? await supabase.auth.signOut(scope: .local)
                 }
                 completion(exists)
             } catch {

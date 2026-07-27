@@ -12,8 +12,9 @@ class FreshInstallDetector {
     static let shared = FreshInstallDetector()
     private init() {}
 
-    /// Detects if this is a fresh install and clears a persisted Supabase session.
-    /// Returns true if a session was cleared due to fresh install.
+    /// Detects a first launch after installation while preserving any valid
+    /// device-local Supabase session that survived in Keychain.
+    /// Returns true when a new installation was detected.
     @MainActor func handleFreshInstall() async -> Bool {
         let userDefaults = UserDefaults.standard
         let isFirstRun = !userDefaults.bool(forKey: Constants.UserDefaultsKeys.firstRun)
@@ -21,19 +22,15 @@ class FreshInstallDetector {
         if isFirstRun {
             userDefaults.set(true, forKey: Constants.UserDefaultsKeys.firstRun)
             userDefaults.set(true, forKey: Constants.UserDefaultsKeys.promptPermsOnNextLogin)
+            resetInstallScopedCaches()
 
             if (try? await supabase.auth.session) != nil {
                 SpotLogger.log(FreshInstallDetectorLogs.reinstallWithKeychainUser)
                 Task { @MainActor in
-                    AnalyticsService.shared.trackAuthEvent(Constants.Analytics.authReinstall, parameters: ["had_keychain_user": true, "action": "auto_sign_out"])
-                }
-
-                do {
-                    try await supabase.auth.signOut()
-                    clearAllCaches()
-                    return true
-                } catch {
-                    SpotLogger.log(FreshInstallDetectorLogs.autoSignOutFailed, details: ["error": error.localizedDescription])
+                    AnalyticsService.shared.trackAuthEvent(
+                        Constants.Analytics.authReinstall,
+                        parameters: ["had_keychain_user": true, "action": "retained"]
+                    )
                 }
             } else {
                 SpotLogger.log(FreshInstallDetectorLogs.reinstallWithoutKeychainUser)
@@ -41,6 +38,7 @@ class FreshInstallDetector {
                     AnalyticsService.shared.trackAuthEvent(Constants.Analytics.authReinstall, parameters: ["had_keychain_user": false, "action": "none"])
                 }
             }
+            return true
         }
 
         return false
@@ -56,7 +54,7 @@ class FreshInstallDetector {
         return shouldPrompt
     }
 
-    @MainActor private func clearAllCaches() {
+    @MainActor private func resetInstallScopedCaches() {
         FeedRepository.shared.reset()
         DeepLinkState.shared.clearUserSession()
         UserDefaults.standard.removeObject(forKey: Constants.UserDefaultsKeys.notificationsRequested)
@@ -64,6 +62,6 @@ class FreshInstallDetector {
         UserDefaults.standard.removeObject(forKey: Constants.UserDefaultsKeys.lastKnownLocationStatus)
         UserDefaults.standard.removeObject(forKey: Constants.UserDefaultsKeys.lastKnownNotificationStatus)
 
-        SpotLogger.log(FreshInstallDetectorLogs.clearedAllCaches)
+        SpotLogger.log(FreshInstallDetectorLogs.resetInstallScopedCaches)
     }
 }
