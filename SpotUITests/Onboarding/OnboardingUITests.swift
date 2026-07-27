@@ -35,8 +35,8 @@ final class OnboardingUITests: XCTestCase {
 
         XCTAssertTrue(settled, "Get Started should reach signup, permission gate, or create-account title")
         if signup.exists {
-            XCTAssertTrue(app.links["auth.footer.openTerms"].exists)
-            XCTAssertTrue(app.links["auth.footer.openPrivacy"].exists)
+            XCTAssertTrue(app.links["Terms of Use"].exists)
+            XCTAssertTrue(app.links["Privacy Policy"].exists)
         }
     }
 }

@@ -99,22 +99,13 @@ struct AuthDivider: View {
 
 struct AuthLegalFooter: View {
     var body: some View {
-        VStack(spacing: 5) {
-            Text("By continuing, you agree to Spot’s Terms of Use and acknowledge our Privacy Policy.")
-                .font(.caption2)
-                .foregroundColor(Constants.Colors.welcomeMutedText)
-                .multilineTextAlignment(.center)
-
-            HStack(spacing: 14) {
-                Link("Open Terms", destination: Constants.Legal.termsURL)
-                    .accessibilityIdentifier("auth.footer.openTerms")
-                Link("Open Privacy", destination: Constants.Legal.privacyURL)
-                    .accessibilityIdentifier("auth.footer.openPrivacy")
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundColor(Constants.Colors.primary)
-            .underline()
-        }
+        Text(
+            "By continuing, you agree to Spot’s [Terms of Use](https://spotapp.online/terms) and acknowledge our [Privacy Policy](https://spotapp.online/privacy)."
+        )
+        .font(.caption2)
+        .foregroundColor(Constants.Colors.welcomeMutedText)
+        .multilineTextAlignment(.center)
+        .tint(Constants.Colors.primary)
         .frame(maxWidth: .infinity)
     }
 }
