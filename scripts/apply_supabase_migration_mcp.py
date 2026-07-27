@@ -170,6 +170,25 @@ select
     return all(marker in compact_result for marker in required_markers), compact_result
 
 
+def verify_unique_precondition(client: MCPClient) -> None:
+    preflight_sql = """
+select not exists (
+  select 1
+  from public.users
+  where username is not null
+  group by lower(btrim(username))
+  having count(*) > 1
+) as no_duplicate_usernames;
+""".strip()
+    preflight = client.call_tool("execute_sql", {"query": preflight_sql})
+    compact_result = response_text(preflight).replace(" ", "")
+    if '"no_duplicate_usernames":true' not in compact_result:
+        raise RuntimeError(
+            "Migration blocked: duplicate normalized usernames exist. "
+            "No production DDL was applied."
+        )
+
+
 def main() -> int:
     args = parse_args()
     access_token = os.environ.get("SUPABASE_ACCESS_TOKEN")
@@ -186,6 +205,7 @@ def main() -> int:
         print("Supabase migration was already applied and verification succeeded.")
         return 0
 
+    verify_unique_precondition(client)
     client.call_tool(
         "apply_migration",
         {"name": args.name, "query": sql},
