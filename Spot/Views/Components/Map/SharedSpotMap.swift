@@ -392,7 +392,10 @@ struct SharedSpotMap: UIViewRepresentable {
                     reuseIdentifier: UserLocationAnnotationView.reuseIdentifier
                 )
                 view.configure(with: user)
-                view.zPriority = .defaultUnselected
+                // The viewer's location must remain visible even when a Spot
+                // shares the same coordinate.
+                view.displayPriority = .required
+                view.zPriority = .max
                 return view
             }
 
