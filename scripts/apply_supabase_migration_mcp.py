@@ -223,7 +223,7 @@ def ensure_project_active(access_token: str, project_id: str) -> None:
     client.initialize()
 
     def project_status() -> str:
-        project = client.call_tool("get_project", {"project_id": project_id})
+        project = client.call_tool("get_project", {"id": project_id})
         compact = response_text(project).replace(" ", "")
         for status in (
             "ACTIVE_HEALTHY",
