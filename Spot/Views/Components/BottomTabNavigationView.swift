@@ -168,6 +168,11 @@ struct BottomTabNavigationView: View {
         .onChange(of: authVM.userId) { _, _ in evaluateFirstRunOnboarding() }
         .onChange(of: authVM.likedSpots) { _, _ in evaluateFirstRunOnboarding() }
         .onChange(of: authVM.bookmarkedSpots) { _, _ in evaluateFirstRunOnboarding() }
+        .onReceive(NotificationCenter.default.publisher(for: .selectMainTab)) { output in
+            guard let tab = output.userInfo?[SpotMainTabNotification.userInfoTabIndexKey] as? Int,
+                  (0...4).contains(tab) else { return }
+            selectTab(tab)
+        }
         .sheet(isPresented: $showTourLocationPrePrompt) {
             LocationPermissionView(
                 authDestination: .signup,

@@ -1,8 +1,9 @@
 import Foundation
 
-/// UserInfo key for `Notification.Name.mainTabReselectSame` — `Int` tab index (matches `BottomTabNavigationView` cases: 0 Home … 4 Profile).
+/// Main-tab notification values (matches `BottomTabNavigationView` cases: 0 Home … 4 Profile).
 enum SpotMainTabNotification {
     static let userInfoTabIndexKey = "tabIndex"
+    static let postTabIndex = 2
 }
 
 /// `userInfo` keys for `Notification.Name.homeFeedLocallyRemove`.
@@ -22,6 +23,8 @@ extension Notification.Name {
     static let spotStoreKitProEntitlementReady = Notification.Name("SpotStoreKitProEntitlementReady")
     /// Posted when the user taps the already-selected main tab so that tab can scroll to top / pop to root / reset local chrome.
     static let mainTabReselectSame = Notification.Name("SpotMainTabReselectSame")
+    /// Requests a programmatic switch to the main tab identified by `SpotMainTabNotification.userInfoTabIndexKey`.
+    static let selectMainTab = Notification.Name("SpotSelectMainTab")
     /// Remove feed rows immediately after block/report (see `SpotHomeFeedNotification`).
     static let homeFeedLocallyRemove = Notification.Name("SpotHomeFeedLocallyRemove")
     
