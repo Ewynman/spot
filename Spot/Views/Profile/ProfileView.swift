@@ -8,6 +8,45 @@
 import SwiftUI
 import MapKit
 
+enum ProfileSpotsEmptyState: Equatable {
+    case ownProfile
+    case otherProfile
+    case privateProfile
+
+    static func resolve(isOwnProfile: Bool, canViewContent: Bool) -> Self {
+        if isOwnProfile {
+            return .ownProfile
+        }
+        return canViewContent ? .otherProfile : .privateProfile
+    }
+
+    var title: String {
+        switch self {
+        case .ownProfile:
+            return "Share your first Spot"
+        case .otherProfile:
+            return "No Spots yet"
+        case .privateProfile:
+            return "This account is private"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .ownProfile:
+            return "Start your collection by sharing a place you love."
+        case .otherProfile:
+            return "They haven't shared any Spots yet."
+        case .privateProfile:
+            return "Follow this user to see the Spots they share."
+        }
+    }
+
+    var showsPostButton: Bool {
+        self == .ownProfile
+    }
+}
+
 struct ProfileView: View {
     var userId: String?
     var fromNavigationPush: Bool = false
@@ -33,6 +72,10 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let tabs = ["Spots", "Map"]
+
+    private var isOwnProfile: Bool {
+        userId == nil || userId == authVM.userId
+    }
 
     var body: some View {
         let content = profileContent
@@ -373,8 +416,14 @@ struct ProfileView: View {
                                 .transition(.opacity)
                                 .zIndex(1)
                             } else {
-                                SpotsGridView(spots: viewModel.spots) { tapped in
-                                    selectedSpot = tapped
+                                Group {
+                                    if viewModel.spots.isEmpty {
+                                        profileSpotsEmptyState
+                                    } else {
+                                        SpotsGridView(spots: viewModel.spots) { tapped in
+                                            selectedSpot = tapped
+                                        }
+                                    }
                                 }
                                 .zIndex(0)
                             }
@@ -675,6 +724,56 @@ struct ProfileView: View {
             guard (output.userInfo?[SpotMainTabNotification.userInfoTabIndexKey] as? Int) == 4 else { return }
             resetProfileTabToRoot()
         }
+    }
+
+    private var profileSpotsEmptyState: some View {
+        let state = ProfileSpotsEmptyState.resolve(
+            isOwnProfile: isOwnProfile,
+            canViewContent: viewModel.canViewContent
+        )
+
+        return VStack(spacing: 16) {
+            Image(systemName: state == .privateProfile ? "lock.fill" : "mappin.slash")
+                .font(.system(size: 44, weight: .light))
+                .foregroundColor(Constants.Colors.primary.opacity(0.55))
+
+            Text(state.title)
+                .font(FontManager.sectionHeader())
+                .foregroundColor(Constants.Colors.primary)
+
+            Text(state.message)
+                .font(FontManager.primaryText())
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+
+            if state.showsPostButton {
+                Button {
+                    NotificationCenter.default.post(
+                        name: .selectMainTab,
+                        object: nil,
+                        userInfo: [
+                            SpotMainTabNotification.userInfoTabIndexKey:
+                                SpotMainTabNotification.postTabIndex
+                        ]
+                    )
+                } label: {
+                    Text("Post a Spot")
+                        .font(FontManager.buttonText())
+                        .foregroundColor(Constants.Colors.buttonText)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Constants.Colors.primary)
+                        .cornerRadius(20)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("profile.postFirstSpotButton")
+            }
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 36)
+        .frame(maxWidth: .infinity, minHeight: 240, alignment: .top)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("profile.spotsEmptyState")
     }
 
     /// Root Profile tab re-tap: return to the main profile surface (not used when embedded from Home/Map/Search).

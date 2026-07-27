@@ -18,6 +18,8 @@ Implementation spread across `Spot/Views/Profile`, `ProfileViewModel`, `ProfileS
 
 A **profile** shows a user’s identity, Spots, collections/bookmarks as implemented, and social actions (follow, etc.).
 
+When a profile has no visible Spots, the Spots area explains the empty state. On the current user's own profile, it also offers a **Post a Spot** action that opens the Post tab. Other users' empty profiles do not show that action, and private profiles explain that following is required to view their Spots.
+
 ### Public vs private
 
 Some profiles or content may be **private** to non-followers or pending requests. Visibility is enforced with **Supabase RLS**; the client reflects “unavailable” or limited UI when appropriate.
