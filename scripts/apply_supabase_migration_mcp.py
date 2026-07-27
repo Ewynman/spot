@@ -224,6 +224,35 @@ select not exists (
         )
 
 
+def verify_auth_sync(client: MCPClient) -> None:
+    sync_sql = """
+with rpc as (
+  select p.oid
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname = 'sync_current_user_v1'
+)
+select
+  exists (select 1 from rpc) as sync_rpc_exists,
+  exists (
+    select 1 from rpc
+    where has_function_privilege('authenticated', oid, 'execute')
+  ) as authenticated_can_sync;
+""".strip()
+    result = client.call_tool("execute_sql", {"query": sync_sql}, retries=2)
+    compact_result = response_text(result).replace(" ", "")
+    required_markers = (
+        '"sync_rpc_exists":true',
+        '"authenticated_can_sync":true',
+    )
+    if not all(marker in compact_result for marker in required_markers):
+        raise RuntimeError(
+            "Auth dependency verification failed: sync_current_user_v1 is "
+            "missing or not executable by authenticated."
+        )
+
+
 def ensure_project_active(access_token: str, project_id: str) -> None:
     client = MCPClient(
         "https://mcp.supabase.com/mcp?features=account",
@@ -282,6 +311,7 @@ def main() -> int:
 
     verified, _ = verify_migration(client)
     if verified:
+        verify_auth_sync(client)
         print("Supabase migration was already applied and verification succeeded.")
         return 0
 
@@ -295,6 +325,7 @@ def main() -> int:
     if not verified:
         raise RuntimeError(f"Migration verification failed: {verification_text}")
 
+    verify_auth_sync(client)
     print("Supabase MCP migration and verification succeeded.")
     return 0
 
