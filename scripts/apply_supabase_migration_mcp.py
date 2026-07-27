@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -98,21 +99,37 @@ class MCPClient:
             expect_response=False,
         )
 
-    def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        self.request_id += 1
-        result = self._post(
-            {
-                "jsonrpc": "2.0",
-                "id": self.request_id,
-                "method": "tools/call",
-                "params": {"name": name, "arguments": arguments},
-            }
-        )
-        if not isinstance(result, dict):
-            raise RuntimeError(f"Unexpected {name} response: {result!r}")
-        if result.get("isError"):
-            raise RuntimeError(f"{name} failed: {json.dumps(result.get('content'))}")
-        return result
+    def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        retries: int = 0,
+    ) -> dict[str, Any]:
+        for attempt in range(retries + 1):
+            self.request_id += 1
+            result = self._post(
+                {
+                    "jsonrpc": "2.0",
+                    "id": self.request_id,
+                    "method": "tools/call",
+                    "params": {"name": name, "arguments": arguments},
+                }
+            )
+            if not isinstance(result, dict):
+                raise RuntimeError(f"Unexpected {name} response: {result!r}")
+            if not result.get("isError"):
+                return result
+
+            error_text = json.dumps(result.get("content"))
+            retryable = any(
+                marker in error_text.lower()
+                for marker in ("connection timeout", "temporarily unavailable")
+            )
+            if not retryable or attempt == retries:
+                raise RuntimeError(f"{name} failed: {error_text}")
+            time.sleep(3 * (attempt + 1))
+
+        raise RuntimeError(f"{name} exhausted retries")
 
 
 def parse_args() -> argparse.Namespace:
@@ -159,7 +176,11 @@ select
   public.is_username_available('a_valid_user') in (true, false)
     as rpc_returns_boolean;
 """.strip()
-    verification = client.call_tool("execute_sql", {"query": verification_sql})
+    verification = client.call_tool(
+        "execute_sql",
+        {"query": verification_sql},
+        retries=2,
+    )
     compact_result = response_text(verification).replace(" ", "")
     required_markers = (
         '"rpc_exists":true',
@@ -180,7 +201,11 @@ select not exists (
   having count(*) > 1
 ) as no_duplicate_usernames;
 """.strip()
-    preflight = client.call_tool("execute_sql", {"query": preflight_sql})
+    preflight = client.call_tool(
+        "execute_sql",
+        {"query": preflight_sql},
+        retries=2,
+    )
     compact_result = response_text(preflight).replace(" ", "")
     if '"no_duplicate_usernames":true' not in compact_result:
         raise RuntimeError(
