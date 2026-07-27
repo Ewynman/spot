@@ -135,6 +135,7 @@ class MCPClient:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--endpoint", required=True)
+    parser.add_argument("--project-id")
     parser.add_argument("--migration", type=Path, required=True)
     parser.add_argument("--name", required=True)
     return parser.parse_args()
@@ -214,12 +215,57 @@ select not exists (
         )
 
 
+def ensure_project_active(access_token: str, project_id: str) -> None:
+    client = MCPClient(
+        "https://mcp.supabase.com/mcp?features=account",
+        access_token,
+    )
+    client.initialize()
+
+    def project_status() -> str:
+        project = client.call_tool("get_project", {"project_id": project_id})
+        compact = response_text(project).replace(" ", "")
+        for status in (
+            "ACTIVE_HEALTHY",
+            "COMING_UP",
+            "INACTIVE",
+            "PAUSED",
+            "ACTIVE_UNHEALTHY",
+        ):
+            if f'"status":"{status}"' in compact:
+                return status
+        return "UNKNOWN"
+
+    status = project_status()
+    if status in ("INACTIVE", "PAUSED"):
+        print("Production project is paused; requesting restore through MCP.")
+        client.call_tool("restore_project", {"project_id": project_id})
+        status = "COMING_UP"
+
+    if status == "ACTIVE_HEALTHY":
+        return
+
+    for _ in range(20):
+        time.sleep(15)
+        status = project_status()
+        if status == "ACTIVE_HEALTHY":
+            print("Production project is active and healthy.")
+            return
+
+    raise RuntimeError(
+        f"Project did not become ACTIVE_HEALTHY; current status: {status}"
+    )
+
+
 def main() -> int:
     args = parse_args()
     access_token = os.environ.get("SUPABASE_ACCESS_TOKEN")
     if not access_token:
         print("SUPABASE_ACCESS_TOKEN is not configured", file=sys.stderr)
         return 2
+
+    if args.project_id:
+        ensure_project_active(access_token, args.project_id)
 
     sql = args.migration.read_text(encoding="utf-8")
     client = MCPClient(args.endpoint, access_token)

@@ -67,5 +67,6 @@ jobs:
         run: |
           python3 scripts/apply_supabase_migration_mcp.py \
             --endpoint "$SUPABASE_MCP_ENDPOINT" \
+            --project-id gomdoguewaawdlvijahg \
             --migration supabase/migrations/20260727210000_username_availability_v1.sql \
             --name username_availability_v1
