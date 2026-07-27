@@ -19,6 +19,8 @@ struct RootView: View {
     @State private var needsTermsUpdateAcceptance: Bool = false
     @State private var pendingActiveTermsVersion: ActiveTermsVersion?
     @State private var hasResolvedTermsAcceptance: Bool = false
+    @State private var savedAccountHint: AuthAccountHint? = AuthAccountHintStore.shared.load()
+    @State private var useAnotherAccount = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -189,11 +191,20 @@ struct RootView: View {
                     }
                     .environmentObject(authViewModel)
                 }
+            } else if let savedAccountHint, !useAnotherAccount {
+                WelcomeBackView(account: savedAccountHint) {
+                    useAnotherAccount = true
+                }
             } else {
                 WelcomeView()
             }
         }
         .environmentObject(authViewModel)
+        .onChange(of: authViewModel.isAuthenticated) { _, isAuthenticated in
+            guard !isAuthenticated else { return }
+            savedAccountHint = AuthAccountHintStore.shared.load()
+            useAnotherAccount = false
+        }
         .onOpenURL { url in
             // Handle custom scheme URLs
             SpotLogger.log(RootViewLogs.receivedCustomSchemeUrl, details: ["url": url.absoluteString])

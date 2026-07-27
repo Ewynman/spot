@@ -13,14 +13,12 @@ struct SignupView: View {
     @State private var email = ""
     @State private var username = ""
     @State private var password = ""
-    @State private var confirmPassword = ""
-    @State private var agreedToTerms = false
     @State private var isPrivate = false
 
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var passwordError: String?
-    @State private var confirmPasswordError: String?
+    @State private var usernameAvailability: UsernameAvailabilityOutcome?
     @State private var toastMessage: String?
     @State private var toastIsError: Bool = true
     @State private var showLogin = false
@@ -32,7 +30,8 @@ struct SignupView: View {
             ZStack {
                 Constants.Colors.background.ignoresSafeArea()
 
-                VStack(spacing: 24) {
+                ScrollView {
+                VStack(spacing: 22) {
                     // Custom Back Button
                     HStack {
                         CustomBackButton {
@@ -43,47 +42,53 @@ struct SignupView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
-                    Text("Sign Up")
-                        .font(FontManager.sectionHeader())
-                        .foregroundColor(Constants.Colors.primary)
-                        .padding(.top, 40)
+                    AuthWordmark()
+                        .padding(.top, 4)
+
+                    AuthScreenHeader(
+                        title: "Create your\nSpot account",
+                        subtitle: "Let’s get you set up."
+                    )
+                    .padding(.horizontal, 28)
 
                     VStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Email")
                                 .font(FontManager.primaryText())
                                 .foregroundColor(Constants.Colors.primary)
-                            CustomTextField(placeholder: "Email", text: $email)
+                            CustomTextField(placeholder: "you@example.com", text: $email, systemImage: "envelope")
+                                .keyboardType(.emailAddress)
+                                .textContentType(.emailAddress)
+                                .accessibilityIdentifier("auth.signup.emailField")
                         }
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Username")
                                 .font(FontManager.primaryText())
                                 .foregroundColor(Constants.Colors.primary)
-                            CustomTextField(placeholder: "Username", text: $username)
+                            CustomTextField(placeholder: "your.username", text: $username, systemImage: "person")
+                                .textContentType(.username)
+                                .accessibilityIdentifier("auth.signup.usernameField")
+                                .task(id: username) {
+                                    await checkUsernameAvailability()
+                                }
+                            if let usernameAvailability {
+                                usernameAvailabilityMessage(usernameAvailability)
+                            }
                         }
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Password")
                                 .font(FontManager.primaryText())
                                 .foregroundColor(Constants.Colors.primary)
-                            CustomSecureField(placeholder: "Password", text: $password)
+                            CustomSecureField(placeholder: "Create a password", text: $password, systemImage: "lock")
+                                .textContentType(.newPassword)
+                                .accessibilityIdentifier("auth.signup.passwordField")
                             if let passwordError {
                                 Text(passwordError)
                                     .font(.system(size: 12))
                                     .foregroundColor(.red)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                        }
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Confirm Password")
-                                .font(FontManager.primaryText())
-                                .foregroundColor(Constants.Colors.primary)
-                            CustomSecureField(placeholder: "Confirm password", text: $confirmPassword)
-                            if let confirmPasswordError {
-                                Text(confirmPasswordError)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.red)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                            passwordRequirements
                         }
                         HStack {
                             Button(action: { isPrivate.toggle() }) {
@@ -100,51 +105,8 @@ struct SignupView: View {
                     }
                     .padding(.horizontal, 32)
 
-                    HStack(alignment: .center, spacing: 6) {
-                        Button(action: {
-                            agreedToTerms.toggle()
-                        }) {
-                            Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
-                                .foregroundColor(Constants.Colors.primary)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-
-                        Text("I agree to the ")
-                            .font(FontManager.primaryText())
-                            .foregroundColor(Constants.Colors.primary)
-
-                        Button(action: { UIApplication.shared.open(Constants.Legal.termsURL) }) {
-                            Text("Terms & Conditions")
-                                .font(FontManager.primaryText())
-                                .fontWeight(.semibold)
-                                .foregroundColor(Constants.Colors.primary)
-                                .underline()
-                        }
-                        .buttonStyle(PlainButtonStyle())
-
-                        Text("and")
-                            .font(FontManager.primaryText())
-                            .foregroundColor(Constants.Colors.primary)
-
-                        Button(action: { UIApplication.shared.open(Constants.Legal.privacyURL) }) {
-                            Text("Privacy Policy")
-                                .font(FontManager.primaryText())
-                                .fontWeight(.semibold)
-                                .foregroundColor(Constants.Colors.primary)
-                                .underline()
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 32)
-
                     Button(action: {
                         passwordError = nil
-                        confirmPasswordError = nil
-                        guard agreedToTerms else {
-                            showToast("Please agree to the Terms of Service.", isError: true)
-                            return
-                        }
 
                         guard !email.isEmpty, !username.isEmpty, !password.isEmpty else {
                             showToast("Please fill in all fields.", isError: true)
@@ -169,11 +131,6 @@ struct SignupView: View {
                             showToast("That username isn’t allowed", isError: true); return
                         }
 
-                        guard password == confirmPassword else {
-                            confirmPasswordError = "Passwords do not match."
-                            return
-                        }
-
                         switch PasswordValidator.validate(password) {
                         case .ok:
                             break
@@ -190,7 +147,7 @@ struct SignupView: View {
                         // here just captures the credentials and metadata.
                         validateAndSignUp()
                     }) {
-                        Text(isLoading ? "Signing Up..." : "Sign Up")
+                        Text(isLoading ? "Creating account..." : "Continue")
                             .font(FontManager.buttonText())
                             .foregroundColor(Constants.Colors.buttonText)
                             .frame(maxWidth: .infinity)
@@ -202,6 +159,20 @@ struct SignupView: View {
                     .disabled(isLoading)
                     .padding(.horizontal, 32)
                     .padding(.top, 8)
+                    .accessibilityIdentifier("auth.signup.continueButton")
+
+                    AuthDivider()
+                        .padding(.horizontal, 32)
+
+                    ThemedAppleSignInButton(
+                        onSuccess: { dismiss() },
+                        onError: { message in showToast(message, isError: true) },
+                        height: 48
+                    )
+                    .padding(.horizontal, 32)
+
+                    AuthLegalFooter()
+                        .padding(.horizontal, 32)
 
                     HStack(spacing: 4) {
                         Text("Already have an account?")
@@ -218,7 +189,8 @@ struct SignupView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
 
-                    Spacer()
+                    Spacer(minLength: 20)
+                }
                 }
 
                 .navigationDestination(isPresented: $showLogin) {
@@ -237,18 +209,69 @@ struct SignupView: View {
         .accessibilityIdentifier("onboarding.signupScreen")
     }
 
+    private func checkUsernameAvailability() async {
+        let candidate = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard case .ok = UsernameValidator().validate(candidate) else {
+            await MainActor.run { usernameAvailability = nil }
+            return
+        }
+        try? await Task.sleep(nanoseconds: 450_000_000)
+        guard !Task.isCancelled else { return }
+        let outcome = await authVM.usernameAvailability(candidate)
+        guard !Task.isCancelled else { return }
+        await MainActor.run { usernameAvailability = outcome }
+    }
+
+    @ViewBuilder
+    private func usernameAvailabilityMessage(_ outcome: UsernameAvailabilityOutcome) -> some View {
+        switch outcome {
+        case .available:
+            Label("Username is available", systemImage: "checkmark.circle.fill")
+                .foregroundColor(Constants.Colors.mapFilterMatch)
+        case .taken:
+            Label("That username is taken", systemImage: "xmark.circle.fill")
+                .foregroundColor(.red)
+        case .unavailable:
+            Label("We couldn’t check that username. Try again.", systemImage: "arrow.clockwise.circle")
+                .foregroundColor(Constants.Colors.welcomeMutedText)
+        }
+    }
+
+    private var passwordRequirements: some View {
+        let checks: [(String, Bool)] = [
+            ("At least 8 characters", password.count >= 8),
+            ("A letter and a number", password.rangeOfCharacter(from: .letters) != nil && password.rangeOfCharacter(from: .decimalDigits) != nil),
+            ("One symbol", password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil)
+        ]
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(checks, id: \.0) { label, isMet in
+                Label(label, systemImage: isMet ? "checkmark.circle.fill" : "circle")
+                    .font(.caption2)
+                    .foregroundColor(isMet ? Constants.Colors.mapFilterMatch : Constants.Colors.welcomeMutedText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func validateAndSignUp() {
         Task {
             let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
-            let available = await authVM.isUsernameAvailable(trimmedUsername)
-            if !available {
+            let outcome = await authVM.usernameAvailability(trimmedUsername)
+            await MainActor.run { usernameAvailability = outcome }
+            switch outcome {
+            case .available:
+                await MainActor.run { self.signUpWithSupabase() }
+            case .taken:
                 await MainActor.run {
                     self.isLoading = false
-                    self.showToast("Username is already taken", isError: true)
+                    self.showToast("That username is taken. Try another.", isError: true)
                 }
-                return
+            case .unavailable:
+                await MainActor.run {
+                    self.isLoading = false
+                    self.showToast("We couldn’t check that username. Try again.", isError: true)
+                }
             }
-            await MainActor.run { self.signUpWithSupabase() }
         }
     }
 
@@ -304,10 +327,16 @@ struct SignupView: View {
                 }
 
                 await MainActor.run {
-                    authVM.beginEmailVerificationPending(email: cleanEmail, avatar: nil)
+                    if response.session == nil {
+                        authVM.beginEmailVerificationPending(email: cleanEmail, avatar: nil)
+                    } else {
+                        authVM.clearEmailVerificationPending()
+                    }
                     self.isLoading = false
                     self.errorMessage = nil
-                    self.showToast("Check your email for the verification code.", isError: false)
+                    if response.session == nil {
+                        self.showToast("Check your email for the verification code.", isError: false)
+                    }
                     self.dismiss()
                 }
             } catch {
@@ -335,38 +364,54 @@ struct SignupView: View {
 struct CustomTextField: View {
     var placeholder: String
     @Binding var text: String
+    var systemImage: String? = nil
 
     var body: some View {
-        TextField(placeholder, text: $text)
-            .padding()
-            .background(Constants.Colors.background)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Constants.Colors.primary, lineWidth: 1)
-            )
-            .font(FontManager.primaryText())
-            .foregroundColor(Constants.Colors.primary)
-            .autocapitalization(.none)
-            .textInputAutocapitalization(.never)
+        HStack(spacing: 10) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .foregroundColor(Constants.Colors.welcomeMutedText)
+            }
+            TextField(placeholder, text: $text)
+                .font(.callout)
+                .foregroundColor(Constants.Colors.primary)
+                .autocapitalization(.none)
+                .textInputAutocapitalization(.never)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 52)
+        .background(Constants.Colors.welcomeSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Constants.Colors.primary.opacity(0.22), lineWidth: 1)
+        )
     }
 }
 
 struct CustomSecureField: View {
     var placeholder: String
     @Binding var text: String
+    var systemImage: String? = nil
 
     var body: some View {
-        SecureField(placeholder, text: $text)
-            .padding()
-            .background(Constants.Colors.background)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Constants.Colors.primary, lineWidth: 1)
-            )
-            .font(FontManager.primaryText())
-            .foregroundColor(Constants.Colors.primary)
+        HStack(spacing: 10) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .foregroundColor(Constants.Colors.welcomeMutedText)
+            }
+            SecureField(placeholder, text: $text)
+                .font(.callout)
+                .foregroundColor(Constants.Colors.primary)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 52)
+        .background(Constants.Colors.welcomeSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Constants.Colors.primary.opacity(0.22), lineWidth: 1)
+        )
     }
 }
 

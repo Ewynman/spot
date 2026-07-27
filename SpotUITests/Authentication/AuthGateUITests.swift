@@ -39,13 +39,17 @@ final class AuthGateUITests: XCTestCase {
         guard login.waitForExistence(timeout: 20) else {
             throw XCTSkip("Welcome not reachable — likely already signed in on this simulator.")
         }
+        let terms = app.buttons["auth.termsCheckbox"]
+        if terms.waitForExistence(timeout: 3) {
+            terms.tap()
+        }
         login.tap()
 
-        let loginTitle = app.staticTexts["Log In"]
-        let emailOrUsername = app.textFields["Email or Username"]
+        let loginScreen = app.descendants(matching: .any)["auth.login.screen"]
+        let email = app.textFields["auth.login.emailField"]
         XCTAssertTrue(
-            loginTitle.waitForExistence(timeout: 12) || emailOrUsername.waitForExistence(timeout: 12),
-            "Login flow should show the Log In screen"
+            loginScreen.waitForExistence(timeout: 12) || email.waitForExistence(timeout: 12),
+            "Login flow should show the redesigned Log in screen"
         )
     }
 }

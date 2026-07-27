@@ -295,8 +295,8 @@ struct WelcomeView: View {
     }
 
     private func heroHeight(for size: CGSize) -> CGFloat {
-        let proposed = size.height * (size.height < 700 ? 0.34 : 0.38)
-        return min(max(proposed, 220), 340)
+        let proposed = size.height * (size.height < 700 ? 0.29 : 0.33)
+        return min(max(proposed, 210), 290)
     }
 
     private func startOnboardingFlow(destination: AuthDestination) {
@@ -333,25 +333,7 @@ struct WelcomeView: View {
 
 private struct SpotWelcomeBackgroundView: View {
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
-            RadialGradient(
-                colors: [
-                    Constants.Colors.welcomeGlow.opacity(0.24),
-                    Constants.Colors.welcomeGlow.opacity(0.08),
-                    .clear
-                ],
-                center: .center,
-                startRadius: 8,
-                endRadius: 360
-            )
-            .ignoresSafeArea()
-
-            TopographicLinesView()
-                .stroke(Constants.Colors.primary.opacity(0.055), lineWidth: 1)
-                .ignoresSafeArea()
-        }
+        Constants.Colors.background.ignoresSafeArea()
     }
 }
 
@@ -368,14 +350,14 @@ private struct SpotWelcomeHeaderView: View {
                 .accessibilityLabel("Spot")
 
             VStack(spacing: 10) {
-                Text("Find places worth sharing")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                Text("Places hit different when they come from your people.")
+                    .font(.system(size: 34, weight: .bold, design: .serif))
                     .foregroundColor(Constants.Colors.primary)
                     .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.74)
 
-                Text("Discover favorite spots, vibe tags, and saved recommendations from people you trust.")
-                    .font(.callout.weight(.medium))
+                Text("Save the places you love. Discover the ones your friends can’t stop talking about.")
+                    .font(.callout)
                     .foregroundColor(Constants.Colors.welcomeMutedText)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
@@ -401,68 +383,32 @@ private struct WelcomeAuthActionsView: View {
     let onLogin: () -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
-            TermsAgreementCheckboxView(
-                isAgreed: termsAgreementBinding,
-                termsURL: termsURL,
-                privacyURL: privacyURL,
-                onLinkTapped: nil
+        VStack(spacing: 10) {
+            AuthPrimaryButton(
+                title: "Get started",
+                isEnabled: isTermsAccepted,
+                action: onGetStarted
             )
+            .accessibilityLabel("Get Started")
+            .accessibilityIdentifier("onboarding.getStartedButton")
+
+            AuthSecondaryButton(title: "Log in", action: onLogin)
+                .accessibilityLabel("Log in")
+                .accessibilityIdentifier("auth.loginButton")
+                .disabled(!isTermsAccepted)
+                .opacity(isTermsAccepted ? 1.0 : 0.45)
 
             ThemedAppleSignInButton(
                 onRequest: onAppleRequest,
                 onSuccess: onAppleSuccess,
                 onError: onAppleError,
-                height: 56
+                height: 48
             )
             .frame(maxWidth: .infinity)
             .accessibilityLabel("Sign in with Apple")
             .accessibilityIdentifier("auth.signInWithAppleButton")
             .disabled(!isTermsAccepted)
             .opacity(isTermsAccepted ? 1.0 : 0.45)
-
-            AuthDividerView()
-
-            Button(action: onGetStarted) {
-                Text("Get Started")
-                    .font(FontManager.buttonText())
-                    .foregroundColor(Constants.Colors.buttonText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(Constants.Colors.primary)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Get Started")
-            .accessibilityIdentifier("onboarding.getStartedButton")
-            .disabled(!isTermsAccepted)
-            .opacity(isTermsAccepted ? 1.0 : 0.45)
-
-            HStack(spacing: 8) {
-                Text("Already have an account?")
-                    .font(.callout)
-                    .foregroundColor(Constants.Colors.welcomeMutedText)
-
-                Button(action: onLogin) {
-                    Text("Log in")
-                        .font(.callout.weight(.semibold))
-                        .foregroundColor(Constants.Colors.primary)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .background(Constants.Colors.welcomeSurface.opacity(0.82))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(Constants.Colors.primary.opacity(0.2), lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Log in")
-                .accessibilityIdentifier("auth.loginButton")
-                .disabled(!isTermsAccepted)
-                .opacity(isTermsAccepted ? 1.0 : 0.45)
-            }
-            .padding(.top, 2)
 
             if let appleErrorMessage {
                 Text(appleErrorMessage)
@@ -472,6 +418,14 @@ private struct WelcomeAuthActionsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("Authentication error: \(appleErrorMessage)")
             }
+
+            TermsAgreementCheckboxView(
+                isAgreed: termsAgreementBinding,
+                termsURL: termsURL,
+                privacyURL: privacyURL,
+                onLinkTapped: nil
+            )
+            .padding(.top, 2)
         }
     }
 }
@@ -499,25 +453,13 @@ private struct SpotWelcomeHeroView: View {
     let configuration: WelcomeHeroMotionConfiguration
 
     @State private var entranceVisible = false
-    @State private var floatAnimation = false
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                ModernMapBackgroundView()
-                    .opacity(entranceVisible ? 1 : 0)
-                    .scaleEffect(entranceVisible ? 1 : 0.95)
-
-                FloatingCardsLayerView(
-                    configuration: configuration,
-                    containerSize: proxy.size,
-                    isVisible: entranceVisible,
-                    floatAnimation: floatAnimation
-                )
-            }
-        }
+        EditorialPlaceCollageView()
+            .opacity(entranceVisible ? 1 : 0)
+            .scaleEffect(entranceVisible ? 1 : 0.96)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Spot preview showing shared places, vibe tags, and saved recommendations.")
+        .accessibilityLabel("A collection of cozy cafes, scenic views, and local favorites shared on Spot.")
         .onAppear(perform: startAnimations)
     }
 
@@ -530,13 +472,92 @@ private struct SpotWelcomeHeroView: View {
             entranceVisible = true
         }
 
-        guard configuration.continuousAnimationsEnabled else {
-            return
-        }
+    }
+}
 
-        withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) {
-            floatAnimation = true
+private struct EditorialPlaceCollageView: View {
+    var body: some View {
+        ZStack {
+            EditorialPlaceTile(
+                title: "Sunday coffee",
+                vibe: "Cozy Corner",
+                systemImage: "cup.and.saucer.fill",
+                alignment: .bottomLeading
+            )
+            .frame(width: 190, height: 180)
+            .offset(x: -44, y: 4)
+            .rotationEffect(.degrees(-3))
+
+            EditorialPlaceTile(
+                title: "Golden hour",
+                vibe: "Scenic View",
+                systemImage: "sun.max.fill",
+                alignment: .topTrailing
+            )
+            .frame(width: 142, height: 154)
+            .offset(x: 86, y: -24)
+            .rotationEffect(.degrees(4))
+
+            EditorialVibeChip(text: "Local favorite", systemImage: "person.2.fill")
+                .offset(x: 76, y: 80)
+            EditorialVibeChip(text: "Great coffee", systemImage: "cup.and.saucer.fill")
+                .offset(x: -80, y: -78)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct EditorialPlaceTile: View {
+    let title: String
+    let vibe: String
+    let systemImage: String
+    let alignment: Alignment
+
+    var body: some View {
+        ZStack(alignment: alignment) {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Constants.Colors.accent)
+
+            VStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 42, weight: .light))
+                Text(title)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundColor(Constants.Colors.primary.opacity(0.82))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Text(vibe)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(Constants.Colors.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Constants.Colors.welcomeSurface.opacity(0.96))
+                .clipShape(Capsule())
+                .padding(12)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Constants.Colors.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Constants.Colors.welcomeCardShadow, radius: 18, y: 10)
+    }
+}
+
+private struct EditorialVibeChip: View {
+    let text: String
+    let systemImage: String
+
+    var body: some View {
+        Label(text, systemImage: systemImage)
+            .font(.caption2.weight(.semibold))
+            .foregroundColor(Constants.Colors.primary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(Constants.Colors.welcomeSurface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Constants.Colors.primary.opacity(0.08), lineWidth: 1))
+            .shadow(color: Constants.Colors.welcomeCardShadow, radius: 8, y: 4)
     }
 }
 
