@@ -11,7 +11,7 @@ struct ConfirmEmailView: View {
     @State private var showToast: String?
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             HStack {
                 Button {
                     authVM.clearEmailVerificationPending()
@@ -29,15 +29,26 @@ struct ConfirmEmailView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
 
-            Text("Enter verification code")
-                .font(FontManager.sectionHeader())
-                .foregroundColor(Constants.Colors.primary)
+            AuthWordmark()
+                .padding(.top, 4)
 
-            Text("We sent a 6-digit code to \(authVM.maskedEmail). Enter it below to confirm your account.")
-                .font(FontManager.primaryText())
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+            AuthScreenHeader(
+                title: "Check your email",
+                subtitle: "We sent a 6-digit code to \(authVM.maskedEmail)."
+            )
+            .padding(.horizontal, 28)
+
+            Label(
+                "You’ll only need this code when creating your account.",
+                systemImage: "envelope.badge"
+            )
+            .font(.footnote)
+            .foregroundColor(Constants.Colors.welcomeMutedText)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Constants.Colors.accent.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 28)
 
             HStack(spacing: 8) {
                 ForEach(0..<6, id: \.self) { index in
@@ -65,8 +76,8 @@ struct ConfirmEmailView: View {
                     .foregroundColor(Constants.Colors.primary)
                     .tint(Constants.Colors.primary)
                     .frame(width: 44, height: 52)
-                    .background(Constants.Colors.background)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Constants.Colors.primary, lineWidth: 1))
+                    .background(Constants.Colors.welcomeSurface)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Constants.Colors.primary.opacity(0.25), lineWidth: 1))
                     .focused($focusedIndex, equals: index)
                     .onChange(of: otpDigits[index]) { oldValue, newValue in
                         if newValue.isEmpty && !oldValue.isEmpty && index > 0 {
@@ -76,6 +87,7 @@ struct ConfirmEmailView: View {
                 }
             }
             .padding(.top, 8)
+            .accessibilityIdentifier("auth.confirmEmail.otp")
 
             if let errorMessage {
                 Text(errorMessage)
@@ -94,12 +106,13 @@ struct ConfirmEmailView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Constants.Colors.primary)
-                    .cornerRadius(20)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(isVerifying || otpCode.count != 6)
             .padding(.horizontal, 32)
             .padding(.top, 8)
+            .accessibilityIdentifier("auth.confirmEmail.verifyButton")
 
             TimelineView(.periodic(from: .now, by: 1)) { _ in
                 Button {
@@ -117,12 +130,28 @@ struct ConfirmEmailView: View {
                 }
                 .disabled(!authVM.canResendVerification() || isResending)
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("auth.confirmEmail.resendButton")
             }
+
+            AuthDivider()
+                .padding(.horizontal, 32)
+
+            Button {
+                authVM.clearEmailVerificationPending()
+                dismiss()
+            } label: {
+                Text("Use a different email")
+                    .font(.callout.weight(.medium))
+                    .foregroundColor(Constants.Colors.primary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("auth.confirmEmail.useDifferentEmail")
 
             Spacer()
         }
-        .background(Color(hex: "F5F3EF").ignoresSafeArea())
+        .background(Constants.Colors.background.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
+        .accessibilityIdentifier("auth.confirmEmail.screen")
         .onAppear { focusedIndex = 0 }
         .overlay(alignment: .top) {
             if let msg = showToast {

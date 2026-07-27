@@ -16,13 +16,14 @@ enum ThemedAppleSignInButtonMode {
 struct ThemedAppleSignInButton: View {
     @EnvironmentObject var authVM: AuthViewModel
     @State private var isInFlight = false
+    @State private var currentNonce: String?
 
     var mode: ThemedAppleSignInButtonMode = .signIn
     var onRequest: (() -> Void)? = nil
     var onSuccess: (() -> Void)? = nil
     var onError: ((String) -> Void)? = nil
-    /// When `mode` is `.accountDeletionReauth`, called with the Apple identity token instead of signing in.
-    var onAppleIDToken: ((String) -> Void)? = nil
+    /// When `mode` is `.accountDeletionReauth`, called with the Apple identity token and raw nonce.
+    var onAppleIDToken: ((_ idToken: String, _ nonce: String) -> Void)? = nil
     var height: CGFloat = 56
 
     private var buttonLabel: SignInWithAppleButton.Label {
@@ -38,6 +39,9 @@ struct ThemedAppleSignInButton: View {
             onRequest: { request in
                 guard !isInFlight else { return }
                 isInFlight = true
+                let nonce = AppleSignInNonce.make()
+                currentNonce = nonce
+                request.nonce = AppleSignInNonce.sha256(nonce)
                 onRequest?()
                 request.requestedScopes = [.fullName, .email]
             },
@@ -63,18 +67,22 @@ struct ThemedAppleSignInButton: View {
         switch result {
         case .failure(let error):
             isInFlight = false
+            currentNonce = nil
             onError?(error.localizedDescription)
         case .success(let auth):
             guard let credential = auth.credential as? ASAuthorizationAppleIDCredential else {
                 isInFlight = false
+                currentNonce = nil
                 onError?("Could not read Apple credential.")
                 return
             }
             guard let tokenData = credential.identityToken,
                   let idToken = String(data: tokenData, encoding: .utf8),
-                  !idToken.isEmpty
+                  !idToken.isEmpty,
+                  let nonce = currentNonce
             else {
                 isInFlight = false
+                currentNonce = nil
                 onError?("Apple did not return a valid identity token.")
                 return
             }
@@ -84,18 +92,25 @@ struct ThemedAppleSignInButton: View {
                 case .accountDeletionReauth:
                     await MainActor.run {
                         isInFlight = false
-                        onAppleIDToken?(idToken)
+                        currentNonce = nil
+                        onAppleIDToken?(idToken, nonce)
                     }
                 case .signIn:
                     do {
-                        try await authVM.signInWithApple(idToken: idToken, fullName: credential.fullName)
+                        try await authVM.signInWithApple(
+                            idToken: idToken,
+                            nonce: nonce,
+                            fullName: credential.fullName
+                        )
                         await MainActor.run {
                             isInFlight = false
+                            currentNonce = nil
                             onSuccess?()
                         }
                     } catch {
                         await MainActor.run {
                             isInFlight = false
+                            currentNonce = nil
                             onError?(error.localizedDescription)
                         }
                     }

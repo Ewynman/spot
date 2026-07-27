@@ -599,7 +599,7 @@ struct SettingsView: View {
         }
     }
 
-    private func deleteAccountWithApple(_ appleIDToken: String) {
+    private func deleteAccountWithApple(_ appleIDToken: String, nonce: String) {
         guard !isSaving else { return }
         SpotLogger.log(SettingsViewLogs.deleteAccountTapped, details: [
             "confirmDelete": confirmDelete,
@@ -611,7 +611,7 @@ struct SettingsView: View {
             return
         }
         isSaving = true
-        authVM.deleteAccount(appleIDToken: appleIDToken) { result in
+        authVM.deleteAccount(appleIDToken: appleIDToken, nonce: nonce) { result in
             handleDeleteAccountResult(result)
         }
     }
@@ -753,7 +753,7 @@ private struct AccountSettingsDetailView: View {
     let onUploadPhoto: (UIImage) -> Void
     let onLogout: () -> Void
     let onDeleteWithPassword: () -> Void
-    let onDeleteWithAppleToken: (String) -> Void
+    let onDeleteWithAppleToken: (_ idToken: String, _ nonce: String) -> Void
     let onDeleteAppleError: (String) -> Void
 
     var body: some View {

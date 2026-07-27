@@ -84,7 +84,7 @@ class AuthService {
     // MARK: - Sign Out
 
     func signOut() async throws {
-        try await supabase.auth.signOut()
+        try await supabase.auth.signOut(scope: .local)
     }
 
     // MARK: - Legacy/Callback API (to satisfy existing callers)
@@ -114,7 +114,7 @@ class AuthService {
                 let exists = !rows.isEmpty
                 if !exists {
                     SpotLogger.log(AuthServiceLogs.missingUserProfileRow, details: ["userId": uid])
-                    try? await supabase.auth.signOut()
+                    try? await supabase.auth.signOut(scope: .local)
                 }
                 completion(exists)
             } catch {
@@ -171,39 +171,20 @@ class AuthService {
         let cleanIdentifier = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
             do {
-                let emailToUse: String
-                if cleanIdentifier.contains("@") {
-                    emailToUse = AuthInputNormalizer.normalizeEmailLegacy(cleanIdentifier)
-                } else {
-                    guard let resolved = try await resolveEmail(forUsername: cleanIdentifier) else {
-                        throw NSError(
-                            domain: "AuthService",
-                            code: 404,
-                            userInfo: [NSLocalizedDescriptionKey: "No account found for that username."]
-                        )
-                    }
-                    emailToUse = resolved
+                guard cleanIdentifier.contains("@") else {
+                    throw NSError(
+                        domain: "AuthService",
+                        code: 400,
+                        userInfo: [NSLocalizedDescriptionKey: "Enter the email address for your account."]
+                    )
                 }
+                let emailToUse = AuthInputNormalizer.normalizeEmailLegacy(cleanIdentifier)
                 _ = try await supabase.auth.signIn(email: emailToUse, password: password)
                 await MainActor.run { completion(.success(())) }
             } catch {
                 await MainActor.run { completion(.failure(error)) }
             }
         }
-    }
-
-    private func resolveEmail(forUsername username: String) async throws -> String? {
-        let normalized = AuthInputNormalizer.normalizeUsernameLowerLegacy(username)
-        guard !normalized.isEmpty else { return nil }
-        struct Params: Encodable { let p_username: String }
-        let email: String? = try await supabase
-            .rpc("resolve_login_email", params: Params(p_username: normalized))
-            .execute()
-            .value
-        if let email, !email.isEmpty {
-            return AuthInputNormalizer.normalizeEmailLegacy(email)
-        }
-        return nil
     }
 
     // MARK: - Reauthentication / Account management (callback style for existing VM)
@@ -265,10 +246,14 @@ class AuthService {
         }
     }
 
-    func deleteAccount(appleIDToken: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    func deleteAccount(
+        appleIDToken: String,
+        nonce: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
         Task {
             do {
-                try await reauthenticate(withAppleIDToken: appleIDToken)
+                try await reauthenticate(withAppleIDToken: appleIDToken, nonce: nonce)
                 try await performAccountDeletionAfterReauth(reauthMethod: "apple")
                 await MainActor.run { completion(.success(())) }
             } catch {
@@ -277,13 +262,15 @@ class AuthService {
         }
     }
 
-    private func reauthenticate(withAppleIDToken idToken: String) async throws {
+    private func reauthenticate(withAppleIDToken idToken: String, nonce: String) async throws {
         let userBefore = try await supabase.auth.user()
         _ = try await supabase.auth.signInWithIdToken(
-            credentials: .init(provider: .apple, idToken: idToken)
+            credentials: .init(provider: .apple, idToken: idToken, nonce: nonce)
         )
         let userAfter = try await supabase.auth.user()
         guard userAfter.id == userBefore.id else {
+            try? await supabase.auth.signOut(scope: .local)
+            AuthAccountHintStore.shared.clear()
             throw NSError(
                 domain: "AuthService",
                 code: -2,

@@ -10,6 +10,12 @@ import UIKit
 import Supabase
 import AuthenticationServices
 
+enum UsernameAvailabilityOutcome: Equatable {
+    case available
+    case taken
+    case unavailable
+}
+
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = true
@@ -34,8 +40,10 @@ class AuthViewModel: ObservableObject {
     @Published var currentUserUsername: String?
 
     private var supabaseAuthTask: Task<Void, Never>?
+    private var sessionRefreshTask: Task<Void, Never>?
 
     init() {
+        restoreVerificationRecovery()
         #if DEBUG
         if SpotLaunchConfiguration.uiTestAuthBootstrap == .loggedIn {
             Task { @MainActor in
@@ -48,6 +56,7 @@ class AuthViewModel: ObservableObject {
 
     deinit {
         supabaseAuthTask?.cancel()
+        sessionRefreshTask?.cancel()
     }
 
     private var previousUserId: String?
@@ -90,13 +99,17 @@ class AuthViewModel: ObservableObject {
         switch event {
         case .initialSession, .signedIn, .tokenRefreshed, .userUpdated:
             guard let session else {
-                clearSignedOutState()
+                clearSignedOutState(preservePendingVerification: awaitingEmailVerification)
                 return
             }
             if session.isExpired {
+                refreshExpiredSessionIfNeeded()
                 return
             }
+            sessionRefreshTask?.cancel()
+            sessionRefreshTask = nil
             let user = session.user
+            AuthVerificationRecoveryStore.shared.clear()
             SpotLogger.log(AuthViewModelLogs.authStateSignedIn, details: ["uid": user.id.uuidString])
 
             let isNewLogin = previousUserId == nil && userId == nil
@@ -107,6 +120,7 @@ class AuthViewModel: ObservableObject {
             isEmailVerified = user.emailConfirmedAt != nil
             awaitingEmailVerification = false
             verificationEmailMaskSource = user.email ?? verificationEmailMaskSource
+            saveAccountHint(for: session)
 
             AnalyticsService.shared.setUserId(user.id.uuidString)
 
@@ -133,6 +147,7 @@ class AuthViewModel: ObservableObject {
 
         case .userDeleted:
             SpotLogger.log(AuthViewModelLogs.authUserDeletedRemotely)
+            AuthAccountHintStore.shared.clear()
             clearSignedOutState()
             Task { await teardownSessionCaches() }
 
@@ -142,16 +157,18 @@ class AuthViewModel: ObservableObject {
     }
 
     @MainActor
-    private func clearSignedOutState() {
+    private func clearSignedOutState(preservePendingVerification: Bool = false) {
         AnalyticsService.shared.setUserId(nil)
         SpotAuthBridge.setSessionUser(id: nil, email: nil)
         userId = nil
         isAuthenticated = false
         isLoading = false
         isEmailVerified = false
-        awaitingEmailVerification = false
-        emailResendAvailableAt = nil
-        verificationEmailMaskSource = ""
+        if !preservePendingVerification {
+            awaitingEmailVerification = false
+            emailResendAvailableAt = nil
+            verificationEmailMaskSource = ""
+        }
         likedSpots = []
         bookmarkedSpots = []
         blockedUsers = []
@@ -162,6 +179,59 @@ class AuthViewModel: ObservableObject {
         currentUserUsername = nil
         previousUserId = nil
         PreAuthTermsAgreementStore.shared.reset()
+    }
+
+    private func restoreVerificationRecovery() {
+        guard let recovery = AuthVerificationRecoveryStore.shared.load() else { return }
+        pendingVerificationEmail = recovery.email
+        verificationEmailMaskSource = recovery.email
+        awaitingEmailVerification = true
+    }
+
+    @MainActor
+    private func refreshExpiredSessionIfNeeded() {
+        guard sessionRefreshTask == nil else { return }
+        isLoading = true
+        sessionRefreshTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.sessionRefreshTask = nil }
+            do {
+                _ = try await supabase.auth.refreshSession()
+            } catch {
+                SpotLogger.log(
+                    AuthViewModelLogs.sessionRefreshFailed,
+                    details: ["error": error.localizedDescription]
+                )
+                TokenService.shared.clearTokens()
+                await self.teardownSessionCaches()
+                self.clearSignedOutState(
+                    preservePendingVerification: self.awaitingEmailVerification
+                )
+            }
+        }
+    }
+
+    private func saveAccountHint(for session: Session) {
+        let user = session.user
+        let provider: AuthAccountProvider =
+            user.appMetadata["provider"]?.stringValue?.lowercased() == "apple" ? .apple : .email
+        let username = user.userMetadata["username"]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let email = user.email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let displayLabel: String
+        if let username, !username.isEmpty {
+            displayLabel = "@\(username)"
+        } else {
+            displayLabel = email?.split(separator: "@").first.map(String.init) ?? "Your Spot account"
+        }
+        AuthAccountHintStore.shared.save(
+            AuthAccountHint(
+                email: email,
+                displayLabel: displayLabel,
+                provider: provider,
+                lastSignedInAt: Date()
+            )
+        )
     }
 
     /// Feed, deep links, and privacy cache — call after sign-out or account deletion.
@@ -190,11 +260,12 @@ class AuthViewModel: ObservableObject {
 
     /// Completes native Apple auth by exchanging the Apple identity token with Supabase.
     /// Optionally persists the full name into auth metadata when Apple provides it (first consent only).
-    func signInWithApple(idToken: String, fullName: PersonNameComponents?) async throws {
+    func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws {
         _ = try await supabase.auth.signInWithIdToken(
             credentials: .init(
                 provider: .apple,
-                idToken: idToken
+                idToken: idToken,
+                nonce: nonce
             )
         )
 
@@ -224,10 +295,12 @@ class AuthViewModel: ObservableObject {
     @MainActor func signOut() {
         Task {
             do {
-                try await supabase.auth.signOut()
+                try await supabase.auth.signOut(scope: .local)
             } catch {
                 SpotLogger.log(AuthViewModelLogs.signOutFailed, details: ["error": error.localizedDescription])
             }
+            TokenService.shared.clearTokens()
+            AuthVerificationRecoveryStore.shared.clear()
             await teardownSessionCaches()
             await MainActor.run {
                 self.clearSignedOutState()
@@ -533,6 +606,7 @@ class AuthViewModel: ObservableObject {
         verificationEmailMaskSource = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         pendingAvatarAfterVerification = avatar
         emailResendAvailableAt = nil
+        AuthVerificationRecoveryStore.shared.save(email: email)
     }
 
     func clearEmailVerificationPending() {
@@ -540,6 +614,7 @@ class AuthViewModel: ObservableObject {
         pendingVerificationEmail = nil
         pendingAvatarAfterVerification = nil
         emailResendAvailableAt = nil
+        AuthVerificationRecoveryStore.shared.clear()
     }
 
     /// Verifies the 6-digit code from the signup email, establishes the session, uploads pending avatar, syncs profile.
@@ -676,17 +751,25 @@ class AuthViewModel: ObservableObject {
     }
 
     // MARK: - Username Availability
-    func isUsernameAvailable(_ username: String) async -> Bool {
+    func usernameAvailability(_ username: String) async -> UsernameAvailabilityOutcome {
         struct Params: Encodable { let p_username: String }
         do {
             let available: Bool = try await supabase
                 .rpc("is_username_available", params: Params(p_username: username))
                 .execute()
                 .value
-            return available
+            return available ? .available : .taken
         } catch {
-            return false
+            SpotLogger.log(
+                AuthViewModelLogs.usernameAvailabilityCheckFailed,
+                details: ["error": error.localizedDescription]
+            )
+            return .unavailable
         }
+    }
+
+    func isUsernameAvailable(_ username: String) async -> Bool {
+        await usernameAvailability(username) == .available
     }
 
     // MARK: - Account Deletion
@@ -710,9 +793,17 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    func deleteAccount(appleIDToken: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    func deleteAccount(
+        appleIDToken: String,
+        nonce: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
         runAccountDeletion(completion: completion) { done in
-            AuthService.shared.deleteAccount(appleIDToken: appleIDToken, completion: done)
+            AuthService.shared.deleteAccount(
+                appleIDToken: appleIDToken,
+                nonce: nonce,
+                completion: done
+            )
         }
     }
 
@@ -727,6 +818,7 @@ class AuthViewModel: ObservableObject {
                     defer { self.accountDeletionInProgress = false }
                     switch result {
                     case .success:
+                        AuthAccountHintStore.shared.clear()
                         self.clearSignedOutState()
                         await self.teardownSessionCaches()
                         completion(.success(()))
