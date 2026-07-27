@@ -34,5 +34,9 @@ final class OnboardingUITests: XCTestCase {
             || app.staticTexts["Create your\nSpot account"].waitForExistence(timeout: 12)
 
         XCTAssertTrue(settled, "Get Started should reach signup, permission gate, or create-account title")
+        if signup.exists {
+            XCTAssertTrue(app.links["auth.footer.openTerms"].exists)
+            XCTAssertTrue(app.links["auth.footer.openPrivacy"].exists)
+        }
     }
 }
