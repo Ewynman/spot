@@ -123,22 +123,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    access_token = os.environ.get("SUPABASE_ACCESS_TOKEN")
-    if not access_token:
-        print("SUPABASE_ACCESS_TOKEN is not configured", file=sys.stderr)
-        return 2
+def response_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "\n".join(response_text(item) for item in value.values())
+    if isinstance(value, list):
+        return "\n".join(response_text(item) for item in value)
+    return ""
 
-    sql = args.migration.read_text(encoding="utf-8")
-    client = MCPClient(args.endpoint, access_token)
-    client.initialize()
 
-    client.call_tool(
-        "apply_migration",
-        {"name": args.name, "query": sql},
-    )
-
+def verify_migration(client: MCPClient) -> tuple[bool, str]:
     verification_sql = """
 select
   to_regprocedure('public.is_username_available(text)') is not null as rpc_exists,
@@ -151,32 +146,41 @@ select
   public.is_username_available('a_valid_user') in (true, false)
     as rpc_returns_boolean;
 """.strip()
-    verification = client.call_tool(
-        "execute_sql",
-        {"query": verification_sql},
-    )
-    content_text = "\n".join(
-        item.get("text", "")
-        for item in verification.get("content", [])
-        if isinstance(item, dict)
-    )
-    verification_text = content_text + json.dumps(
-        verification.get("structuredContent", {})
-    )
+    verification = client.call_tool("execute_sql", {"query": verification_sql})
+    compact_result = response_text(verification).replace(" ", "")
     required_markers = (
         '"rpc_exists":true',
         '"index_exists":true',
         '"anon_can_execute":true',
         '"rpc_returns_boolean":true',
     )
-    compact_result = verification_text.replace(" ", "")
-    missing = [marker for marker in required_markers if marker not in compact_result]
-    if missing:
-        raise RuntimeError(
-            "Migration verification failed; missing true markers: "
-            + ", ".join(missing)
-            + f". Response: {verification_text}"
-        )
+    return all(marker in compact_result for marker in required_markers), compact_result
+
+
+def main() -> int:
+    args = parse_args()
+    access_token = os.environ.get("SUPABASE_ACCESS_TOKEN")
+    if not access_token:
+        print("SUPABASE_ACCESS_TOKEN is not configured", file=sys.stderr)
+        return 2
+
+    sql = args.migration.read_text(encoding="utf-8")
+    client = MCPClient(args.endpoint, access_token)
+    client.initialize()
+
+    verified, _ = verify_migration(client)
+    if verified:
+        print("Supabase migration was already applied and verification succeeded.")
+        return 0
+
+    client.call_tool(
+        "apply_migration",
+        {"name": args.name, "query": sql},
+    )
+
+    verified, verification_text = verify_migration(client)
+    if not verified:
+        raise RuntimeError(f"Migration verification failed: {verification_text}")
 
     print("Supabase MCP migration and verification succeeded.")
     return 0
