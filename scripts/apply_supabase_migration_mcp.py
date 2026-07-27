@@ -28,6 +28,9 @@ class MCPClient:
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
+            # Cloudflare rejects Python urllib's default user-agent before the
+            # request reaches Supabase. Use an explicit MCP client identity.
+            "User-Agent": "spot-mcp-deployer/1.0",
         }
         if self.session_id:
             headers["Mcp-Session-Id"] = self.session_id
