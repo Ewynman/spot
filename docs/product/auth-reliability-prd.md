@@ -11,6 +11,8 @@ Make account creation, email verification, login, and session restoration reliab
 - **Target:** Before release candidate approval
 - **Last reviewed:** 2026-07-27
 - **Evidence basis:** Repository audit. Live staging and production Supabase configuration still requires verification.
+- **Client implementation:** In progress on the authentication reliability branch
+- **Approved UX:** Option A editorial welcome plus create-account, OTP, returning-account, and email-login flow
 
 ## Problem statement
 
@@ -40,10 +42,11 @@ These findings establish credible code-level causes but do not prove which one o
 - Present actionable, privacy-safe errors for invalid credentials, unverified email, connectivity failures, and unavailable backend services.
 - Ensure all client-required database functions are versioned, deployed, permissioned, and tested in staging and production.
 - Add automated coverage and release checks for the critical authentication journeys.
+- Replace the generic authentication entry screens with the approved premium editorial flow.
 
 ## Non-goals
 
-- Redesigning the full onboarding experience.
+- Redesigning post-auth tours, permissions, or the main tab experience.
 - Changing Sign in with Apple behavior except where shared session handling is affected.
 - Adding social login providers.
 - Broad profile or feed architecture changes.
@@ -99,10 +102,11 @@ The client invokes `is_username_available`, but no definition is committed under
    - environment mismatch
    - unknown SDK sign-out
 4. Release builds must fail CI if the embedded Supabase project does not match the approved production project.
-5. The delete/reinstall policy must be explicitly approved. Recommended launch behavior is:
+5. The approved delete/reinstall policy is:
    - preserve valid sessions for in-place updates;
-   - treat a confirmed delete/reinstall separately;
-   - if security requires logout after reinstall, document and test it rather than classifying it as an update.
+   - preserve and validate the device-local Supabase session after reinstall on the same phone;
+   - never copy or synchronize Supabase access or refresh tokens to another device;
+   - use Sign in with Apple, iCloud Password AutoFill, and eventually passkeys for a new-device sign-in.
 
 ### R2 — Username availability
 
@@ -136,6 +140,26 @@ The client invokes `is_username_available`, but no definition is committed under
 4. Username login must not ship unless its backend dependency is versioned, deployed, security-reviewed, and covered end to end.
 5. Recommended release baseline: label the field as **Email** and support email login only until a secure username-login design is approved. Returning an account email from a public username-resolution RPC creates enumeration and privacy risk.
 
+### R6 — Approved authentication UX
+
+1. The welcome screen uses the approved **Option A — Editorial** direction:
+   - “Places hit different when they come from your people.”
+   - a minimal editorial place collage using Spot’s brand palette;
+   - Get started as the primary action;
+   - Log in as the secondary action;
+   - native Sign in with Apple;
+   - visible Terms of Use and Privacy Policy agreement before authentication.
+2. Create account collects email, username, and one password entry with inline requirements.
+3. Username availability distinguishes available, taken, invalid, and backend unavailable.
+4. OTP verification clearly states that the code is required for account creation, supports resend, and supports changing the email.
+5. Returning-account UI may display a device-local account hint after logout. It must:
+   - contain no password, OTP, Apple identity token, Supabase token, or authorization claim;
+   - be removable through “Use another account”;
+   - be cleared on account deletion;
+   - still require the Terms agreement and real authentication.
+6. Email and password fields use iOS credential content types so the system Password AutoFill experience can supply credentials from iCloud Keychain.
+7. New-device passwordless continuation must not be represented as functional until Supabase passkeys are enabled and verified.
+
 ### R5 — Backend contract and environment parity
 
 1. Every RPC invoked by the auth client must exist in migrations, including:
@@ -159,6 +183,9 @@ The client invokes `is_username_available`, but no definition is committed under
 - Use RLS and least-privilege grants for all auth-adjacent tables and functions.
 - Keep username enumeration risk bounded through public-profile policy, validation, and rate limiting.
 - Persist only the minimum verification recovery state; never persist the password.
+- Bind every native Apple authorization to a cryptographically random nonce and pass the raw nonce to Supabase for verification.
+- Keep Supabase session storage device-local. Do not set `kSecAttrSynchronizable` on session or token data.
+- A custom account hint is device-local by default; cross-device credentials are owned by Apple Password AutoFill, Sign in with Apple, or passkeys.
 - Document database and auth security changes in `docs/engineering/database-and-rls.md` and `docs/engineering/networking-and-auth.md`.
 
 ## UX requirements
@@ -229,6 +256,39 @@ Release candidate approval requires all P0 journeys to pass on a physical device
 5. **Quality gates:** add unit, database, and UI tests plus the manual release matrix.
 6. **Operations:** add dashboards, sign-out reason monitoring, and an auth incident runbook.
 
+## Supabase implementation package
+
+The client UI and safe local persistence do not complete the backend work. The following package is required before authentication release approval.
+
+### Database and RPC
+
+1. Create `is_username_available` in a committed migration using the canonical normalized username.
+2. Enforce username uniqueness atomically with a database constraint; the availability RPC is advisory only.
+3. Return only a boolean availability result and expose the minimum execution grant needed for pre-auth signup.
+4. Apply and verify the migration in staging and production through the Supabase migration workflow.
+5. Confirm `sync_current_user_v1` exists, has the expected grants, and succeeds after OTP verification in both projects.
+6. Do not deploy `resolve_login_email` to anonymous clients. Launch login is email-only until a server design can authenticate by username without returning private email addresses.
+
+### Auth configuration
+
+1. Enable email confirmation in both projects.
+2. Configure the email template to include the six-digit OTP token expected by the client.
+3. Align OTP expiry, resend limits, SMTP configuration, and abuse controls across environments.
+4. Confirm Sign in with Apple provider configuration for the production bundle and Services ID.
+5. Verify refresh-token rotation and reuse interval against multi-device sessions.
+
+### Passkeys and new-device SSO
+
+1. Upgrade `supabase-swift` to a version supporting the reviewed passkey API.
+2. Treat the current Swift passkey API as experimental until security and release review approves it.
+3. Enable passkeys in the Supabase project.
+4. Configure `spotapp.online` as the relying-party domain.
+5. Add `webcredentials:spotapp.online` to Associated Domains.
+6. Publish the required `webcredentials` section in the Apple App Site Association file.
+7. Register a passkey only after a user has authenticated and completed account verification.
+8. Test discoverable passkey sign-in on a second physical device using the same iCloud Keychain.
+9. Keep Sign in with Apple and email/password recovery available when passkeys are unavailable.
+
 ## Release gates
 
 The app is not authentication-ready for release until:
@@ -245,11 +305,12 @@ The app is not authentication-ready for release until:
 
 | Decision | Recommended default | Owner |
 | --- | --- | --- |
-| Delete/reinstall session policy | Explicit logout is acceptable only if documented; never apply it to an in-place update | TODO |
-| Launch login identifier | Email only | TODO |
-| Email confirmation mode | Six-digit OTP, matching the current UI | TODO |
-| Verification recovery storage | Keychain-backed minimal state | TODO |
-| Username normalization | One client/database contract, case-insensitive | TODO |
+| Delete/reinstall session policy | **Approved:** retain and validate device-local session | Product |
+| Launch login identifier | **Approved implementation:** email only | Product/Engineering |
+| Cross-device login | Sign in with Apple and Password AutoFill now; passkeys after Supabase setup | Product/Engineering |
+| Email confirmation mode | Six-digit OTP, matching the approved UI | TODO: verify Supabase |
+| Verification recovery storage | Device-local Keychain email + timestamp only | Engineering |
+| Username normalization | One client/database contract, case-insensitive | TODO: approve with database migration |
 
 ## Live verification checklist
 
