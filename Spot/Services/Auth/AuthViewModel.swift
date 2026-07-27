@@ -120,7 +120,7 @@ class AuthViewModel: ObservableObject {
             isEmailVerified = user.emailConfirmedAt != nil
             awaitingEmailVerification = false
             verificationEmailMaskSource = user.email ?? verificationEmailMaskSource
-            saveAccountHint(for: user)
+            saveAccountHint(for: session)
 
             AnalyticsService.shared.setUserId(user.id.uuidString)
 
@@ -211,7 +211,8 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    private func saveAccountHint(for user: User) {
+    private func saveAccountHint(for session: Session) {
+        let user = session.user
         let provider: AuthAccountProvider =
             user.appMetadata["provider"]?.stringValue?.lowercased() == "apple" ? .apple : .email
         let username = user.userMetadata["username"]?.stringValue?
