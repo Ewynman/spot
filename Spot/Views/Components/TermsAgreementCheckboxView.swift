@@ -42,54 +42,41 @@ struct TermsAgreementCheckboxView: View {
     }
 
     private var agreementText: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            (
-                Text("I agree to Spot's ")
-                    .foregroundColor(Constants.Colors.welcomeMutedText)
-                + Text("Terms of Use (EULA)")
-                    .underline()
-                    .fontWeight(.semibold)
-                    .foregroundColor(Constants.Colors.primary)
-                + Text(" and ")
-                    .foregroundColor(Constants.Colors.welcomeMutedText)
-                + Text("Privacy Policy")
-                    .underline()
-                    .fontWeight(.semibold)
-                    .foregroundColor(Constants.Colors.primary)
-                + Text(".")
-                    .foregroundColor(Constants.Colors.welcomeMutedText)
-            )
+        Text(attributedAgreementText)
             .font(.footnote)
+            .foregroundColor(Constants.Colors.welcomeMutedText)
+            .tint(Constants.Colors.primary)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 12) {
-                Button {
-                    onLinkTapped?("terms")
-                    UIApplication.shared.open(termsURL)
-                } label: {
-                    Text("Open Terms")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(Constants.Colors.primary)
-                        .underline()
+            .environment(
+                \.openURL,
+                OpenURLAction { url in
+                    if url == termsURL {
+                        onLinkTapped?("terms")
+                    } else if url == privacyURL {
+                        onLinkTapped?("privacy")
+                    }
+                    UIApplication.shared.open(url)
+                    return .handled
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("auth.openTermsLink")
+            )
+    }
 
-                Button {
-                    onLinkTapped?("privacy")
-                    UIApplication.shared.open(privacyURL)
-                } label: {
-                    Text("Open Privacy")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(Constants.Colors.primary)
-                        .underline()
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("auth.openPrivacyLink")
-            }
-            .padding(.top, 2)
-        }
+    private var attributedAgreementText: AttributedString {
+        var text = AttributedString("I agree to Spot's ")
+
+        var terms = AttributedString("Terms of Use (EULA)")
+        terms.link = termsURL
+        text.append(terms)
+
+        text.append(AttributedString(" and "))
+
+        var privacy = AttributedString("Privacy Policy")
+        privacy.link = privacyURL
+        text.append(privacy)
+
+        text.append(AttributedString("."))
+        return text
     }
 }
 
