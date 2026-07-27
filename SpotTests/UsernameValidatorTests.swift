@@ -47,6 +47,11 @@ struct UsernameValidatorTests {
         if case .invalidChars = validator.validate("user__name") { } else { Issue.record("Expected invalidChars") }
     }
 
+    @Test func validateInvalidCharsMixedConsecutiveSeparators() {
+        let validator = UsernameValidator()
+        if case .invalidChars = validator.validate("user_-name") { } else { Issue.record("Expected invalidChars") }
+    }
+
     @Test func validateInvalidCharsDisallowedChars() {
         let validator = UsernameValidator()
         if case .invalidChars = validator.validate("user name") { } else { Issue.record("Expected invalidChars") }
