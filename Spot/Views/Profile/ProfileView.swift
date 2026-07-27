@@ -416,11 +416,13 @@ struct ProfileView: View {
                                 .transition(.opacity)
                                 .zIndex(1)
                             } else {
-                                if viewModel.spots.isEmpty {
-                                    profileSpotsEmptyState
-                                } else {
-                                    SpotsGridView(spots: viewModel.spots) { tapped in
-                                        selectedSpot = tapped
+                                Group {
+                                    if viewModel.spots.isEmpty {
+                                        profileSpotsEmptyState
+                                    } else {
+                                        SpotsGridView(spots: viewModel.spots) { tapped in
+                                            selectedSpot = tapped
+                                        }
                                     }
                                 }
                                 .zIndex(0)
