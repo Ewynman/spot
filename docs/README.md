@@ -26,6 +26,7 @@ Reflects the repository as of the documentation refresh. Implementation details 
 | [product/overview.md](product/overview.md) | What Spot is, surfaces, principles |
 | [product/terminology.md](product/terminology.md) | Shared vocabulary |
 | [product/user-flows.md](product/user-flows.md) | Primary journeys + Mermaid |
+| [product/auth-reliability-prd.md](product/auth-reliability-prd.md) | **P0 release requirements for signup, verification, login, and session continuity** |
 | [product/onboarding.md](product/onboarding.md) | First-run and home tour |
 | [product/posting-flow.md](product/posting-flow.md) | Create and publish Spots |
 | [product/map-experience.md](product/map-experience.md) | Map, pins, spot drawer |
