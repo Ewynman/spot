@@ -125,11 +125,24 @@ def parse_args() -> argparse.Namespace:
 
 def response_text(value: Any) -> str:
     if isinstance(value, str):
-        return value
+        parts = [value]
+        stripped = value.strip()
+        if stripped.startswith(("{", "[")):
+            try:
+                decoded = json.loads(stripped)
+            except json.JSONDecodeError:
+                pass
+            else:
+                parts.append(response_text(decoded))
+        return "\n".join(parts)
     if isinstance(value, dict):
-        return "\n".join(response_text(item) for item in value.values())
+        return json.dumps(value, separators=(",", ":")) + "\n" + "\n".join(
+            response_text(item) for item in value.values()
+        )
     if isinstance(value, list):
-        return "\n".join(response_text(item) for item in value)
+        return json.dumps(value, separators=(",", ":")) + "\n" + "\n".join(
+            response_text(item) for item in value
+        )
     return ""
 
 
