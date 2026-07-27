@@ -13,6 +13,7 @@ enum AuthViewModelLogs: SpotLog {
     case authStateSignedOut
     case authUserDeletedRemotely
     case signOutFailed
+    case sessionRefreshFailed
     case refreshBlockedUsersFailed
     case refreshUserFlagsFailed
     case proStatusUpdated
@@ -37,6 +38,7 @@ enum AuthViewModelLogs: SpotLog {
         case .authStateSignedOut: return .debug
         case .authUserDeletedRemotely: return .info
         case .signOutFailed: return .error
+        case .sessionRefreshFailed: return .error
         case .refreshBlockedUsersFailed: return .error
         case .refreshUserFlagsFailed: return .error
         case .proStatusUpdated: return .info
@@ -61,6 +63,7 @@ enum AuthViewModelLogs: SpotLog {
         case .authStateSignedOut: return "Auth state changed: no user"
         case .authUserDeletedRemotely: return "Auth user deleted remotely; clearing local session"
         case .signOutFailed: return "Failed to sign out"
+        case .sessionRefreshFailed: return "Failed to refresh expired session"
         case .refreshBlockedUsersFailed: return "Failed to refresh blocked users"
         case .refreshUserFlagsFailed: return "Failed to refresh user flags"
         case .proStatusUpdated: return "Pro status updated"

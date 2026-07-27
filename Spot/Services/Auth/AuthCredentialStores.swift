@@ -31,7 +31,7 @@ protocol AuthDataStoring {
     func delete()
 }
 
-/// Stores only an account hint in synchronizable Keychain storage.
+/// Stores only an account hint in device-local Keychain storage.
 /// Passwords, OTPs, Supabase tokens, and Apple identity tokens must never be stored here.
 final class AuthAccountHintStore {
     static let shared = AuthAccountHintStore()
@@ -106,7 +106,7 @@ final class AuthKeychainDataStore: AuthDataStoring {
     static let accountHint = AuthKeychainDataStore(
         service: "com.edwardwynman.Spot.account-hint",
         account: "last-account",
-        synchronizable: true
+        synchronizable: false
     )
     static let verificationRecovery = AuthKeychainDataStore(
         service: "com.edwardwynman.Spot.verification-recovery",
@@ -125,11 +125,26 @@ final class AuthKeychainDataStore: AuthDataStoring {
     }
 
     func save(_ data: Data) {
-        delete()
-        var query = baseQuery
-        query[kSecValueData as String] = data
-        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(query as CFDictionary, nil)
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: synchronizable
+            ? kSecAttrAccessibleAfterFirstUnlock
+            : kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
+        guard updateStatus == errSecItemNotFound else {
+            if updateStatus != errSecSuccess {
+                log(.saveFailed, status: updateStatus)
+            }
+            return
+        }
+
+        var addQuery = baseQuery
+        attributes.forEach { addQuery[$0.key] = $0.value }
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        if addStatus != errSecSuccess {
+            log(.saveFailed, status: addStatus)
+        }
     }
 
     func load() -> Data? {
@@ -137,14 +152,21 @@ final class AuthKeychainDataStore: AuthDataStoring {
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else {
+            if status != errSecItemNotFound {
+                log(.loadFailed, status: status)
+            }
             return nil
         }
         return result as? Data
     }
 
     func delete() {
-        SecItemDelete(baseQuery as CFDictionary)
+        let status = SecItemDelete(baseQuery as CFDictionary)
+        if status != errSecSuccess, status != errSecItemNotFound {
+            log(.deleteFailed, status: status)
+        }
     }
 
     private var baseQuery: [String: Any] {
@@ -154,5 +176,9 @@ final class AuthKeychainDataStore: AuthDataStoring {
             kSecAttrAccount as String: account,
             kSecAttrSynchronizable as String: synchronizable
         ]
+    }
+
+    private func log(_ event: AuthCredentialStoreLogs, status: OSStatus) {
+        SpotLogger.log(event, details: ["status": status])
     }
 }

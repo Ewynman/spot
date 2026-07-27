@@ -312,7 +312,7 @@ struct SignupView: View {
                         )
                         self.isLoading = false
                         self.showToast(
-                            "An account with this email already exists. Try logging in or resetting your password.",
+                            "We couldn’t create this account. Try logging in or resetting your password.",
                             isError: true
                         )
                     }

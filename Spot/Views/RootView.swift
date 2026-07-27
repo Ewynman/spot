@@ -191,8 +191,10 @@ struct RootView: View {
                     }
                     .environmentObject(authViewModel)
                 }
-            } else if let savedAccountHint, !useAnotherAccount {
+            } else if let savedAccountHint, shouldShowSavedAccountHint {
                 WelcomeBackView(account: savedAccountHint) {
+                    AuthAccountHintStore.shared.clear()
+                    self.savedAccountHint = nil
                     useAnotherAccount = true
                 }
             } else {
@@ -244,6 +246,15 @@ struct RootView: View {
         .onChange(of: permissionManager.lifecycleRefreshTick) { _, _ in
             Task { await refreshPostAuthSetupRequirement() }
         }
+    }
+
+    private var shouldShowSavedAccountHint: Bool {
+        #if DEBUG
+        if SpotLaunchConfiguration.isUITestMode {
+            return false
+        }
+        #endif
+        return !useAnotherAccount
     }
 
     /// Loads the active Terms version + checks whether the signed-in user has

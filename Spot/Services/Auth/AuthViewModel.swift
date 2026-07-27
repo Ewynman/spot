@@ -40,6 +40,7 @@ class AuthViewModel: ObservableObject {
     @Published var currentUserUsername: String?
 
     private var supabaseAuthTask: Task<Void, Never>?
+    private var sessionRefreshTask: Task<Void, Never>?
 
     init() {
         restoreVerificationRecovery()
@@ -55,6 +56,7 @@ class AuthViewModel: ObservableObject {
 
     deinit {
         supabaseAuthTask?.cancel()
+        sessionRefreshTask?.cancel()
     }
 
     private var previousUserId: String?
@@ -101,8 +103,11 @@ class AuthViewModel: ObservableObject {
                 return
             }
             if session.isExpired {
+                refreshExpiredSessionIfNeeded()
                 return
             }
+            sessionRefreshTask?.cancel()
+            sessionRefreshTask = nil
             let user = session.user
             AuthVerificationRecoveryStore.shared.clear()
             SpotLogger.log(AuthViewModelLogs.authStateSignedIn, details: ["uid": user.id.uuidString])
@@ -142,6 +147,7 @@ class AuthViewModel: ObservableObject {
 
         case .userDeleted:
             SpotLogger.log(AuthViewModelLogs.authUserDeletedRemotely)
+            AuthAccountHintStore.shared.clear()
             clearSignedOutState()
             Task { await teardownSessionCaches() }
 
@@ -180,6 +186,29 @@ class AuthViewModel: ObservableObject {
         pendingVerificationEmail = recovery.email
         verificationEmailMaskSource = recovery.email
         awaitingEmailVerification = true
+    }
+
+    @MainActor
+    private func refreshExpiredSessionIfNeeded() {
+        guard sessionRefreshTask == nil else { return }
+        isLoading = true
+        sessionRefreshTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.sessionRefreshTask = nil }
+            do {
+                _ = try await supabase.auth.refreshSession()
+            } catch {
+                SpotLogger.log(
+                    AuthViewModelLogs.sessionRefreshFailed,
+                    details: ["error": error.localizedDescription]
+                )
+                TokenService.shared.clearTokens()
+                await self.teardownSessionCaches()
+                self.clearSignedOutState(
+                    preservePendingVerification: self.awaitingEmailVerification
+                )
+            }
+        }
     }
 
     private func saveAccountHint(for user: User) {
@@ -230,11 +259,12 @@ class AuthViewModel: ObservableObject {
 
     /// Completes native Apple auth by exchanging the Apple identity token with Supabase.
     /// Optionally persists the full name into auth metadata when Apple provides it (first consent only).
-    func signInWithApple(idToken: String, fullName: PersonNameComponents?) async throws {
+    func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws {
         _ = try await supabase.auth.signInWithIdToken(
             credentials: .init(
                 provider: .apple,
-                idToken: idToken
+                idToken: idToken,
+                nonce: nonce
             )
         )
 
@@ -762,9 +792,17 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    func deleteAccount(appleIDToken: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    func deleteAccount(
+        appleIDToken: String,
+        nonce: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
         runAccountDeletion(completion: completion) { done in
-            AuthService.shared.deleteAccount(appleIDToken: appleIDToken, completion: done)
+            AuthService.shared.deleteAccount(
+                appleIDToken: appleIDToken,
+                nonce: nonce,
+                completion: done
+            )
         }
     }
 
@@ -779,6 +817,7 @@ class AuthViewModel: ObservableObject {
                     defer { self.accountDeletionInProgress = false }
                     switch result {
                     case .success:
+                        AuthAccountHintStore.shared.clear()
                         self.clearSignedOutState()
                         await self.teardownSessionCaches()
                         completion(.success(()))

@@ -4,6 +4,7 @@ struct WelcomeBackView: View {
     let account: AuthAccountHint
     let onUseAnotherAccount: () -> Void
 
+    @ObservedObject private var termsStore = PreAuthTermsAgreementStore.shared
     @State private var showLogin = false
     @State private var appleError: String?
 
@@ -22,15 +23,30 @@ struct WelcomeBackView: View {
 
                 accountCard
 
+                TermsAgreementCheckboxView(
+                    isAgreed: Binding(
+                        get: { termsStore.hasAgreed },
+                        set: { termsStore.setAgreed($0) }
+                    ),
+                    termsURL: termsStore.termsURL,
+                    privacyURL: termsStore.privacyURL,
+                    onLinkTapped: nil
+                )
+
                 if account.provider == .apple {
                     ThemedAppleSignInButton(
                         onError: { appleError = $0 },
                         height: 52
                     )
+                    .disabled(!termsStore.hasAgreed)
+                    .opacity(termsStore.hasAgreed ? 1 : 0.45)
                 } else {
-                    AuthPrimaryButton(title: "Continue as \(account.displayLabel)") {
-                        showLogin = true
-                    }
+                    AuthPrimaryButton(
+                        title: "Continue as \(account.displayLabel)",
+                        isEnabled: termsStore.hasAgreed
+                    ) {
+                            showLogin = true
+                        }
                     .accessibilityIdentifier("auth.welcomeBack.continueButton")
                 }
 
@@ -49,7 +65,7 @@ struct WelcomeBackView: View {
                 Label(
                     account.provider == .apple
                         ? "Secured with Sign in with Apple"
-                        : "Account suggestion synced by iCloud Keychain",
+                        : "Account suggestion saved securely on this device",
                     systemImage: "lock.fill"
                 )
                 .font(.caption)
@@ -61,6 +77,9 @@ struct WelcomeBackView: View {
             .background(Constants.Colors.background.ignoresSafeArea())
             .navigationDestination(isPresented: $showLogin) {
                 LoginView(initialIdentifier: account.email ?? "")
+            }
+            .task {
+                await termsStore.loadActiveVersion()
             }
         }
         .accessibilityIdentifier("auth.welcomeBack.screen")
