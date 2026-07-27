@@ -166,16 +166,25 @@ def response_text(value: Any) -> str:
 
 def verify_migration(client: MCPClient) -> tuple[bool, str]:
     verification_sql = """
+with rpc as (
+  select p.oid, p.prorettype
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname = 'is_username_available'
+    and pg_get_function_identity_arguments(p.oid) = 'p_username text'
+)
 select
-  to_regprocedure('public.is_username_available(text)') is not null as rpc_exists,
+  exists (select 1 from rpc) as rpc_exists,
   to_regclass('public.users_username_normalized_uidx') is not null as index_exists,
-  has_function_privilege(
-    'anon',
-    'public.is_username_available(text)',
-    'execute'
+  exists (
+    select 1 from rpc
+    where has_function_privilege('anon', oid, 'execute')
   ) as anon_can_execute,
-  public.is_username_available('a_valid_user') in (true, false)
-    as rpc_returns_boolean;
+  exists (
+    select 1 from rpc
+    where prorettype = 'boolean'::regtype
+  ) as rpc_returns_boolean;
 """.strip()
     verification = client.call_tool(
         "execute_sql",
