@@ -47,6 +47,7 @@ final class UserLocationAnnotationView: MKAnnotationView {
     private let ringLayer = CAShapeLayer()
     private let avatarLayer = CALayer()
     private let initialsLabel = UILabel()
+    private let fallbackSymbolView = UIImageView()
     private let haloLayer = CAShapeLayer()
 
     private var loadedAvatarURL: String?
@@ -106,21 +107,25 @@ final class UserLocationAnnotationView: MKAnnotationView {
         initialsLabel.textColor = UIColor(Constants.Colors.primary)
         initialsLabel.adjustsFontSizeToFitWidth = true
         initialsLabel.minimumScaleFactor = 0.6
-        initialsLabel.text = "·"
-        let labelHost = CALayer()
-        labelHost.frame = avatarLayer.frame
-        avatarLayer.addSublayer(labelHost)
-        // Note: CALayer doesn't host UILabels directly; we attach as subview.
         addSubview(initialsLabel)
         initialsLabel.frame = avatarLayer.frame
+
+        // Generic fallback for accounts without a profile photo or username.
+        // A recognizable silhouette is intentionally used instead of the
+        // previous tiny dot, which could look like a missing map marker.
+        fallbackSymbolView.image = UIImage(systemName: "person.fill")
+        fallbackSymbolView.tintColor = UIColor(Constants.Colors.primary)
+        fallbackSymbolView.contentMode = .scaleAspectFit
+        fallbackSymbolView.frame = avatarLayer.frame.insetBy(dx: 7, dy: 7)
+        addSubview(fallbackSymbolView)
+        showFallback(for: nil)
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
         avatarLayer.contents = nil
         loadedAvatarURL = nil
-        initialsLabel.isHidden = false
-        initialsLabel.text = "·"
+        showFallback(for: nil)
         ringLayer.strokeColor = UIColor(Constants.Colors.mapAvatarRing).cgColor
         haloLayer.opacity = 0
     }
@@ -136,9 +141,6 @@ final class UserLocationAnnotationView: MKAnnotationView {
             ringLayer.strokeColor = UIColor(Constants.Colors.proGold).cgColor
         }
 
-        // Initials fallback
-        initialsLabel.text = Self.initials(from: annotation.username)
-
         // Avatar — normalize whitespace / scheme-less URLs; only skip a
         // re-fetch when the *same normalized* URL already decoded into the
         // layer (a failed fetch must be allowed to retry when configure
@@ -146,8 +148,12 @@ final class UserLocationAnnotationView: MKAnnotationView {
         if let normalized = Self.normalizeProfileURLString(annotation.profileImageURL),
            let url = URL(string: normalized) {
             if loadedAvatarURL == normalized, avatarLayer.contents != nil {
+                initialsLabel.isHidden = true
+                fallbackSymbolView.isHidden = true
                 return
             }
+            avatarLayer.contents = nil
+            showFallback(for: annotation.username)
             loadedAvatarURL = normalized
             MapAvatarImageCache.shared.fetch(url) { [weak self] image in
                 guard let self,
@@ -155,6 +161,9 @@ final class UserLocationAnnotationView: MKAnnotationView {
                     return
                 }
                 guard let image else {
+                    self.loadedAvatarURL = nil
+                    self.avatarLayer.contents = nil
+                    self.showFallback(for: annotation.username)
                     SpotLogger.log(MapMarkerLogs.userMarkerAvatarFallback, details: [
                         "reason": "decode_or_network_failed",
                         "urlLength": normalized.count
@@ -166,6 +175,7 @@ final class UserLocationAnnotationView: MKAnnotationView {
                 self.avatarLayer.contents = image.cgImage
                 self.avatarLayer.contentsGravity = .resizeAspectFill
                 self.initialsLabel.isHidden = true
+                self.fallbackSymbolView.isHidden = true
                 CATransaction.commit()
                 SpotLogger.log(MapMarkerLogs.userMarkerAvatarLoaded, details: [
                     "scheme": url.scheme ?? "none",
@@ -173,11 +183,24 @@ final class UserLocationAnnotationView: MKAnnotationView {
                 ])
             }
         } else {
+            loadedAvatarURL = nil
             avatarLayer.contents = nil
-            initialsLabel.isHidden = false
+            showFallback(for: annotation.username)
             SpotLogger.log(MapMarkerLogs.userMarkerAvatarFallback, details: [
                 "username": annotation.username ?? "nil"
             ])
+        }
+    }
+
+    private func showFallback(for username: String?) {
+        switch Self.fallbackContent(from: username) {
+        case .initials(let initials):
+            initialsLabel.text = initials
+            initialsLabel.isHidden = false
+            fallbackSymbolView.isHidden = true
+        case .personSymbol:
+            initialsLabel.isHidden = true
+            fallbackSymbolView.isHidden = false
         }
     }
 
@@ -209,14 +232,26 @@ final class UserLocationAnnotationView: MKAnnotationView {
 
     /// Returns initials from a username. "Eddie Wynman" → "EW", "eddie" → "E".
     static func initials(from username: String?) -> String {
-        guard let username, !username.isEmpty else { return "·" }
+        guard case .initials(let initials) = fallbackContent(from: username) else { return "·" }
+        return initials
+    }
+
+    static func fallbackContent(from username: String?) -> UserLocationMarkerFallbackContent {
+        guard let username, !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .personSymbol
+        }
         let parts = username.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-        if parts.isEmpty { return "·" }
-        if parts.count == 1 { return String(parts[0].prefix(1)).uppercased() }
+        if parts.isEmpty { return .personSymbol }
+        if parts.count == 1 { return .initials(String(parts[0].prefix(1)).uppercased()) }
         let first = parts.first.map { String($0.prefix(1)) } ?? ""
         let last = parts.last.map { String($0.prefix(1)) } ?? ""
-        return (first + last).uppercased()
+        return .initials((first + last).uppercased())
     }
+}
+
+enum UserLocationMarkerFallbackContent: Equatable {
+    case initials(String)
+    case personSymbol
 }
 
 // MARK: - Avatar image cache
