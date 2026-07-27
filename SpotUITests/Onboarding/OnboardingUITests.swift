@@ -21,6 +21,11 @@ final class OnboardingUITests: XCTestCase {
         guard getStarted.waitForExistence(timeout: 20) else {
             throw XCTSkip("Welcome not reachable — likely already signed in on this simulator.")
         }
+        XCTAssertTrue(app.links["Terms of Use (EULA)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.links["Privacy Policy"].exists)
+        XCTAssertFalse(app.buttons["auth.openTermsLink"].exists)
+        XCTAssertFalse(app.buttons["auth.openPrivacyLink"].exists)
+
         let terms = app.buttons["auth.termsCheckbox"]
         if terms.waitForExistence(timeout: 3) {
             terms.tap()
