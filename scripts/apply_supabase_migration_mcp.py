@@ -118,7 +118,6 @@ class MCPClient:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--endpoint", required=True)
-    parser.add_argument("--project-id", required=True)
     parser.add_argument("--migration", type=Path, required=True)
     parser.add_argument("--name", required=True)
     return parser.parse_args()
@@ -135,10 +134,9 @@ def main() -> int:
     client = MCPClient(args.endpoint, access_token)
     client.initialize()
 
-    common = {"project_id": args.project_id}
     client.call_tool(
         "apply_migration",
-        {**common, "name": args.name, "query": sql},
+        {"name": args.name, "query": sql},
     )
 
     verification_sql = """
@@ -155,7 +153,7 @@ select
 """.strip()
     verification = client.call_tool(
         "execute_sql",
-        {**common, "query": verification_sql},
+        {"query": verification_sql},
     )
     content_text = "\n".join(
         item.get("text", "")

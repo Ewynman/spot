@@ -23,7 +23,6 @@ jobs:
     timeout-minutes: 10
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_ID: aeurigbbohyxvtsfiyul
       SUPABASE_MCP_ENDPOINT: https://mcp.supabase.com/mcp?project_ref=aeurigbbohyxvtsfiyul&features=database
 
     steps:
@@ -41,6 +40,5 @@ jobs:
         run: |
           python3 scripts/apply_supabase_migration_mcp.py \
             --endpoint "$SUPABASE_MCP_ENDPOINT" \
-            --project-id "$SUPABASE_PROJECT_ID" \
             --migration supabase/migrations/20260727210000_username_availability_v1.sql \
             --name username_availability_v1
