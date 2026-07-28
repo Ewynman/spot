@@ -16,6 +16,8 @@ enum TokenServiceLogs: SpotLog {
     case noTokenReceived
     case gotFreshToken
     case failedToSaveToKeychain
+    case projectReferenceChanged
+    case failedToClearIncompatibleSession
 
     var tag: String { "TokenService" }
     var level: LogLevel {
@@ -28,6 +30,8 @@ enum TokenServiceLogs: SpotLog {
         case .noTokenReceived: return .error
         case .gotFreshToken: return .debug
         case .failedToSaveToKeychain: return .error
+        case .projectReferenceChanged: return .info
+        case .failedToClearIncompatibleSession: return .error
         }
     }
     var message: String {
@@ -40,6 +44,8 @@ enum TokenServiceLogs: SpotLog {
         case .noTokenReceived: return "No token received from Supabase Auth"
         case .gotFreshToken: return "Got fresh token from Supabase Auth"
         case .failedToSaveToKeychain: return "Failed to save to keychain"
+        case .projectReferenceChanged: return "Supabase project changed; clearing incompatible local session state"
+        case .failedToClearIncompatibleSession: return "Failed to clear incompatible Supabase session during project switch"
         }
     }
 }

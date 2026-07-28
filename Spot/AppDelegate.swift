@@ -21,20 +21,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // Skip Firebase initialisation during unit tests – GoogleService-Info.plist
         // is not present in the repository and FirebaseApp.configure() would abort.
         if !SpotLaunchConfiguration.isUnitTestMode {
-            // Initialize Firebase early
-            FirebaseApp.configure()
-
-            // Enable Crashlytics collection
-            Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
-            Crashlytics.crashlytics().log("AppDelegate didFinishLaunching")
-
-            // Configure Firebase Analytics
-            #if DEBUG
-            // Disable analytics collection in debug builds (optional, for privacy)
-            // Analytics.setAnalyticsCollectionEnabled(false)
-            #else
-            Analytics.setAnalyticsCollectionEnabled(true)
-            #endif
+            if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+                FirebaseApp.configure()
+                Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
+                Crashlytics.crashlytics().log("AppDelegate didFinishLaunching")
+                #if !DEBUG
+                Analytics.setAnalyticsCollectionEnabled(true)
+                #endif
+            } else {
+                SpotLogger.log(AppDelegateLogs.firebaseConfigurationMissing)
+            }
         }
 
         // Configure logging defaults.

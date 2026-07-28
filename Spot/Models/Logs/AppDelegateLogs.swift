@@ -13,6 +13,7 @@ enum AppDelegateLogs: SpotLog {
     case locationUpdateFailed
     case memoryWarning
     case notificationActionReceived
+    case firebaseConfigurationMissing
 
     var tag: String { "AppDelegate" }
     var level: LogLevel {
@@ -22,6 +23,7 @@ enum AppDelegateLogs: SpotLog {
         case .locationUpdateFailed: return .error
         case .memoryWarning: return .info
         case .notificationActionReceived: return .info
+        case .firebaseConfigurationMissing: return .error
         }
     }
     var message: String {
@@ -31,6 +33,7 @@ enum AppDelegateLogs: SpotLog {
         case .locationUpdateFailed: return "Location update failed"
         case .memoryWarning: return "Received memory warning; cleared in-memory caches"
         case .notificationActionReceived: return "User tapped notification action"
+        case .firebaseConfigurationMissing: return "GoogleService-Info.plist missing; Firebase initialization skipped"
         }
     }
 }
