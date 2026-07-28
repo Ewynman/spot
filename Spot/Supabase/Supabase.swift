@@ -145,8 +145,13 @@ let supabase: SupabaseClient = {
     let config = SupabaseConfiguration.load()
 
     #if DEBUG || INTERNAL_TESTING
-    print("🔧 Supabase Environment: \(config.environment.displayName)")
-    print("🔧 Supabase URL: \(config.url.absoluteString)")
+    SpotLogger.log(
+        SupabaseConfigurationLogs.configurationLoaded,
+        details: [
+            "environment": config.environment.displayName,
+            "urlHost": config.url.host ?? "unknown"
+        ]
+    )
     #endif
 
     return SupabaseClient(

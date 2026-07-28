@@ -20,10 +20,10 @@ enum LikesViewModelLogs: SpotLog {
     var level: LogLevel {
         switch self {
         case .alreadyLoading: return .debug
-        case .startingLoadInitial: return .info
-        case .fetchedSpotsFromService: return .info
+        case .startingLoadInitial: return .debug
+        case .fetchedSpotsFromService: return .debug
         case .spotWithoutIdFound: return .debug
-        case .loadedSpots: return .info
+        case .loadedSpots: return .debug
         case .loadInitialFailed: return .error
         case .loadInitialCompleted: return .info
         }

@@ -8,6 +8,7 @@
 import Foundation
 
 enum AppDelegateLogs: SpotLog {
+    case appLaunched
     case universalLinkOnLaunch
     case customSchemeUrlOnLaunch
     case locationUpdateFailed
@@ -18,6 +19,7 @@ enum AppDelegateLogs: SpotLog {
     var tag: String { "AppDelegate" }
     var level: LogLevel {
         switch self {
+        case .appLaunched: return .info
         case .universalLinkOnLaunch: return .info
         case .customSchemeUrlOnLaunch: return .info
         case .locationUpdateFailed: return .error
@@ -28,6 +30,7 @@ enum AppDelegateLogs: SpotLog {
     }
     var message: String {
         switch self {
+        case .appLaunched: return "App launched"
         case .universalLinkOnLaunch: return "Received Universal Link on app launch"
         case .customSchemeUrlOnLaunch: return "Received custom scheme URL on app launch"
         case .locationUpdateFailed: return "Location update failed"

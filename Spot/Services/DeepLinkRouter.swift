@@ -34,8 +34,14 @@ final class DeepLinkRouter {
 
     // MARK: - URL Parsing
     func parseURL(_ url: URL) -> DeepLinkRoute {
-        SpotLogger.log(DeepLinkRouterLogs.parsingUrl, details: ["url": url.absoluteString])
-        SpotLogger.log(DeepLinkRouterLogs.urlHostInfo, details: ["host": url.host ?? "nil", "path": url.path, "pathComponents": url.pathComponents])
+        SpotLogger.log(
+            DeepLinkRouterLogs.parsingUrl,
+            details: [
+                "scheme": url.scheme ?? "nil",
+                "host": url.host ?? "nil",
+                "pathComponentCount": url.pathComponents.count
+            ]
+        )
 
         // Handle Universal Links (https://spotapp.online/s/:spotId, localhost for testing, or ngrok for DEBUG)
         if url.scheme == "https" && URLConfiguration.shared.isAllowedUniversalLinkHost(url.host ?? "") {

@@ -9,7 +9,6 @@ import Foundation
 
 enum DeepLinkRouterLogs: SpotLog {
     case parsingUrl
-    case urlHostInfo
     case unknownUrlScheme
     case parsedUniversalLinkForSpot
     case invalidSpotIdInUniversalLink
@@ -30,7 +29,6 @@ enum DeepLinkRouterLogs: SpotLog {
     var level: LogLevel {
         switch self {
         case .parsingUrl: return .debug
-        case .urlHostInfo: return .debug
         case .unknownUrlScheme: return .debug
         case .parsedUniversalLinkForSpot: return .info
         case .invalidSpotIdInUniversalLink: return .debug
@@ -51,7 +49,6 @@ enum DeepLinkRouterLogs: SpotLog {
     var message: String {
         switch self {
         case .parsingUrl: return "Parsing URL"
-        case .urlHostInfo: return "URL host info"
         case .unknownUrlScheme: return "Unknown URL scheme"
         case .parsedUniversalLinkForSpot: return "Parsed Universal Link for spot"
         case .invalidSpotIdInUniversalLink: return "Invalid spot ID in Universal Link"
