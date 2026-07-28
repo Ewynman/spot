@@ -71,12 +71,24 @@ struct DebugKeychainResetTests {
         let services = queries.compactMap { $0[kSecAttrService as String] as? String }
         let accounts = queries.compactMap { $0[kSecAttrAccount as String] as? String }
 
-        #expect(queries.count == 5)
+        #expect(queries.count == 9)
         #expect(services.contains("supabase.gotrue.swift"))
         #expect(services.contains("com.edwardwynman.Spot.account-hint"))
         #expect(services.contains("com.edwardwynman.Spot.verification-recovery"))
         #expect(accounts.contains("com.spotapp.spot.supabaseAccessToken"))
         #expect(accounts.contains("com.spotapp.spot.tokenExpiration"))
+        #expect(accounts.contains(
+            "com.spotapp.spot.supabaseAccessToken.\(SupabaseEnvironment.stagingProjectRef)"
+        ))
+        #expect(accounts.contains(
+            "com.spotapp.spot.supabaseAccessToken.\(SupabaseEnvironment.productionProjectRef)"
+        ))
+        #expect(accounts.contains(
+            "com.spotapp.spot.tokenExpiration.\(SupabaseEnvironment.stagingProjectRef)"
+        ))
+        #expect(accounts.contains(
+            "com.spotapp.spot.tokenExpiration.\(SupabaseEnvironment.productionProjectRef)"
+        ))
         #expect(queries.allSatisfy {
             ($0[kSecClass as String] as? String) == (kSecClassGenericPassword as String)
         })
@@ -89,7 +101,7 @@ struct DebugKeychainResetTests {
             return errSecItemNotFound
         }
         #expect(noItems == errSecItemNotFound)
-        #expect(noItemCalls == 5)
+        #expect(noItemCalls == 9)
 
         var successCalls = 0
         let deleted = DebugKeychainReset.deleteSpotAuthenticationItems { _ in
@@ -97,7 +109,7 @@ struct DebugKeychainResetTests {
             return successCalls == 2 ? errSecSuccess : errSecItemNotFound
         }
         #expect(deleted == errSecSuccess)
-        #expect(successCalls == 5)
+        #expect(successCalls == 9)
 
         var failureCalls = 0
         let failed = DebugKeychainReset.deleteSpotAuthenticationItems { _ in

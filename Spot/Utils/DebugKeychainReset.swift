@@ -71,7 +71,7 @@ enum DebugKeychainReset {
     }
 
     static func spotAuthenticationQueries() -> [[String: Any]] {
-        [
+        let serviceQueries = [
             serviceQuery("supabase.gotrue.swift"),
             serviceQuery(
                 "com.edwardwynman.Spot.account-hint",
@@ -80,10 +80,20 @@ enum DebugKeychainReset {
             serviceQuery(
                 "com.edwardwynman.Spot.verification-recovery",
                 account: "pending-signup"
-            ),
-            accountQuery("com.spotapp.spot.supabaseAccessToken"),
-            accountQuery("com.spotapp.spot.tokenExpiration")
+            )
         ]
+        let tokenKeyBases = [
+            "com.spotapp.spot.supabaseAccessToken",
+            "com.spotapp.spot.tokenExpiration"
+        ]
+        let projectRefs = [
+            SupabaseEnvironment.stagingProjectRef,
+            SupabaseEnvironment.productionProjectRef
+        ]
+        let tokenQueries = tokenKeyBases.flatMap { base in
+            [accountQuery(base)] + projectRefs.map { accountQuery("\(base).\($0)") }
+        }
+        return serviceQueries + tokenQueries
     }
 
     private static func serviceQuery(
