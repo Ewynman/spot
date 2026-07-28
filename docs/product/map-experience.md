@@ -36,6 +36,12 @@ Pro-only map filters (if present) must remain **clearly gated** behind entitleme
 
 Map and discovery may request location; prior prompt state is tracked in `UserDefaults` keys in `Constants.UserDefaultsKeys`.
 
+- The map remains usable with a continental-US fallback before permission or when permission is denied.
+- Granting permission from the native prompt or Settings triggers a location request while the map is open; switching tabs is not required.
+- A persisted last-known-good coordinate may center the map immediately while Core Location obtains a fresh fix.
+- The current-user marker uses the signed-in profile image when available and falls back to username initials or a person symbol.
+- Refreshing permission or map state must not delete profile or Spot data; those refreshes only reload client-visible state.
+
 ### Empty / error / loading
 
 Show appropriate placeholders or errors when viewport fetch fails or returns no spots (see map view model and logs under map-related log categories).

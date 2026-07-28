@@ -87,14 +87,16 @@ See `.github/workflows/README.md` for detailed workflow documentation.
 2. **Version Management:** Auto-increment build number
 3. **Release Notes:** Extract PR information for release notes
 4. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
-5. **Code Signing:** Install certificates and provisioning profiles
-6. **Build:** Archive and export signed IPA
-7. **Deploy:** Upload to Firebase App Distribution
-8. **Version Commit:** Push build number update back to main
+5. **Supabase Configuration:** Inject and verify staging project credentials
+6. **Code Signing:** Install certificates and provisioning profiles
+7. **Build:** Archive and export signed IPA
+8. **Deploy:** Upload to Firebase App Distribution
+9. **Version Commit:** Push build number update back to main
 
 **What it does:**
 - Automatically increments `CURRENT_PROJECT_VERSION` in Xcode project via `scripts/increment-build-number.sh`
 - **Pushes the build number bump to `main` before building** (prevents duplicate Firebase build numbers when upload succeeds but a later step fails)
+- Pins Firebase-distributed internal builds to staging Supabase project `aeurigbbohyxvtsfiyul`; the workflow fails if another project URL is embedded
 - Builds signed IPA for distribution
 - Generates release notes from merged PR title and description
 - Uploads to Firebase App Distribution with testers group
@@ -108,6 +110,7 @@ See `.github/workflows/README.md` for detailed workflow documentation.
 - `APPLE_CERTIFICATE_PASSWORD` - Password used when exporting the .p12
 - `FIREBASE_PROVISIONING_PROFILE` - Ad Hoc provisioning profile (.mobileprovision, base64 encoded)
 - `KEYCHAIN_PASSWORD` - Temporary CI keychain password
+- `SUPABASE_STAGING_URL` / `SUPABASE_STAGING_ANON_KEY` - Optional staging overrides; the committed staging publishable configuration is used when absent
 
 Export options template: `.github/workflows/ExportOptions-Firebase.plist` (`method = ad-hoc`, `signingCertificate = Apple Distribution`). The provisioning profile name is injected at build time after decoding `FIREBASE_PROVISIONING_PROFILE`.
 

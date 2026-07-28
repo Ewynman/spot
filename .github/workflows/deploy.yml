@@ -9,7 +9,7 @@ on:
 # Serialize deploys so concurrent runs cannot read the same build number.
 concurrency:
   group: deploy-firebase-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -167,35 +167,42 @@ jobs:
             exit 1
           fi
 
-      - name: Configure Supabase Environment (Production)
+      - name: Configure Supabase Environment (Staging)
         env:
-          SUPABASE_PRODUCTION_URL: ${{ secrets.SUPABASE_PRODUCTION_URL }}
-          SUPABASE_PRODUCTION_ANON_KEY: ${{ secrets.SUPABASE_PRODUCTION_ANON_KEY }}
+          SUPABASE_STAGING_URL: ${{ secrets.SUPABASE_STAGING_URL }}
+          SUPABASE_STAGING_ANON_KEY: ${{ secrets.SUPABASE_STAGING_ANON_KEY }}
         run: |
           set -euo pipefail
-          
-          # Firebase App Distribution builds use production Supabase environment.
-          # If secrets are not set, fall back to hardcoded production values.
-          
-          if [ -n "${SUPABASE_PRODUCTION_URL:-}" ] && [ -n "${SUPABASE_PRODUCTION_ANON_KEY:-}" ]; then
-            echo "✅ Using Supabase production credentials from GitHub secrets"
-            SUPABASE_URL="$SUPABASE_PRODUCTION_URL"
-            SUPABASE_KEY="$SUPABASE_PRODUCTION_ANON_KEY"
+
+          # Firebase App Distribution is the non-production lane and must use
+          # the staging project that contains internal test data.
+          if [ -n "${SUPABASE_STAGING_URL:-}" ] && [ -n "${SUPABASE_STAGING_ANON_KEY:-}" ]; then
+            echo "✅ Using Supabase staging credentials from GitHub secrets"
+            SUPABASE_URL="$SUPABASE_STAGING_URL"
+            SUPABASE_KEY="$SUPABASE_STAGING_ANON_KEY"
           else
-            echo "⚠️  SUPABASE_PRODUCTION_URL or SUPABASE_PRODUCTION_ANON_KEY not set"
-            echo "⚠️  Using hardcoded production values from SupabaseEnvironment.swift"
-            echo "⚠️  Add secrets to GitHub for production-ready configuration"
-            # Keep existing Info.plist values (will use SupabaseEnvironment.swift defaults)
-            exit 0
+            echo "⚠️  Staging secrets are not configured; using the committed publishable staging configuration"
+            SUPABASE_URL="https://aeurigbbohyxvtsfiyul.supabase.co"
+            SUPABASE_KEY="sb_publishable_5IKZU3dDw6C0-V9lRPc7vw_z_v8a08G"
           fi
-          
-          # Inject production credentials into Info.plist
+
+          if [ "$SUPABASE_URL" != "https://aeurigbbohyxvtsfiyul.supabase.co" ]; then
+            echo "❌ Firebase builds must target staging project aeurigbbohyxvtsfiyul"
+            exit 1
+          fi
+
+          # Inject staging credentials into Info.plist.
           /usr/libexec/PlistBuddy -c "Set :Supabase:url ${SUPABASE_URL}" Spot/Info.plist 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Add :Supabase:url string ${SUPABASE_URL}" Spot/Info.plist
           /usr/libexec/PlistBuddy -c "Set :Supabase:anonKey ${SUPABASE_KEY}" Spot/Info.plist 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Add :Supabase:anonKey string ${SUPABASE_KEY}" Spot/Info.plist
-          
-          echo "✅ Supabase production configuration injected into Info.plist"
+
+          EMBEDDED_URL=$(/usr/libexec/PlistBuddy -c "Print :Supabase:url" Spot/Info.plist)
+          if [ "$EMBEDDED_URL" != "https://aeurigbbohyxvtsfiyul.supabase.co" ]; then
+            echo "❌ Embedded Supabase project does not match staging"
+            exit 1
+          fi
+          echo "✅ Supabase staging configuration injected and verified"
 
       - name: Install Apple Certificate and Provisioning Profile
         env:

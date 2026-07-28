@@ -48,7 +48,7 @@ struct UsernameValidator {
                     allowRegex: "^[A-Za-z0-9._-]+$",
                     disallowLeading: [".", "_", "-"],
                     disallowTrailing: [".", "_", "-"],
-                    disallowConsecutive: ["..", "__", "--", "._", "_.", "-.", ".-", "_ -", "-_"]
+                    disallowConsecutive: ["..", "__", "--", "._", "_.", "-.", ".-", "_-", "-_"]
                 )
             )
         }

@@ -12,10 +12,10 @@ Engineering team, infrastructure owners, release managers, and Cursor agents imp
 
 | Item | Current State | Target State |
 |------|--------------|--------------|
-| **Supabase Projects** | 1 shared project | 2 isolated projects (staging + production) |
-| **Firebase Builds (main)** | Use production Supabase | Will use staging Supabase |
-| **TestFlight Builds (release/**)** | Use production Supabase | Will continue using production Supabase |
-| **Config Method** | Hardcoded in Info.plist | Injected via GitHub Actions from secrets |
+| **Supabase Projects** | 2 isolated projects | Keep staging and production isolated |
+| **Firebase Builds (main)** | Use staging Supabase | Keep using staging Supabase |
+| **TestFlight Builds (release/**)** | Use production Supabase | Keep using production Supabase |
+| **Config Method** | Injected by GitHub Actions with guarded fallbacks | Keep project-ID artifact checks |
 | **Schema Migrations** | Applied directly to production | Test in staging first, then production |
 | **Data Isolation** | None (shared database) | Complete (separate databases) |
 | **Implementation Status** | Not started | [See Phase 1](#phase-1-project-setup-week-1) |
@@ -42,7 +42,7 @@ Engineering team, infrastructure owners, release managers, and Cursor agents imp
 
 ## Current Status
 
-**Ready for implementation** — This document has been reviewed and is ready to proceed. The strategy has been validated against the current codebase state as of 2026-07-06. No environment separation is currently implemented; all builds (Firebase App Distribution testing builds and TestFlight production builds) use the same Supabase project (`aeurigbbohyxvtsfiyul`).
+**Environment routing implemented** — As of 2026-07-28, local DEBUG and Firebase App Distribution builds use staging (`aeurigbbohyxvtsfiyul`), while TestFlight/App Store builds use production (`gomdoguewaawdlvijahg`). The Firebase workflow rejects any non-staging project URL before building.
 
 ## Table of Contents
 

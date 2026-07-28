@@ -146,6 +146,9 @@ struct MapView: View {
                 .onReceive(locationManager.$userLocation) { newValue in
                     onUserLocationReceived(newValue)
                 }
+                .onChange(of: permissionManager.locationStatus) { oldStatus, newStatus in
+                    handleLocationAuthorizationChange(from: oldStatus, to: newStatus)
+                }
                 .onChange(of: filterState) { _, newValue in
                     syncMapSelectionWithActiveFilter(newValue)
                 }
@@ -328,8 +331,7 @@ struct MapView: View {
         // Always request a fresh location when authorized, even if we have
         // a cached one. This ensures the map shows the user's current
         // location, not where they were during onboarding or last session.
-        let isAuthorized = permissionManager.locationStatus == .authorizedWhenInUse ||
-                          permissionManager.locationStatus == .authorizedAlways
+        let isAuthorized = LocationPermissionPolicy.isAuthorized(permissionManager.locationStatus)
         if isAuthorized {
             SpotLogger.log(MapViewLogs.freshLocationRequested, details: [
                 "hasCachedLocation": locationManager.userLocation != nil,
@@ -393,6 +395,37 @@ struct MapView: View {
             dismissSelectedSpot(reason: .tabLeft, animated: false)
         }
         mapVM.clearVisibleSpots()
+    }
+
+    /// Permission can change while the map remains mounted (native prompt)
+    /// or while the app is in Settings. `onAppear` will not run in either
+    /// case, so react to PermissionManager's system refresh directly.
+    private func handleLocationAuthorizationChange(
+        from oldStatus: CLAuthorizationStatus,
+        to newStatus: CLAuthorizationStatus
+    ) {
+        guard LocationPermissionPolicy.isAuthorized(newStatus) else { return }
+
+        SpotLogger.log(MapViewLogs.freshLocationRequested, details: [
+            "hasCachedLocation": locationManager.userLocation != nil,
+            "auth": authStatusLabel(newStatus),
+            "source": "permission_change",
+            "previousAuth": authStatusLabel(oldStatus)
+        ])
+
+        userHasMovedMap = false
+        hasCenteredOnUser = false
+        locationManager.requestCurrentLocationForMapTab()
+
+        // Give immediate feedback from the persisted last-known-good fix.
+        // The subsequent CoreLocation callback replaces it with a fresh fix.
+        if let cachedLocation = locationManager.userLocation {
+            centerOnUser(
+                coordinate: cachedLocation.coordinate,
+                animated: true,
+                source: "permission_change_cached"
+            )
+        }
     }
 
     /// Fired for the initial published value AND every subsequent fix.

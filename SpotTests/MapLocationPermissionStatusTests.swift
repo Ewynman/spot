@@ -285,6 +285,36 @@ struct MapLocationPermissionStatusTests {
         #expect(shouldShowPrompt == false, "Should not show prompt when already authorized")
         #expect(shouldCenter == true, "Should center on location immediately")
     }
+
+    // MARK: - Shared Permission Policy Tests
+
+    @Test func authorizedStatusCompletesAnAlreadyPresentedPrePrompt() {
+        #expect(
+            LocationPermissionPolicy.primaryAction(for: .authorizedWhenInUse) == .complete
+        )
+        #expect(
+            LocationPermissionPolicy.primaryAction(for: .authorizedAlways) == .complete
+        )
+    }
+
+    @Test func unresolvedStatusRequestsSystemPermission() {
+        #expect(
+            LocationPermissionPolicy.primaryAction(for: .notDetermined) == .requestSystemPermission
+        )
+    }
+
+    @Test func deniedStatusRoutesToSettings() {
+        #expect(LocationPermissionPolicy.primaryAction(for: .denied) == .openSettings)
+        #expect(LocationPermissionPolicy.primaryAction(for: .restricted) == .openSettings)
+    }
+
+    @Test func freshPermissionStatusWinsOverStaleLocationMirror() {
+        let staleLocationStatus: CLAuthorizationStatus = .notDetermined
+        let freshPermissionStatus: CLAuthorizationStatus = .authorizedWhenInUse
+
+        #expect(LocationPermissionPolicy.isAuthorized(staleLocationStatus) == false)
+        #expect(LocationPermissionPolicy.isAuthorized(freshPermissionStatus) == true)
+    }
     
     // MARK: - Helper function that mirrors MapView's shouldShowRecenterControl logic
     

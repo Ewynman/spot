@@ -298,7 +298,11 @@ struct BottomTabNavigationView: View {
         }
 
         permissionManager.updatePermissionStatuses()
-        switch LocationManager.shared.authorizationStatus {
+        // PermissionManager just read the system value. LocationManager's
+        // published mirror can lag behind its separate CLLocationManager
+        // delegate, which previously sent authorized users back through the
+        // pre-prompt instead of requesting their location.
+        switch permissionManager.locationStatus {
         case .notDetermined:
             showTourLocationPrePrompt = true
         case .authorizedAlways, .authorizedWhenInUse:

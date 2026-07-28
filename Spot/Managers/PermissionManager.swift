@@ -12,6 +12,31 @@ import UIKit
 import Photos
 import AVFoundation
 
+enum LocationPermissionPrimaryAction: Equatable {
+    case requestSystemPermission
+    case openSettings
+    case complete
+}
+
+enum LocationPermissionPolicy {
+    static func isAuthorized(_ status: CLAuthorizationStatus) -> Bool {
+        status == .authorizedWhenInUse || status == .authorizedAlways
+    }
+
+    static func primaryAction(for status: CLAuthorizationStatus) -> LocationPermissionPrimaryAction {
+        switch status {
+        case .notDetermined:
+            return .requestSystemPermission
+        case .denied, .restricted:
+            return .openSettings
+        case .authorizedAlways, .authorizedWhenInUse:
+            return .complete
+        @unknown default:
+            return .complete
+        }
+    }
+}
+
 @MainActor
 class PermissionManager: NSObject, ObservableObject {
     static let shared = PermissionManager()
