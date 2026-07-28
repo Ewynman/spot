@@ -61,7 +61,8 @@ final class SpotLogger {
     static let shared = SpotLogger()
     private init() {}
 
-    private(set) static var profile: LoggingProfile = .errorsOnly
+    private static let profileLock = NSLock()
+    private static var activeProfile: LoggingProfile = .errorsOnly
     private static let detailsIndentation = "    "
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.spotapp.spot",
@@ -79,12 +80,20 @@ final class SpotLogger {
         "MapView",
         "MapViewModel",
         "SearchViewModel",
+        "SpotSearchDataSource",
         "SpotCard"
     ]
 
+    static var profile: LoggingProfile {
+        profileLock.lock()
+        defer { profileLock.unlock() }
+        return activeProfile
+    }
+
     static func setProfile(_ newProfile: LoggingProfile) {
-        profile = newProfile
-        FeedFlags.enableDiagnosticLogging = newProfile == .all
+        profileLock.lock()
+        activeProfile = newProfile
+        profileLock.unlock()
     }
 
     /// Emits one log through the shared logger.
@@ -167,9 +176,11 @@ final class SpotLogger {
     // MARK: - Privacy-safe detail formatting
 
     private static func formatted(_ value: Any, forKey key: String) -> String {
+        guard let value = unwrapped(value) else { return "nil" }
         let normalizedKey = key.lowercased()
 
-        if ["password", "token", "secret", "authorization", "query"]
+        if ["password", "token", "secret", "authorization", "query", "prefix",
+            "searchtext", "searchterm", "body", "payload", "responsepreview"]
             .contains(where: normalizedKey.contains) ||
             (normalizedKey.contains("email") && value is String) ||
             normalizedKey.contains("path") {
@@ -206,6 +217,13 @@ final class SpotLogger {
         default:
             return String(describing: value)
         }
+    }
+
+    private static func unwrapped(_ value: Any) -> Any? {
+        let mirror = Mirror(reflecting: value)
+        guard mirror.displayStyle == .optional else { return value }
+        guard let wrapped = mirror.children.first?.value else { return nil }
+        return unwrapped(wrapped)
     }
 
     private static func quoted(_ value: String) -> String {

@@ -92,7 +92,10 @@ struct SpotLoggerTests {
                 "latitude": 37.1234,
                 "signedURL": "https://example.com/private/file?token=secret",
                 "userId": "12345678-1234-1234-1234-123456789abc",
-                "errorMessage": "Failed for person@example.com at https://example.com/private"
+                "errorMessage": "Failed for person@example.com at https://example.com/private",
+                "prefix": "private search",
+                "bodyPreview": Optional("private response") as Any,
+                "mimeType": Optional<String>.none as Any
             ]
         )
 
@@ -100,7 +103,10 @@ struct SpotLoggerTests {
         #expect(!output.contains("37.1234"))
         #expect(!output.contains("token=secret"))
         #expect(!output.contains("12345678-1234-1234-1234"))
+        #expect(!output.contains("private search"))
+        #expect(!output.contains("private response"))
         #expect(output.contains("userId: \"…56789abc\""))
+        #expect(output.contains("mimeType: nil"))
     }
 
     @Test func profilesApplyExpectedFilters() {
@@ -113,6 +119,7 @@ struct SpotLoggerTests {
         #expect(!SpotLogger.shouldEmit(level: .debug, tag: "AuthService", file: serviceFile, profile: .information))
         #expect(SpotLogger.shouldEmit(level: .debug, tag: "AuthService", file: serviceFile, profile: .debugging))
         #expect(!SpotLogger.shouldEmit(level: .debug, tag: "LocationManager", file: serviceFile, profile: .debugging))
+        #expect(!SpotLogger.shouldEmit(level: .debug, tag: "SpotSearchDataSource", file: serviceFile, profile: .debugging))
         #expect(SpotLogger.shouldEmit(level: .debug, tag: "LoginView", file: viewFile, profile: .uiOnly))
         #expect(!SpotLogger.shouldEmit(level: .error, tag: "AuthService", file: serviceFile, profile: .uiOnly))
         #expect(SpotLogger.shouldEmit(level: .debug, tag: "LocationManager", file: serviceFile, profile: .all))
