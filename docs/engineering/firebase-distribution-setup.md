@@ -72,15 +72,15 @@ This is the Firebase iOS App ID from your Firebase project.
 6. Click **Download GoogleService-Info.plist**
 7. Save the file to your computer
 
-#### Step 2: Convert to Base64
+#### Step 2: Encode the Firebase plist
 
 ```bash
 cd ~/Downloads  # or wherever you saved the plist
 base64 -i GoogleService-Info.plist | pbcopy
-# The base64 string is now in your clipboard
+# The encoded Firebase plist is now in your clipboard
 ```
 
-#### Step 3: Add to GitHub Secrets
+#### Step 3: Add the Firebase plist secret
 
 - Secret name: `GOOGLE_SERVICE_INFO_PLIST_BASE64`
 - Secret value: Paste from clipboard (should be a long string of letters and numbers)
@@ -107,16 +107,16 @@ base64 -i GoogleService-Info.plist | pbcopy
 # 7. Set a password (remember this for next step!)
 ```
 
-#### Step 2: Convert to Base64
+#### Step 2: Encode the distribution certificate
 
 ```bash
 # In Terminal:
 cd ~/Downloads  # or wherever you saved the .p12
 base64 -i Certificates.p12 | pbcopy
-# The base64 string is now in your clipboard
+# The encoded certificate is now in your clipboard
 ```
 
-#### Step 3: Add to GitHub Secrets
+#### Step 3: Add the certificate secret
 
 - Secret name: `FIREBASE_DEV_CERT`
 - Secret value: Paste from clipboard (should be a long string of letters and numbers)
@@ -146,15 +146,15 @@ base64 -i Certificates.p12 | pbcopy
 2. Find your **Ad Hoc** profile for `com.edwardwynman.Spot`
 3. Download it (will be named something like `Spot_AdHoc.mobileprovision`)
 
-#### Step 2: Convert to Base64
+#### Step 2: Encode the provisioning profile
 
 ```bash
 cd ~/Downloads  # or wherever you downloaded the profile
 base64 -i Spot_Distribution.mobileprovision | pbcopy
-# The base64 string is now in your clipboard
+# The encoded provisioning profile is now in your clipboard
 ```
 
-#### Step 3: Add to GitHub Secrets
+#### Step 3: Add the provisioning-profile secret
 
 - Secret name: `FIREBASE_PROVISIONING_PROFILE`
 - Secret value: Paste from clipboard
