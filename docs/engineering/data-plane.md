@@ -10,7 +10,7 @@ All engineers, reviewers, Cursor agents, and anyone merging PRs that touch posti
 
 ## Current status
 
-**Authoritative as of April 2026.** `main` uses **Supabase only** for the application data plane. Firebase is limited to observability SDKs.
+Verified on 2026-07-28. `main` uses **Supabase only** for the application data plane. Firebase is limited to observability SDKs; App Check is linked but not initialized.
 
 ## Supabase (required data plane)
 
@@ -21,7 +21,7 @@ All engineers, reviewers, Cursor agents, and anyone merging PRs that touch posti
 | Spots | `public.spots`, `public.spot_images`, vibe tags |
 | Home feed | RPC `get_home_feed_v1` |
 | Publish | `SpotPublishCoordinator` → `SpotSupabaseRepository.publishSpotFromDraft` → moderation + RPC `publish_spot_with_approved_media_assets_v1` |
-| Images | Supabase Storage buckets (`pending_images`, `approved_spot_images`, `approved_profile_images`) |
+| Images | Supabase Storage, including moderated Spot buckets and legacy `spots` / `avatars` paths |
 | Social graph | `follows`, `follow_requests`, likes/bookmarks tables + RLS |
 | Schema changes | `supabase/migrations/` (apply via reviewed SQL + Supabase MCP in agent workflows) |
 
@@ -46,6 +46,8 @@ flowchart LR
 | Firebase Crashlytics | Crash reporting |
 | Firebase App Check | Abuse reduction (if enabled for build) |
 
+App Check is currently a linked dependency only; no app-code initialization was found. Do not claim enforcement until initialization and backend verification are implemented.
+
 Firebase must **not** be used for:
 
 - Firestore reads/writes (`FirebaseFirestore`, `Firestore.firestore()`)
@@ -62,6 +64,15 @@ Firebase must **not** be used for:
 - `Firestore.firestore()`, `Storage.storage()` (Firebase Storage API)
 
 **Allowed exceptions:** `FirebaseCore`, `FirebaseAnalytics`, `FirebaseCrashlytics`, `FirebaseAppCheck` in `AppDelegate` / analytics files only.
+
+## Known Supabase media exceptions
+
+These do not change the data-plane decision, but they are important safety gaps:
+
+- Profile avatars upload directly to the public Supabase `avatars` bucket and currently bypass `media_assets` moderation.
+- Home-feed batch signing assumes the legacy Supabase `spots` bucket even when `spot_images.storage_bucket` points to `approved_spot_images`.
+
+Fix these within Supabase Storage and the existing moderation pipeline. They are not reasons to add Firebase Storage.
 
 ## Obsolete PRs and branches
 

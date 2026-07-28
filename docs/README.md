@@ -10,7 +10,7 @@ New developers, reviewers, release owners, support, and Cursor agents.
 
 ## Current status
 
-Reflects the repository as of the documentation refresh. Implementation details that were not verified in code are marked `TODO: verify` in the relevant pages.
+Code and workflow behavior were re-audited on **2026-07-28**. Remaining unknowns are explicitly marked; verified implementation gaps are documented as limitations rather than target behavior.
 
 ## Details
 
@@ -32,6 +32,7 @@ Reflects the repository as of the documentation refresh. Implementation details 
 | [product/posting-flow.md](product/posting-flow.md) | Create and publish Spots |
 | [product/map-experience.md](product/map-experience.md) | Map, pins, spot drawer |
 | [product/home-feed.md](product/home-feed.md) | Feed purpose and ranking |
+| [product/search-experience.md](product/search-experience.md) | Search segments, grids, privacy, Pro filters |
 | [product/profiles-and-social.md](product/profiles-and-social.md) | Profiles, follows, privacy |
 | [product/pro-subscription.md](product/pro-subscription.md) | Pro / StoreKit |
 | [product/support-and-policies.md](product/support-and-policies.md) | Support and policy surfaces |
@@ -41,10 +42,12 @@ Reflects the repository as of the documentation refresh. Implementation details 
 | Doc | Topics |
 | --- | --- |
 | [engineering/architecture.md](engineering/architecture.md) | Modules, data flow, integrations |
+| [engineering/runtime-flows.md](engineering/runtime-flows.md) | **Code-verified runtime flows, source map, and known limitations** |
 | [engineering/local-setup.md](engineering/local-setup.md) | Xcode, schemes, simulator |
 | [engineering/environment-variables.md](engineering/environment-variables.md) | Config keys (no secrets) |
 | [engineering/configuration.md](engineering/configuration.md) | Info.plist, entitlements |
 | [engineering/logging.md](engineering/logging.md) | SpotLogger, debug categories |
+| [engineering/notifications.md](engineering/notifications.md) | Local notifications and remote-push gaps |
 | [engineering/networking-and-auth.md](engineering/networking-and-auth.md) | Sessions, RLS expectations |
 | [engineering/supabase.md](engineering/supabase.md) | Supabase role in the app |
 | [engineering/supabase-environment-strategy.md](engineering/supabase-environment-strategy.md) | **Production and non-production environment split strategy** |
@@ -60,6 +63,8 @@ Reflects the repository as of the documentation refresh. Implementation details 
 | [testing/private-account-tests.md](testing/private-account-tests.md) | Private account test suite |
 | [engineering/ci-cd.md](engineering/ci-cd.md) | GitHub Actions CI/CD, Xcode Cloud disabled |
 | [engineering/release-process.md](engineering/release-process.md) | Pre-release and App Store |
+| [engineering/firebase-distribution-setup.md](engineering/firebase-distribution-setup.md) | Firebase App Distribution setup |
+| [engineering/location-selection-improvements.md](engineering/location-selection-improvements.md) | Location selection implementation notes |
 | [engineering/troubleshooting.md](engineering/troubleshooting.md) | Common failures |
 
 ### Diagrams
@@ -84,13 +89,15 @@ Reflects the repository as of the documentation refresh. Implementation details 
 | [operations/runbooks.md](operations/runbooks.md) | Routine checks |
 | [operations/incident-response.md](operations/incident-response.md) | Severity and response |
 | [operations/app-store-review-notes.md](operations/app-store-review-notes.md) | Review-facing notes |
+| [operations/app-store-rejection-july-2026-fix-guide.md](operations/app-store-rejection-july-2026-fix-guide.md) | Historical July 2026 rejection remediation |
+| [operations/documentation-audit-2026-07.md](operations/documentation-audit-2026-07.md) | **Code/docs audit, external verification, known implementation gaps** |
 | [operations/documentation-maintenance.md](operations/documentation-maintenance.md) | When to update docs |
 
 ### Suggested reading paths
 
-**New developer:** [local-setup](engineering/local-setup.md) → [architecture](engineering/architecture.md) → [testing](engineering/testing.md) → [product overview](product/overview.md).
+**New developer:** [local-setup](engineering/local-setup.md) → [architecture](engineering/architecture.md) → [runtime flows](engineering/runtime-flows.md) → [testing](engineering/testing.md) → [product overview](product/overview.md).
 
-**Cursor agent:** [.cursor/rules/project.mdc](../.cursor/rules/project.mdc) → [data-plane](engineering/data-plane.md) → [architecture](engineering/architecture.md) → [networking-and-auth](engineering/networking-and-auth.md) → [database-and-rls](engineering/database-and-rls.md) → [universal-links](engineering/universal-links.md).
+**Cursor agent:** [.cursor/rules/project.mdc](../.cursor/rules/project.mdc) → [data-plane](engineering/data-plane.md) → [runtime flows](engineering/runtime-flows.md) → [networking-and-auth](engineering/networking-and-auth.md) → [database-and-rls](engineering/database-and-rls.md) → [universal-links](engineering/universal-links.md).
 
 **Release owner:** [release-process](engineering/release-process.md) → [runbooks](operations/runbooks.md) → [app-store-review-notes](operations/app-store-review-notes.md) → [troubleshooting](engineering/troubleshooting.md).
 

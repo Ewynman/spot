@@ -24,7 +24,8 @@ final class SupabaseEnvironmentConfigurationTests: XCTestCase {
         XCTAssertTrue(env.anonKey.hasPrefix("sb_publishable_"))
         
         // Verify display name
-        XCTAssertEqual(env.displayName, "Staging")
+        XCTAssertEqual(env.displayName, "staging")
+        XCTAssertEqual(env.projectRef, SupabaseEnvironment.stagingProjectRef)
     }
     
     func testProductionEnvironmentProperties() {
@@ -37,7 +38,8 @@ final class SupabaseEnvironmentConfigurationTests: XCTestCase {
         XCTAssertFalse(env.anonKey.isEmpty)
         
         // Verify display name
-        XCTAssertEqual(env.displayName, "Production")
+        XCTAssertEqual(env.displayName, "production")
+        XCTAssertEqual(env.projectRef, SupabaseEnvironment.productionProjectRef)
     }
     
     func testCurrentEnvironmentInDebugBuild() {
@@ -147,8 +149,8 @@ final class SupabaseEnvironmentConfigurationTests: XCTestCase {
     
     func testEnvironmentDisplayNamesAreUserFriendly() {
         // Display names should be human-readable
-        XCTAssertEqual(SupabaseEnvironment.staging.displayName, "Staging")
-        XCTAssertEqual(SupabaseEnvironment.production.displayName, "Production")
+        XCTAssertEqual(SupabaseEnvironment.staging.displayName, "staging")
+        XCTAssertEqual(SupabaseEnvironment.production.displayName, "production")
         
         // Should not be empty
         XCTAssertFalse(SupabaseEnvironment.staging.displayName.isEmpty)
@@ -179,5 +181,16 @@ final class SupabaseEnvironmentConfigurationTests: XCTestCase {
         XCTAssertEqual(SupabaseEnvironment.staging, SupabaseEnvironment.staging)
         XCTAssertEqual(SupabaseEnvironment.production, SupabaseEnvironment.production)
         XCTAssertNotEqual(SupabaseEnvironment.staging, SupabaseEnvironment.production)
+    }
+
+    func testProjectRefExtractedFromKnownURL() throws {
+        let url = try XCTUnwrap(URL(string: SupabaseEnvironment.staging.url))
+        XCTAssertEqual(SupabaseEnvironment.projectRef(from: url), SupabaseEnvironment.stagingProjectRef)
+    }
+
+    func testEnvironmentResolvedFromProjectRef() {
+        XCTAssertEqual(SupabaseEnvironment.from(projectRef: SupabaseEnvironment.stagingProjectRef), .staging)
+        XCTAssertEqual(SupabaseEnvironment.from(projectRef: SupabaseEnvironment.productionProjectRef), .production)
+        XCTAssertNil(SupabaseEnvironment.from(projectRef: "unknown-ref"))
     }
 }

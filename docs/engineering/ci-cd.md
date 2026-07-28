@@ -30,7 +30,7 @@ The Spot project uses GitHub Actions for continuous integration and deployment. 
 | --- | --- | --- | --- | --- | --- |
 | PR validation | `pull_request` → `main` | none | none | n/a (simulator tests) | n/a |
 | Firebase Test ENV | `push` → `main` | `FIREBASE_DEV_CERT` | `FIREBASE_PROVISIONING_PROFILE` | `ad-hoc` | build number `+1` |
-| TestFlight | `push` → `release/**` | `TESTFLIGHT_APPLE_CERT` | `TESTFLIGHT_APPLE_PROFILE` | `app-store` | version from branch, build = `run_number` |
+| TestFlight | `push` → `release/**` | `TESTFLIGHT_APPLE_CERT` | `TESTFLIGHT_APPLE_PROFILE` | `app-store` | version from branch, build number `+1` |
 
 The Firebase and TestFlight signing assets are never swapped: the Ad Hoc profile is only used for Firebase, and the App Store Connect profile is only used for TestFlight. `APPLE_CERTIFICATE_PASSWORD` is the single password used to import both `.p12` files, and `KEYCHAIN_PASSWORD` is the temporary CI keychain password.
 
@@ -73,25 +73,27 @@ See `.github/workflows/README.md` for detailed workflow documentation.
 #### Deployment workflow: `deploy.yml`
 
 **Triggers:**
-- Merge to `main` (after PR validation passes)
+- Push to `main`
 - Manual workflow dispatch
+
+The workflow trigger is not technically gated on the separate CI workflow succeeding. Branch protection and merge policy must enforce validation before code reaches `main`.
 
 **Environment:**
 - Runner: macOS 15
-- Xcode: Default Xcode on the runner
+- Xcode: Selects Xcode 26.x when installed; otherwise retains the runner default and reports the selected version
 - Requires: Apple signing certificates and Firebase credentials
 
 **Pipeline stages:**
 
 1. **Checkout:** Pull repository code with full history
 2. **Version Management:** Auto-increment build number
-3. **Release Notes:** Extract PR information for release notes
-4. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
-5. **Supabase Configuration:** Inject and verify staging project credentials
-6. **Code Signing:** Install certificates and provisioning profiles
-7. **Build:** Archive and export signed IPA
-8. **Deploy:** Upload to Firebase App Distribution
-9. **Version Commit:** Push build number update back to main
+3. **Version Commit:** Push build number update back to `main`
+4. **Release Notes:** Extract PR information for release notes
+5. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
+6. **Supabase Configuration:** Inject and verify staging project credentials
+7. **Code Signing:** Install certificates and provisioning profiles
+8. **Build:** Archive and export signed IPA
+9. **Deploy:** Upload to Firebase App Distribution
 
 **What it does:**
 - Automatically increments `CURRENT_PROJECT_VERSION` in Xcode project via `scripts/increment-build-number.sh`
@@ -131,7 +133,7 @@ See [firebase-distribution-setup.md](firebase-distribution-setup.md) for detaile
 **Pipeline stages:**
 
 1. **Checkout:** Pull repository code with full history
-2. **Resolve version:** Derive `MARKETING_VERSION` from the branch name and set `CURRENT_PROJECT_VERSION` to `github.run_number`
+2. **Resolve version:** Derive `MARKETING_VERSION` from the branch name and increment `CURRENT_PROJECT_VERSION` with `scripts/increment-build-number.sh`
 3. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
 4. **Code Signing:** Install `TESTFLIGHT_APPLE_CERT` + `TESTFLIGHT_APPLE_PROFILE` into a temporary keychain
 5. **Build:** Archive unsigned, then export an App Store `.ipa`
@@ -141,9 +143,9 @@ See [firebase-distribution-setup.md](firebase-distribution-setup.md) for detaile
 
 **Versioning rule:**
 - The release branch name controls the user-facing version. `release/1.1.0` → `MARKETING_VERSION = 1.1.0`.
-- Only the build number auto-increments, using the unique `github.run_number`:
-  - `release/1.1.0` run 101 → version `1.1.0`, build `101`
-  - `release/1.1.0` run 102 → version `1.1.0`, build `102`
+- The build number increments from the project value using the same script as the Firebase lane:
+  - if the branch contains build 35, the workflow builds version `1.1.0` (36)
+  - a later run only advances again if the branch's committed project value has advanced
 - The pipeline never bumps `1.1.0` → `1.2.0` automatically. To ship a new version, create a new `release/<version>` branch.
 - TestFlight upload does **not** submit the build to App Store Review.
 
@@ -372,8 +374,8 @@ If Xcode Cloud starts building again:
 
 **Build versioning:**
 - Marketing version: `1.000` (manual updates for releases)
-- Build number: Auto-incremented on every deployment (current: `7`)
-- Format: `Version 1.000 (Build 7)`
+- Build number: Auto-incremented from `CURRENT_PROJECT_VERSION` on every deployment
+- The Xcode project is authoritative; do not duplicate a static “current build” number in this runbook.
 
 **Deploy safeguards:**
 - **Concurrency:** Only one deploy runs at a time (`deploy-firebase-main` group)

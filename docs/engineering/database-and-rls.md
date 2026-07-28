@@ -36,9 +36,12 @@ flowchart TD
 
 ### Table / policy inventory
 
-**TODO: verify** — generate from live schema or maintain a curated list. Starting references from migrations:
+Curated security-sensitive inventory from committed migrations:
 
-- `media_assets`, `media_moderation_events`
+- `media_assets`: authenticated owners can insert pending rows and select their own rows; clients cannot approve assets. `media_moderation_events`: service-role-only moderation audit.
+- `terms_versions`, `user_terms_acceptances`: active legal versions and per-user acceptance records.
+- `moderation_events`, `content_moderation_results`, and `moderation_queue`: service-role moderation audit and work queue.
+- `spot_vibe_tags`: multi-vibe junction used by Pro publishing and discovery.
 - `users`, `spots` (including `media_display_aspect_ratio`, `media_count`, `media_layout_version` for feed layout), `spot_images` (per-image width/height and clamped display ratio), follow-related tables (see dated migrations)
 - `public.follows`: RLS policies `follows_select_related`, `follows_insert_self`, `follows_delete_related` (`20260502120000_security_sweep_rls_part_1.sql`); **unique** `(follower_id, followee_id)` via `follows_follower_followee_uidx` (`20260503120000_follows_unique_follower_followee.sql`)
 - `public.reports`: client **insert only** (`reports_insert_own`); columns include `spot_id`, `reporter_id`, `owner_id` (must match `spots.user_id` for `spot_id`), `reason`, `details`, `block_requested`, `platform`, `app_version`, `created_at` (`20260502120000_security_sweep_rls_part_1.sql`, `20260507120000_reports_block_requested_insert_validation.sql`); **after insert** trigger `reports_apply_volume_suspension` sets `users.suspended_for_reports_at` when an author hits report thresholds (see `20260510120000_report_volume_suspension.sql`)
@@ -48,6 +51,7 @@ flowchart TD
 - `public.users`: **select/insert/delete** + column-scoped **update** for `authenticated` (`20260503120000_users_grant_authenticated_table_dml.sql`, `20260509120000_users_grants_user_blocks_insert_fix.sql`). The column-scoped update deliberately **excludes `id`** so users cannot rewrite their own primary key.
 - **Username availability** uses `public.is_username_available(text)` (`SECURITY DEFINER`) so `anon` can receive one boolean without gaining table access (`20260727210000_username_availability_v1.sql`). The shared syntax is 3–20 ASCII letters, numbers, dots, underscores, or hyphens; separators cannot lead, trail, or appear consecutively. Normalization is `lower(btrim(username))`. The RPC is advisory; `users_username_normalized_uidx` atomically enforces final case-insensitive uniqueness.
 - **User profile sync** goes through `public.sync_current_user_v1(...)` (**SECURITY DEFINER**, `search_path = public`), not a direct client upsert (`20260702120000_sync_current_user_security_definer_v1.sql`). A PostgREST `upsert(onConflict: "id")` compiles to `INSERT ... ON CONFLICT (id) DO UPDATE SET id = excluded.id, ...`; because `authenticated` lacks **update** on `id`, that failed for existing rows with **42501 permission denied for table users** (new users worked via the INSERT branch, returning users' sync silently failed). The RPC derives the row id from `auth.uid()`, only writes the caller's own row, and on conflict refreshes only login/heartbeat fields (`email`, `email_verified`, `last_active_at`, `locale`) while preserving user-managed fields (`username`, `username_lower`, `is_private`, `profile_image_url`, `is_pro`, `pro_until`).
+- **Account deletion** uses the latest `delete_my_account` definition applied in migration order and removes `media_assets` rows after clearing references. Storage blobs are outside Postgres; current client cleanup does not cover all moderated buckets.
 
 ### Privacy classification (high level)
 
@@ -64,7 +68,7 @@ Add dated SQL under `supabase/migrations/`. Never edit applied migration files i
 ### Testing RLS
 
 - Use Supabase SQL editor with different `auth.uid()` contexts, or
-- Integration tests with test users (**TODO: verify** if repo has automated RLS tests beyond app-level).
+- Integration tests with environment-specific test users. Unit tests cover client privacy and guard logic, but they do not prove live RLS policy behavior.
 
 ## Related docs
 

@@ -56,6 +56,7 @@ struct SpotApp: App {
                                 else { return }
                                 await authViewModel.setProActive(true, proUntil: expirationDate)
                             }
+                            _ = await TokenService.shared.enforceProjectSessionIsolationIfNeeded()
                             _ = await FreshInstallDetector.shared.handleFreshInstall()
                             deepLinkState.processPendingDeepLinks()
                         }

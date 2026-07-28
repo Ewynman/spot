@@ -14,8 +14,8 @@ runbook in `docs/operations/app-store-review-notes.md`.
 
 ## Current status
 
-Implemented and applied to production in May 2026 ahead of resubmission to App
-Review. All features below ship in the binary submitted alongside Build 1.0.0.
+Implemented in repository migrations and client code. Deployed production state must
+be verified before each App Review submission; source control alone cannot prove it.
 
 ## Details
 
@@ -25,7 +25,7 @@ Review. All features below ship in the binary submitted alongside Build 1.0.0.
 | --- | --- | --- |
 | Pre-auth Terms gate | Unchecked checkbox blocks Apple Sign-In, Get Started, Log in | `WelcomeView` + `TermsAgreementCheckboxView` |
 | Registration-step Terms gate | Unchecked checkbox blocks "Continue" on the post-Sign-in-with-Apple username/profile-photo screen | `PostAuthSetupFlowView` + `TermsAgreementCheckboxView` |
-| Post-auth update gate | Blocking sheet on launch when active terms version changes | `RootView` → `TermsUpdateGateView` |
+| Post-auth update gate | Implemented but currently disabled pending production RPC verification | `RootView` → `TermsUpdateGateView` |
 | Report a Spot | Reason picker, optional details, optional block toggle | `SpotCard` "ellipsis" menu → `ReportSheet` |
 | Report a User | Reason picker, optional details, optional block toggle | `ProfileView` "ellipsis" menu (other user) → `ProfileReportSheet` |
 | Block a User | Confirmation alert, immediate feed removal | `ProfileView` "ellipsis" menu, also reachable from `ReportSheet`/`ProfileReportSheet` toggle |
@@ -58,7 +58,7 @@ All applied via Supabase migrations under `supabase/migrations/`.
 
 | File | Responsibility |
 | --- | --- |
-| `Spot/Services/Moderation/ModerationService.swift` | Wraps `submit_content_report` and `block_user_v1` RPCs |
+| `Spot/Services/Moderation/ModerationService.swift` | Wraps `submit_content_report` and an available `block_user_v1` RPC path |
 | `Spot/Services/Moderation/TermsAcceptanceService.swift` | Loads active terms, calls `record_terms_acceptance_v1` and `has_accepted_active_terms` |
 | `Spot/Services/Moderation/PreAuthTermsAgreementStore.swift` | `@MainActor ObservableObject` for the pre-auth checkbox state (transient per launch) |
 | `Spot/Models/Logs/ModerationServiceLogs.swift` | Structured logs |
@@ -84,6 +84,10 @@ Client-side, callers post `Notification.Name.homeFeedLocallyRemove` with the
 without waiting for the next feed refresh. Server-side, `can_view_author`
 already filters via `user_blocks`, so subsequent feed reads return nothing from
 that author either direction.
+
+Current report/profile UI paths use this direct-insert block implementation rather
+than `ModerationService.blockUser`. Keep the database trigger and RLS path valid
+for every insert route.
 
 ### Severe text blocklist
 

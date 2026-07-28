@@ -39,9 +39,9 @@ A **Spot** is a user-created post: typically photos, a place, **vibe tags**, cap
 | **Post** | Multi-step flow to create and publish a Spot (media, place, vibes, publish). |
 | **Search** | Users, places, vibes. |
 | **Profile** | User’s Spots, social graph, settings, Pro entry points. |
-| **Onboarding** | First-run coach flows (`HomeTourManager`, `SpotFirstRunOnboardingManager`). |
+| **Onboarding** | Active first-run coach (`SpotFirstRunOnboardingManager`); legacy tour state is migrated. |
 | **Pro** | Subscription via StoreKit; gated features (see [pro-subscription.md](pro-subscription.md)). |
-| **Support / legal** | Settings and policy surfaces as implemented in app (exact URLs: TODO: verify in app Settings). |
+| **Support / legal** | Settings links to `spotapp.online/privacy`, `spotapp.online/terms`, and `support@spotapp.online`. |
 
 ### Product principles
 
@@ -59,4 +59,4 @@ A **Spot** is a user-created post: typically photos, a place, **vibe tags**, cap
 
 ## Open questions / TODOs
 
-- Exact legal/support URLs and in-app entry points: TODO: verify in codebase / App Store listing.
+- Confirm App Store Connect metadata matches the code-verified legal URLs before each submission.

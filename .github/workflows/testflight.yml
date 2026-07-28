@@ -8,8 +8,8 @@ on:
 
 # Serialize release uploads so two pushes cannot race for the same run context.
 concurrency:
-  group: deploy-testflight-${{ github.ref }}
-  cancel-in-progress: false
+  group: deploy-testflight-release
+  cancel-in-progress: true
 
 jobs:
   build-and-upload:
@@ -36,6 +36,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Restrict workflow dispatch branch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "${GITHUB_REF_NAME}" != "release/"* ]]; then
+            echo "❌ Manual TestFlight deployment must run from a release/** branch."
+            exit 1
+          fi
 
       - name: Resolve marketing version
         id: version
@@ -136,6 +144,8 @@ jobs:
           SUPABASE_PRODUCTION_ANON_KEY: ${{ secrets.SUPABASE_PRODUCTION_ANON_KEY }}
         run: |
           set -euo pipefail
+          EXPECTED_PRODUCTION_URL="https://gomdoguewaawdlvijahg.supabase.co"
+          STAGING_URL="https://aeurigbbohyxvtsfiyul.supabase.co"
           
           # TestFlight/App Store builds MUST use production Supabase environment.
           # GitHub secrets are REQUIRED for production builds.
@@ -153,6 +163,15 @@ jobs:
           fi
           
           echo "✅ Using Supabase production credentials from GitHub secrets"
+
+          if [ "$SUPABASE_PRODUCTION_URL" = "$STAGING_URL" ]; then
+            echo "❌ Production Supabase URL cannot point to staging project."
+            exit 1
+          fi
+          if [ "$SUPABASE_PRODUCTION_URL" != "$EXPECTED_PRODUCTION_URL" ]; then
+            echo "❌ Production Supabase URL must be $EXPECTED_PRODUCTION_URL"
+            exit 1
+          fi
           
           # Inject production credentials into Info.plist
           /usr/libexec/PlistBuddy -c "Set :Supabase:url ${SUPABASE_PRODUCTION_URL}" Spot/Info.plist 2>/dev/null \
@@ -160,7 +179,17 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :Supabase:anonKey ${SUPABASE_PRODUCTION_ANON_KEY}" Spot/Info.plist 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Add :Supabase:anonKey string ${SUPABASE_PRODUCTION_ANON_KEY}" Spot/Info.plist
           
-          echo "✅ Supabase production configuration injected into Info.plist"
+          EMBEDDED_URL=$(/usr/libexec/PlistBuddy -c "Print :Supabase:url" Spot/Info.plist)
+          if [ "$EMBEDDED_URL" != "$EXPECTED_PRODUCTION_URL" ]; then
+            echo "❌ Embedded production Supabase URL mismatch"
+            exit 1
+          fi
+          EMBEDDED_KEY=$(/usr/libexec/PlistBuddy -c "Print :Supabase:anonKey" Spot/Info.plist)
+          if [ -z "$EMBEDDED_KEY" ]; then
+            echo "❌ Embedded production anon key is empty"
+            exit 1
+          fi
+          echo "✅ Supabase production configuration injected and source plist verified"
 
       - name: Install Apple Certificate and Provisioning Profile
         env:
@@ -265,6 +294,67 @@ jobs:
             echo "❌ IPA creation failed"
             exit 1
           fi
+
+      - name: Verify exported IPA environment and metadata
+        env:
+          MARKETING_VERSION: ${{ steps.version.outputs.marketing_version }}
+          CURRENT_PROJECT_VERSION: ${{ steps.increment_build.outputs.new_build }}
+        run: |
+          set -euo pipefail
+          IPA_PATH="$RUNNER_TEMP/export/Spot.ipa"
+          EXTRACT_DIR="$RUNNER_TEMP/ipa-verify"
+          EXPECTED_SUPABASE_URL="https://gomdoguewaawdlvijahg.supabase.co"
+          EXPECTED_BUNDLE_ID="com.edwardwynman.Spot"
+
+          rm -rf "$EXTRACT_DIR"
+          mkdir -p "$EXTRACT_DIR"
+          unzip -q "$IPA_PATH" -d "$EXTRACT_DIR"
+
+          APP_PLIST="$EXTRACT_DIR/Payload/Spot.app/Info.plist"
+          FIREBASE_PLIST="$EXTRACT_DIR/Payload/Spot.app/GoogleService-Info.plist"
+          SOURCE_FIREBASE_PLIST="Spot/GoogleService-Info.plist"
+
+          ACTUAL_SUPABASE_URL=$(/usr/libexec/PlistBuddy -c "Print :Supabase:url" "$APP_PLIST")
+          ACTUAL_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PLIST")
+          ACTUAL_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PLIST")
+          ACTUAL_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PLIST")
+
+          if [ "$ACTUAL_SUPABASE_URL" != "$EXPECTED_SUPABASE_URL" ]; then
+            echo "❌ Exported IPA Supabase URL mismatch: $ACTUAL_SUPABASE_URL"
+            exit 1
+          fi
+          if [ "$ACTUAL_BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]; then
+            echo "❌ Exported IPA bundle identifier mismatch: $ACTUAL_BUNDLE_ID"
+            exit 1
+          fi
+          if [ "$ACTUAL_VERSION" != "$MARKETING_VERSION" ]; then
+            echo "❌ Exported IPA version mismatch: $ACTUAL_VERSION"
+            exit 1
+          fi
+          if [ "$ACTUAL_BUILD" != "$CURRENT_PROJECT_VERSION" ]; then
+            echo "❌ Exported IPA build mismatch: $ACTUAL_BUILD"
+            exit 1
+          fi
+
+          if [ ! -f "$FIREBASE_PLIST" ]; then
+            echo "❌ Exported IPA missing GoogleService-Info.plist"
+            exit 1
+          fi
+          SOURCE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$SOURCE_FIREBASE_PLIST")
+          EXPORTED_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$FIREBASE_PLIST")
+          if [ "$EXPORTED_APP_ID" != "$SOURCE_APP_ID" ]; then
+            echo "❌ Exported IPA Firebase app configuration mismatch"
+            exit 1
+          fi
+
+          {
+            echo "### TestFlight Artifact Verification"
+            echo "- Supabase URL: $ACTUAL_SUPABASE_URL"
+            echo "- Bundle ID: $ACTUAL_BUNDLE_ID"
+            echo "- Version: $ACTUAL_VERSION"
+            echo "- Build: $ACTUAL_BUILD"
+            echo "- Firebase GOOGLE_APP_ID: verified"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload build artifact
         if: always()

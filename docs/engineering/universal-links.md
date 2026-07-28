@@ -36,9 +36,9 @@ Associated Domains in `Spot/Spot.entitlements`:
 | Spot detail (www) | `https://www.spotapp.online/s/{spotId}` | Same | Same |
 | Spot (custom scheme) | `spotapp://spot/{spotId}` | Same as universal warm path | Same |
 | Query variant | `spotapp://open?spotId={spotId}` | Same | Same |
-| Subscription return | `spotapp://subscription/return` | Triggers subscription success handling in `DeepLinkState` | **TODO: verify** exact UX |
+| Subscription return | `spotapp://subscription/return` | If authenticated and server Pro state is active, shows `ProSuccessView` over the tab shell | Yes |
 | Profile / username path | `/u/{username}` | **Not implemented** in `DeepLinkRouter` today | N/A |
-| Invite / share beyond `/s/` | — | **TODO: verify** if marketing hosts other paths | — |
+| Invite / share beyond `/s/` | — | Not implemented by `DeepLinkRouter` | — |
 
 **HTTP localhost** — `DeepLinkRouter` accepts `http://localhost` with `/s/:spotId` for local testing.
 
@@ -116,4 +116,5 @@ Simulator note: Universal Links can be finicky; **validate on device** before re
 
 ## Open questions / TODOs
 
-- Confirm Settings “test deep link” UI still exists; old doc referenced it—**not found** in quick grep: TODO: verify in Settings views.
+- No Settings deep-link test UI exists in the current source.
+- Live AASA content remains a release-time external verification.

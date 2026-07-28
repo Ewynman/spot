@@ -16,7 +16,7 @@ This directory contains GitHub Actions workflows for the Spot iOS app.
   - **Documentation Validation**: Checks if documentation needs updates
   - **Unit Tests**: Runs full test suite using the `SpotTests` scheme
   - **Code Coverage Enforcement**: Validates 80% minimum coverage on changed files
-- Uses macOS 15 runners with Xcode 16.3 (includes Swift 6.1 required by swift-crypto@4.5.0)
+- Uses macOS 15 runners and reports the selected Xcode version at runtime
 - Boots an iPhone simulator and executes tests
 - Enables code coverage collection
 - Posts validation results as PR comment
@@ -53,8 +53,10 @@ The workflow uses three validation scripts in `scripts/`:
 ### `deploy.yml` - Firebase App Distribution Deployment (Test ENV)
 
 **Triggers:**
-- Merges/pushes to `main` (after CI passes)
+- Pushes to `main`
 - Manual workflow dispatch
+
+This trigger does not depend on the separate CI workflow. Repository branch protection and merge policy are responsible for preventing unvalidated changes from reaching `main`.
 
 **What it does:**
 - Automatically increments build number in `CURRENT_PROJECT_VERSION` (build number `+1` only)
@@ -102,16 +104,14 @@ See [docs/engineering/firebase-distribution-setup.md](../../docs/engineering/fir
 
 **What it does:**
 - Derives the marketing version from the branch name (e.g. `release/1.1.0` → `MARKETING_VERSION=1.1.0`)
-- Uses `github.run_number` as the unique build number (the version itself is **not** auto-bumped)
+- Increments `CURRENT_PROJECT_VERSION` with `scripts/increment-build-number.sh` (the marketing version itself is not auto-bumped)
 - Injects Firebase configuration (`GoogleService-Info.plist`) from secrets
 - Installs Apple signing assets into a temporary CI keychain
 - Archives unsigned, then exports a **signed App Store IPA**
 - Uploads the IPA artifact, then uploads to App Store Connect / TestFlight via `xcrun altool`
 - Does **not** submit to App Store Review
 
-**Versioning examples:**
-- `release/1.1.0` run 101 → version `1.1.0`, build `101`
-- `release/1.1.0` run 102 → version `1.1.0`, build `102`
+**Versioning example:** if the committed project build is 35, a `release/1.1.0` run sets marketing version `1.1.0` and increments the project build to 36.
 
 **Signing assets (TestFlight / App Store lane):**
 - Certificate: `TESTFLIGHT_APPLE_CERT` (base64-encoded **.p12**, Apple Distribution)

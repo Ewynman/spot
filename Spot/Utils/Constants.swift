@@ -67,6 +67,8 @@ enum Constants {
         static let logNetworkComponent = "logNetworkComponent"
         static let logDeepLink = "logDeepLink"
         static let clearKeychainOnNextLaunch = "debugClearKeychainOnNextLaunch"
+        static let lastSupabaseProjectReference = "lastSupabaseProjectReference"
+        static let supabaseSessionResetReason = "supabaseSessionResetReason"
         /// When true, `SpotLogger` treats all debug categories as on (per-area toggles are ignored).
         static let logAllDebugCategories = "logAllDebugCategories"
     }
