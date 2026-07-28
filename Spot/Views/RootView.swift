@@ -8,6 +8,11 @@
 import SwiftUI
 
 struct RootView: View {
+    // Temporarily disabled while the production Supabase terms-acceptance RPC
+    // is investigated. Keep the pre-auth legal agreement visible, but do not
+    // make an unavailable backend verification path block signed-in users.
+    private static let isTermsUpdateGateEnabled = false
+
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var deepLinkState: DeepLinkState
     @EnvironmentObject var permissionManager: PermissionManager
@@ -262,6 +267,13 @@ struct RootView: View {
     /// signup flow doesn't block on a network round-trip we can't satisfy yet.
     @MainActor
     private func refreshTermsAcceptanceRequirement() async {
+        guard Self.isTermsUpdateGateEnabled else {
+            hasResolvedTermsAcceptance = true
+            needsTermsUpdateAcceptance = false
+            pendingActiveTermsVersion = nil
+            return
+        }
+
         guard authViewModel.isAuthenticated, authViewModel.isEmailVerified else {
             hasResolvedTermsAcceptance = true
             needsTermsUpdateAcceptance = false
