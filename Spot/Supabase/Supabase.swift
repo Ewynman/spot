@@ -10,99 +10,124 @@ import Supabase
 
 // MARK: - Environment Configuration
 
-/// Environment configuration for Supabase connections.
-/// - In DEBUG builds: uses staging environment (current project: aeurigbbohyxvtsfiyul)
-/// - In RELEASE builds: uses production environment (to be created)
-enum SupabaseEnvironment {
+enum SupabaseEnvironment: Equatable {
     case staging
     case production
-    
-    /// Current environment based on build configuration.
-    /// DEBUG builds use staging; RELEASE builds use production.
+
+    static let stagingProjectRef = "aeurigbbohyxvtsfiyul"
+    static let productionProjectRef = "gomdoguewaawdlvijahg"
+
     static var current: SupabaseEnvironment {
-        #if DEBUG
+        #if DEBUG || INTERNAL_TESTING
         return .staging
         #else
         return .production
         #endif
     }
-    
-    /// Supabase project URL for the current environment.
+
     var url: String {
         switch self {
         case .staging:
-            // Current project (will be used for Firebase App Distribution testing builds)
-            return "https://aeurigbbohyxvtsfiyul.supabase.co"
+            return "https://\(Self.stagingProjectRef).supabase.co"
         case .production:
-            // Production project (created: 2026-07-08, ID: gomdoguewaawdlvijahg)
-            // This will be injected by CI/CD from GitHub secrets for release builds
-            return "https://gomdoguewaawdlvijahg.supabase.co"
+            return "https://\(Self.productionProjectRef).supabase.co"
         }
     }
-    
-    /// Supabase anon/publishable key for the current environment.
+
     var anonKey: String {
         switch self {
         case .staging:
-            // Current project anon key (testing/development)
             return "sb_publishable_5IKZU3dDw6C0-V9lRPc7vw_z_v8a08G"
         case .production:
-            // Production anon key (will be injected by CI/CD from GitHub secrets)
-            return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbWRvZ3Vld2Fhd2RsdmlqYWhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MTY4MjIsImV4cCI6MjA5OTA5MjgyMn0.pNezI--Bxni589iGsW33ni8VxlE9tFq_oKmiXnGURxE"
+            return "PLACEHOLDER_PRODUCTION_KEY_MUST_BE_INJECTED"
         }
     }
-    
-    /// Human-readable environment name for logging.
+
     var displayName: String {
         switch self {
         case .staging:
-            return "Staging"
+            return "staging"
         case .production:
-            return "Production"
+            return "production"
+        }
+    }
+
+    var projectRef: String {
+        switch self {
+        case .staging:
+            return Self.stagingProjectRef
+        case .production:
+            return Self.productionProjectRef
+        }
+    }
+
+    static func projectRef(from url: URL) -> String? {
+        guard let host = url.host?.lowercased(),
+              host.hasSuffix(".supabase.co") else {
+            return nil
+        }
+        return host.replacingOccurrences(of: ".supabase.co", with: "")
+    }
+
+    static func from(projectRef: String) -> SupabaseEnvironment? {
+        switch projectRef.lowercased() {
+        case stagingProjectRef:
+            return .staging
+        case productionProjectRef:
+            return .production
+        default:
+            return nil
         }
     }
 }
 
-/// Configuration loader that supports both environment-based and Info.plist-based configuration.
-/// - In DEBUG: uses SupabaseEnvironment enum directly
-/// - In RELEASE: attempts to load from Info.plist first (for CI/CD injection), falls back to enum
 enum SupabaseConfiguration {
-    /// Load Supabase configuration from Info.plist or environment defaults.
-    static func load() -> (url: URL, anonKey: String, environment: SupabaseEnvironment) {
-        let environment = SupabaseEnvironment.current
-        
-        // For RELEASE builds, try to load from Info.plist first (CI/CD may inject values)
-        #if !DEBUG
-        if let plistConfig = loadFromPlist(), 
-           !plistConfig.url.absoluteString.contains("PLACEHOLDER"),
-           !plistConfig.anonKey.contains("PLACEHOLDER") {
-            return (plistConfig.url, plistConfig.anonKey, environment)
+    static func load() -> (url: URL, anonKey: String, environment: SupabaseEnvironment, projectRef: String) {
+        let expectedEnvironment = SupabaseEnvironment.current
+
+        #if DEBUG
+        guard let url = URL(string: expectedEnvironment.url),
+              !expectedEnvironment.anonKey.isEmpty else {
+            fatalError("Supabase staging configuration is invalid for DEBUG builds.")
         }
-        #endif
-        
-        // Fall back to environment-based configuration
-        let urlString = environment.url
-        let anonKey = environment.anonKey
-        
-        guard let url = URL(string: urlString),
-              !anonKey.contains("PLACEHOLDER") else {
+        return (
+            url: url,
+            anonKey: expectedEnvironment.anonKey,
+            environment: expectedEnvironment,
+            projectRef: expectedEnvironment.projectRef
+        )
+        #else
+        guard let plistConfig = loadFromPlist() else {
+            fatalError("Supabase configuration missing from Info.plist for non-debug build.")
+        }
+
+        guard !plistConfig.anonKey.isEmpty,
+              !plistConfig.anonKey.contains("PLACEHOLDER") else {
+            fatalError("Supabase anon key is missing or placeholder in Info.plist.")
+        }
+
+        guard let resolvedProjectRef = SupabaseEnvironment.projectRef(from: plistConfig.url),
+              let resolvedEnvironment = SupabaseEnvironment.from(projectRef: resolvedProjectRef) else {
+            fatalError("Supabase URL must target a known Spot Supabase project.")
+        }
+
+        guard resolvedEnvironment == expectedEnvironment else {
             fatalError("""
-                Supabase configuration error:
-                Environment: \(environment.displayName)
-                
-                Production builds require a valid Supabase project.
-                Either:
-                1. Create a new production Supabase project and update SupabaseEnvironment
-                2. Configure CI/CD to inject credentials into Info.plist
-                
-                See docs/engineering/supabase-environment-strategy.md for setup instructions.
+                Supabase environment mismatch.
+                Expected: \(expectedEnvironment.displayName) (\(expectedEnvironment.projectRef))
+                Actual: \(resolvedEnvironment.displayName) (\(resolvedProjectRef))
                 """)
         }
-        
-        return (url, anonKey, environment)
+
+        return (
+            url: plistConfig.url,
+            anonKey: plistConfig.anonKey,
+            environment: resolvedEnvironment,
+            projectRef: resolvedProjectRef
+        )
+        #endif
     }
-    
-    /// Attempt to load configuration from Info.plist (used by CI/CD injection).
+
     private static func loadFromPlist() -> (url: URL, anonKey: String)? {
         guard let path = Bundle.main.path(forResource: "Info", ofType: "plist"),
               let root = NSDictionary(contentsOfFile: path) as? [String: Any],
@@ -116,17 +141,14 @@ enum SupabaseConfiguration {
     }
 }
 
-// MARK: - Global Supabase Client
-
 let supabase: SupabaseClient = {
     let config = SupabaseConfiguration.load()
-    
-    #if DEBUG
-    // Log environment in DEBUG builds only (never log in production)
+
+    #if DEBUG || INTERNAL_TESTING
     print("🔧 Supabase Environment: \(config.environment.displayName)")
     print("🔧 Supabase URL: \(config.url.absoluteString)")
     #endif
-    
+
     return SupabaseClient(
         supabaseURL: config.url,
         supabaseKey: config.anonKey,

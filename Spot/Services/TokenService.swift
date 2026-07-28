@@ -12,8 +12,8 @@ import Supabase
 class TokenService {
     static let shared = TokenService()
 
-    private let tokenKey = "com.spotapp.spot.supabaseAccessToken"
-    private let expirationKey = "com.spotapp.spot.tokenExpiration"
+    private let tokenKeyBase = "com.spotapp.spot.supabaseAccessToken"
+    private let expirationKeyBase = "com.spotapp.spot.tokenExpiration"
     private let tokenExpirationHours: TimeInterval = 24 // 24 hours
 
     private init() {}
@@ -41,9 +41,45 @@ class TokenService {
 
     /// Clear stored tokens (useful for logout)
     func clearTokens() {
-        deleteFromKeychain(key: tokenKey)
-        deleteFromKeychain(key: expirationKey)
+        deleteFromKeychain(key: scopedKey(baseKey: tokenKeyBase))
+        deleteFromKeychain(key: scopedKey(baseKey: expirationKeyBase))
         SpotLogger.log(TokenServiceLogs.clearedStoredTokens)
+    }
+
+    /// Clears local auth/session state if app switched between Supabase projects.
+    /// Returns true when an incompatible prior project was detected and cleared.
+    func enforceProjectSessionIsolationIfNeeded() async -> Bool {
+        let defaults = UserDefaults.standard
+        let previousProjectRef = defaults.string(forKey: Constants.UserDefaultsKeys.lastSupabaseProjectReference)
+        let currentProjectRef = SupabaseConfiguration.load().projectRef
+
+        defer {
+            defaults.set(currentProjectRef, forKey: Constants.UserDefaultsKeys.lastSupabaseProjectReference)
+        }
+
+        guard shouldResetSession(previousProjectRef: previousProjectRef, currentProjectRef: currentProjectRef) else {
+            return false
+        }
+
+        SpotLogger.log(
+            TokenServiceLogs.projectReferenceChanged,
+            details: ["from": previousProjectRef ?? "none", "to": currentProjectRef]
+        )
+        defaults.set("project_reference_changed", forKey: Constants.UserDefaultsKeys.supabaseSessionResetReason)
+
+        clearTokens()
+        do {
+            try await supabase.auth.signOut(scope: .local)
+        } catch {
+            SpotLogger.log(TokenServiceLogs.failedToClearIncompatibleSession, details: ["error": error.localizedDescription])
+        }
+        SpotAuthBridge.setSessionUser(id: nil, email: nil)
+        AuthVerificationRecoveryStore.shared.clear()
+        await MainActor.run {
+            FeedRepository.shared.reset()
+            DeepLinkState.shared.clearUserSession()
+        }
+        return true
     }
 
     // MARK: - Private Methods
@@ -73,22 +109,31 @@ class TokenService {
     private func cacheToken(_ token: String) {
         let expirationDate = Date().addingTimeInterval(tokenExpirationHours * 3600)
 
-        saveToKeychain(key: tokenKey, value: token)
-        saveToKeychain(key: expirationKey, value: String(expirationDate.timeIntervalSince1970))
+        saveToKeychain(key: scopedKey(baseKey: tokenKeyBase), value: token)
+        saveToKeychain(key: scopedKey(baseKey: expirationKeyBase), value: String(expirationDate.timeIntervalSince1970))
     }
 
     private func getCachedToken() -> String? {
-        return getFromKeychain(key: tokenKey)
+        return getFromKeychain(key: scopedKey(baseKey: tokenKeyBase))
     }
 
     private func isTokenExpired() -> Bool {
-        guard let expirationString = getFromKeychain(key: expirationKey),
+        guard let expirationString = getFromKeychain(key: scopedKey(baseKey: expirationKeyBase)),
               let expirationTimeInterval = TimeInterval(expirationString) else {
             return true // Consider expired if we can't read expiration
         }
 
         let expirationDate = Date(timeIntervalSince1970: expirationTimeInterval)
         return Date() >= expirationDate
+    }
+
+    func scopedKey(baseKey: String, projectRef: String = SupabaseConfiguration.load().projectRef) -> String {
+        "\(baseKey).\(projectRef)"
+    }
+
+    func shouldResetSession(previousProjectRef: String?, currentProjectRef: String) -> Bool {
+        guard let previousProjectRef, !previousProjectRef.isEmpty else { return false }
+        return previousProjectRef != currentProjectRef
     }
 
     // MARK: - Keychain Operations
