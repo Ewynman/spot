@@ -10,21 +10,24 @@ Product and engineering.
 
 ## Current status
 
-High-level; see `HomeTourManager` and `SpotFirstRunOnboardingManager` for exact steps.
+Verified against `SpotFirstRunOnboardingManager` wiring in `BottomTabNavigationView`. `HomeTourManager` is legacy and unmounted.
 
 ## Details
 
 ```mermaid
 flowchart TD
-  A[Authenticated user enters app] --> B{First-run onboarding done?}
-  B -->|No| C[SpotFirstRunOnboardingManager steps]
-  C --> D[Complete or skip]
-  B -->|Yes| E[Main tabs]
-  D --> E
-  E --> F{Home tour needed?}
-  F -->|Yes| G[HomeTourManager coach]
-  F -->|No| H[Normal home]
-  G --> H
+  A[Verified user enters tab shell] --> B{First-session candidate and not completed?}
+  B -->|No| C[Normal tabs]
+  B -->|Yes| D[SpotFirstRunOnboarding overlay]
+  D --> E[Spot card, social, and map coach steps]
+  E --> F{Complete or skip}
+  F --> G{Notification permission undetermined?}
+  G -->|Yes| H[Notification pre-prompt after 600 ms]
+  G -->|No| C
+  H --> C
+  E --> I[User-location step]
+  I --> J[Optional location permission sheet]
+  J --> E
 ```
 
 ## Related docs
@@ -33,4 +36,4 @@ flowchart TD
 
 ## Open questions / TODOs
 
-- Wire exact conditions to UI entry files: TODO: verify in `RootView`.
+- None.

@@ -16,7 +16,7 @@ Verify all **TODO** items before each submission.
 
 ### Where subscription is presented
 
-**TODO: verify** all entry points; typically Profile → Settings → Pro / paywall surfaces.
+Profile and Settings expose “Go Pro.” Feature-limit call sites route through `PaywallRouter`, and `RootView` presents `PaywallView`.
 
 ### Product ID (code)
 
@@ -34,7 +34,7 @@ Spot detail links use `https://spotapp.online/s/{spotId}` (and `www` variant). S
 
 ### Moderation / safety (Guideline 1.2)
 
-The Spot binary submitted with this review enforces all four App Review UGC requirements end-to-end. See [../engineering/ugc-moderation.md](../engineering/ugc-moderation.md) for the full system.
+The repository implements Terms acknowledgement, server text filtering, reporting, blocking, and a moderator queue. Verify deployed backend state and the known media gaps below before asserting end-to-end compliance in submission notes.
 
 | Requirement | Where to verify in the build |
 | --- | --- |
@@ -44,7 +44,7 @@ The Spot binary submitted with this review enforces all four App Review UGC requ
 | Mechanism to block abusive users | "Block User" — ellipsis menu on another user's profile, plus toggle inside the report sheets. Block writes to `user_blocks`, the `homeFeedLocallyRemove` notification removes the blocked user's spots from the feed instantly, and `can_view_author` filters server-side from then on. |
 | Act on reports within 24 hours | `moderation_queue` view (service-role) prioritizes reports for the on-call moderator; SLA tracked by `select count(*) from moderation_queue where created_at < now() - interval '24 hours'`. |
 
-Images for Spots and profile photos additionally go through Azure Content Safety scoring (`media_assets` / `media_moderation_events`); rejected uploads receive non-graphic in-app messaging.
+Spot images go through Azure Content Safety scoring (`media_assets` / `media_moderation_events`) and rejected uploads receive non-graphic messaging. **Profile photos currently upload directly to the public `avatars` bucket and bypass moderation.** This conflicts with the product safety requirement and must be resolved before representing profile-image moderation as implemented to App Review.
 
 ### Privacy / support links
 

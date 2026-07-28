@@ -21,8 +21,10 @@ High-level; expand with dashboard deep links as your org standardizes them.
 
 ### Verify moderation function
 
-- Supabase → Edge Functions → `moderate-image` (name **TODO: verify**) → logs and error rate.
-- Submit a test image through staging app build.
+- Supabase → Edge Functions → `moderate-image` → invocation logs and error rate.
+- Submit a safe test image through a staging build and confirm HTTP 200 with `approved=true`.
+- Exercise a policy fixture expecting 422 and a controlled unavailable-provider path expecting retryable 503.
+- Confirm the Edge Function, Azure secrets, and Storage promotion are configured separately in staging and production.
 
 ### Verify Universal Links
 
@@ -33,6 +35,20 @@ High-level; expand with dashboard deep links as your org standardizes them.
 
 - App Store Connect → agreements, tax, banking.
 - Sandbox purchase of product id **`spotPro`** (`SpotProProducts.swift`).
+
+### Verify release environment
+
+- `main` / Firebase: confirm embedded project ref is staging (`aeurigbbohyxvtsfiyul`).
+- `release/**` / TestFlight: confirm production secrets were injected for `gomdoguewaawdlvijahg`.
+- Sign in with an environment-specific account; cross-environment credentials should not work.
+- Smoke-test feed, map, Search, profile, deep link, and one controlled moderated publish.
+
+### Check orphan media
+
+- Inspect `media_assets` grouped by `status` and `linked_spot_id`.
+- Investigate old `pending`, `failed`, `rejected`, or approved-unlinked rows before deletion.
+- Storage objects require separate inspection; deleting a database row does not guarantee blob deletion.
+- No scheduled cleanup is defined in this repository, so use a reviewed, environment-specific procedure.
 
 ### Safety / moderation incident
 

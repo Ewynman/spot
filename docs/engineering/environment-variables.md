@@ -10,22 +10,25 @@ Engineers and infra owners.
 
 ## Current status
 
-iOS client reads Supabase URL and anon key from **`Spot/Info.plist`** (see `Spot/Supabase/Supabase.swift`). Edge functions and Azure keys belong in **Supabase dashboard / function secrets**, not the app bundle.
+DEBUG builds select staging defaults in **`Spot/Supabase/Supabase.swift`**. Release builds prefer values injected into **`Spot/Info.plist`** by CI. Edge Function and Azure credentials belong in Supabase function secrets, never the app bundle.
 
 ## Details
 
 | Name | Used by | Required | Secret? | Location | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Supabase **project URL** (staging) | iOS app (DEBUG) | Yes | No (public URL) | `SupabaseEnvironment.swift` → `.staging.url` | Staging/development environment. |
-| Supabase **anon / publishable key** (staging) | iOS app (DEBUG) | Yes | **Treat as sensitive** — must rely on **RLS** | `SupabaseEnvironment.swift` → `.staging.anonKey` | Never ship service-role in the app. |
+| Supabase **project URL** (staging) | iOS app (DEBUG) | Yes | No (public URL) | `Spot/Supabase/Supabase.swift` → `.staging.url` | Staging/development environment. |
+| Supabase **anon / publishable key** (staging) | iOS app (DEBUG) | Yes | Public client credential; protect data with **RLS** | `Spot/Supabase/Supabase.swift` → `.staging.anonKey` | Never ship service-role in the app. |
 | Supabase **project URL** (production) | iOS app (RELEASE) | Yes | No (public URL) | Injected by CI/CD from `SUPABASE_PRODUCTION_URL` secret | Production environment. |
-| Supabase **anon / publishable key** (production) | iOS app (RELEASE) | Yes | **Treat as sensitive** — must rely on **RLS** | Injected by CI/CD from `SUPABASE_PRODUCTION_ANON_KEY` secret | Never ship service-role in the app. |
+| Supabase **anon / publishable key** (production) | iOS app (RELEASE) | Yes | Public client credential; protect data with **RLS** | Injected by CI/CD from `SUPABASE_PRODUCTION_ANON_KEY` secret | Never ship service-role in the app. |
 | `SUPABASE_STAGING_URL` | GitHub Actions (deploy.yml) | Optional | No | GitHub repository secrets | Staging project URL; falls back to hardcoded if not set. |
 | `SUPABASE_STAGING_ANON_KEY` | GitHub Actions (deploy.yml) | Optional | Yes | GitHub repository secrets | Staging anon key; falls back to hardcoded if not set. |
 | `SUPABASE_PRODUCTION_URL` | GitHub Actions (testflight.yml) | **Required** | No | GitHub repository secrets | Production project URL; TestFlight builds fail without this. |
 | `SUPABASE_PRODUCTION_ANON_KEY` | GitHub Actions (testflight.yml) | **Required** | Yes | GitHub repository secrets | Production anon key; TestFlight builds fail without this. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server / Edge only | If admin operations | **Yes** | Supabase secrets | **Never** in client. |
-| `AZURE_CONTENT_SAFETY_*` | Moderation function | If Azure enabled | Endpoint: often non-secret; key: **Yes** | Function env in Supabase | Do not put in client. |
+| `AZURE_CONTENT_SAFETY_ENDPOINT` | `moderate-image` | Yes | Usually no | Function secret/config in Supabase | Server-side only. |
+| `AZURE_CONTENT_SAFETY_KEY` | `moderate-image` | Yes | **Yes** | Function secret in Supabase | Server-side only. |
+| `AZURE_CONTENT_SAFETY_API_VERSION` | `moderate-image` | Optional | No | Function config in Supabase | Provider API override. |
+| `MODERATION_THRESHOLDS_JSON` | `moderate-image` | Optional | Policy-sensitive | Function config in Supabase | Overrides default category thresholds. |
 | Share / Universal Link config | iOS app | Yes | No | `Info.plist` → `SpotURLs` | Domains must match entitlements. |
 
 ### Example placeholders only
@@ -49,4 +52,4 @@ iOS client reads Supabase URL and anon key from **`Spot/Info.plist`** (see `Spot
 
 ## Open questions / TODOs
 
-- Enumerate every Edge Function secret name from deployed functions: TODO: verify in Supabase dashboard.
+- Dashboard deployment state and secret presence cannot be proven from source control; verify them during environment smoke tests without copying values into docs.

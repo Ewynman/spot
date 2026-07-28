@@ -19,7 +19,7 @@ This document provides step-by-step instructions to fix both issues.
 
 ## Issue 1: Guideline 3.1.2(c) - Missing EULA Link
 
-### What Apple Said
+### Guideline 3.1.2(c) review message
 > The submission did not include all the required information for apps offering auto-renewable subscriptions. The following information needs to be included in the App Store metadata: a functional link to the Terms of Use (EULA).
 
 ### What's Required
@@ -82,7 +82,7 @@ The link is now visible in the App Description field on App Store Connect and wi
 
 ## Issue 2: Guideline 2.1(b) - Subscription Failed to Load on iPad
 
-### What Apple Said
+### Guideline 2.1(b) review message
 > The In-App Purchase products in the app exhibited one or more bugs which create a poor user experience. Specifically, the app failed to load subscription. Review device details: iPad Air 11-inch (M3), iPadOS 26.5.
 
 ### Root Cause
@@ -321,7 +321,7 @@ See `Spot/Services/SubscriptionManager.swift` for implementation details.
 
 - [app-store-review-notes.md](./app-store-review-notes.md) - General review notes
 - [../product/pro-subscription.md](../product/pro-subscription.md) - Product spec
-- [../engineering/subscriptions.md](../engineering/subscriptions.md) - Technical implementation (if exists)
+- [../diagrams/subscription-flow.md](../diagrams/subscription-flow.md) - Purchase and entitlement flow
 
 ---
 

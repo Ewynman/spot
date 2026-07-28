@@ -22,6 +22,8 @@ User opens **Post** tab → multi-step composer (`Spot/Views/PostFlow`) → sele
 
 Photos are chosen from the library or camera per system permissions (`Constants.UserDefaultsKeys` track permission prompts).
 
+Free accounts can publish one photo and one vibe tag. Pro accounts can publish up to five photos and five vibe tags. The publish RPC independently enforces entitlement limits.
+
 ### Location
 
 User confirms or selects a place (canonical places JSON + search: `LocationSelectionView`).
@@ -32,7 +34,9 @@ User picks from known tags and adds caption/details as the UI allows.
 
 ### Draft behavior
 
-Draft persistence (local vs server): **TODO: verify** in `PostFlowViewModel` and related persistence code.
+`PostDraftStore` persists drafts locally under Application Support, including a reserved `autosave` draft and user-saved drafts. Draft metadata is indexed locally; no server draft table is involved.
+
+Submission persists a snapshot before JPEG encoding and queueing. The composer resets as soon as `SpotPublishCoordinator` accepts the job, allowing the user to leave the Post tab while the global publish banner reports progress.
 
 ### Publish and moderation
 
@@ -43,10 +47,12 @@ Every image for Spots must pass **moderation** before being treated as approved 
 | Condition | Expected UX (high level) |
 | --- | --- |
 | Not authenticated | Block publish; route to auth. |
-| Upload fails | Error state; user can retry; draft preserved where applicable. |
+| Upload fails | Error toast; a pre-queue local snapshot normally exists. |
 | Moderation rejects | Safe message; do not publish. |
 | Supabase insert / RPC fails | Error; preserve draft where applicable. |
-| Network unavailable | Retry / offline messaging per implementation. |
+| Network unavailable | Retryable error messaging; no offline publish queue. |
+
+The coordinator has a 90-second timeout. A partial multi-image failure can leave approved but unlinked media assets. Current failure handling can also persist the already-reset composer over the earlier autosave, so the “saved to drafts” timeout copy does not guarantee full recovery. Treat this as a known implementation gap, not a recovery contract.
 
 ### Flow diagram
 
@@ -60,12 +66,13 @@ flowchart TD
   F --> G{User action}
   G -->|Save draft| H[Persist draft locally]
   G -->|Publish| I[SpotPublishCoordinator enqueue]
-  I --> J[Upload to Supabase pending_images]
-  J --> K[Edge Function moderate-image]
-  K --> L{Approved?}
-  L -->|No| M[Show blocked reason]
-  L -->|Yes| N[RPC publish_spot_with_approved_media_assets_v1]
-  N --> O[Show success / feed update]
+  I --> J[Create pending media_assets row]
+  J --> K[Upload to Supabase pending_images]
+  K --> L[Edge Function moderate-image]
+  L --> M{Approved?}
+  M -->|No| N[Show safe failure]
+  M -->|Yes| O[RPC publish_spot_with_approved_media_assets_v1]
+  O --> P[Show success / optimistic feed update]
 ```
 
 ## Related docs
@@ -76,4 +83,4 @@ flowchart TD
 
 ## Open questions / TODOs
 
-- Exact draft storage and recovery UX: TODO: verify in Post flow view models.
+- Add orphan-media cleanup and make failed-publish draft recovery transactional before promising guaranteed recovery.

@@ -10,31 +10,34 @@ Engineers, reviewers.
 
 ## Current status
 
-Conceptual; align with `SpotApp`, `RootView`, and Supabase session APIs.
+Verified against `AppDelegate`, `SpotApp`, `AuthViewModel`, and `RootView` on 2026-07-28.
 
 ## Details
 
 ```mermaid
 flowchart TD
-  A[App launch] --> B[Detect installation state]
-  B --> C[Retain device-local Keychain session]
-  C --> D[Load local Supabase session]
-  D --> E{Session exists?}
-  E -->|No| F{Pending OTP recovery?}
-  F -->|Yes| G[Resume email verification]
-  F -->|No| H{Saved account hint?}
-  H -->|Yes| I[Show Welcome back]
-  H -->|No| J[Show editorial auth entry]
-  E -->|Yes| K{Session expired?}
+  A[AppDelegate launch setup] --> B[SpotApp branded splash]
+  B --> C[RootView]
+  C --> D{AuthViewModel loading?}
+  D -->|Yes| B
+  D -->|No| E{Pending verification recovery?}
+  E -->|Yes| F[ConfirmEmailView]
+  E -->|No| G{Session exists?}
+  G -->|No| H{Saved account hint?}
+  H -->|Yes| I[WelcomeBackView]
+  H -->|No| J[WelcomeView]
+  G -->|Yes| K{Session expired?}
   K -->|Yes| L[Refresh session]
   L --> M{Refresh succeeds?}
-  M -->|No| F
-  M -->|Yes| N[Load profile]
+  M -->|No| H
+  M -->|Yes| N{Email verified?}
   K -->|No| N
-  N --> O{Profile complete?}
-  O -->|No| P[Complete required account setup]
-  O -->|Yes| Q[Enter main app]
+  N -->|No| F
+  N -->|Yes| O{Apple username setup needed?}
+  O -->|Yes| P[PostAuthSetupFlowView]
+  O -->|No| Q[MainTabView]
   P --> Q
+  Q --> R[Contextual first-run coach and permissions]
 ```
 
 Authentication entry and new-device paths:
@@ -43,13 +46,13 @@ Authentication entry and new-device paths:
 flowchart LR
   A[Option A editorial welcome] --> B[Create account]
   B --> C[Email + username + password]
-  C --> D[Six-digit signup OTP]
+  C --> D[Six-digit signup OTP when required]
   D --> E[Authenticated session]
   A --> F[Email login]
   A --> G[Sign in with Apple + nonce]
   H[New device] --> G
   H --> I[iCloud Password AutoFill]
-  H -. future Supabase work .-> J[Passkey]
+  H -. not implemented .-> J[Passkey]
 ```
 
 ## Related docs

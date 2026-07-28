@@ -16,7 +16,7 @@ StoreKit integration: `Spot/Services/SubscriptionManager.swift`, product IDs in 
 
 ### What Pro is
 
-**Pro** is the paid subscription tier unlocking premium capabilities (exact feature list: **TODO: verify** in paywall copy and `ProEntitlementChecker` usage across features).
+**Pro** is the paid subscription tier unlocking premium creation, saving, map, and Search capabilities.
 
 ### Product ID (code)
 
@@ -28,7 +28,7 @@ StoreKit integration: `Spot/Services/SubscriptionManager.swift`, product IDs in 
 
 ### Paywall entry points
 
-Common entry points include Profile / Settings / “Go Pro” surfaces and feature gates—**TODO: verify** all `PaywallRouter` / paywall presentation call sites.
+Profile and Settings expose “Go Pro.” Feature limits route through `PaywallRouter.show()`, which posts `.showPaywall`; `RootView` owns the paywall sheet. Successful purchase can post `.showPostPurchaseProOnboarding`.
 
 ### Restore purchases
 
@@ -36,12 +36,21 @@ Common entry points include Profile / Settings / “Go Pro” surfaces and featu
 
 ### Pro-gated features
 
-Examples may include map filters or badges—**TODO: verify** by searching `hasPro`, `ProEntitlement`, or `SubscriptionManager` consumers.
+| Feature | Free | Pro |
+| --- | --- | --- |
+| Photos per Spot | 1 | Up to 5 |
+| Vibe tags per Spot | 1 | Up to 5, including composer custom-vibe support |
+| Bookmarks | 50 | Unlimited with collections UI |
+| Map filters | Hidden | Vibe, saved, liked, following |
+| Search filters | Basic grids | Location plus selected vibe tags |
+| Map user marker | Standard green ring | Gold ring |
+
+Entitlement state combines StoreKit transaction updates with server `is_pro` / `pro_until` fields. Publish limits are enforced again by the Supabase RPC.
 
 ### Subscription testing
 
 - Use **Sandbox** Apple IDs and Xcode StoreKit testing configuration.
-- **TODO: verify** StoreKit Configuration file presence in the Xcode project.
+- Local StoreKit testing uses `Spot/StoreKit/SpotDev.storekit`, which contains the yearly `spotPro` product.
 
 ### Localized price
 
@@ -55,4 +64,5 @@ Built from `SubscriptionPriceLineFormatter` + `Product` subscription period.
 
 ## Open questions / TODOs
 
-- Complete feature gate inventory and screenshot list for review: TODO: verify with product.
+- Confirm App Store Connect pricing, product metadata, and review screenshots outside the repository before release.
+- The map Following filter is visible to Pro users but does not yet receive followed-user IDs.

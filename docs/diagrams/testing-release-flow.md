@@ -24,12 +24,12 @@ flowchart TD
   F --> C
   E -->|Yes| G[Code review]
   G --> H[Merge to main]
-  H --> I[CI runs on main]
+  H --> I[CI plus Firebase staging distribution]
   I --> J[Run SpotUITests if major UI changes]
-  J --> K[Run manual smoke tests]
-  K --> L[Verify docs updated]
-  L --> M[Verify security/RLS/moderation if touched]
-  M --> N[TestFlight build]
+  J --> K[Run staging smoke tests]
+  K --> L[Cut release/X.Y.Z branch]
+  L --> M[TestFlight workflow with production Supabase]
+  M --> N[Run production-safe release smoke]
   N --> O[App Store review checklist]
 ```
 

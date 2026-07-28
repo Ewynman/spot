@@ -26,11 +26,19 @@ Some profiles or content may be **private** to non-followers or pending requests
 
 ### Follow / following
 
-Follow graph and optional **follow requests** are backed by Postgres (see migrations such as `20260503100000_follow_requests_revoke_client_update.sql`). UX: request, accept, revoke—**TODO: verify** exact screens.
+Public profiles use direct follow/unfollow actions. Private profiles use request, requested/cancel, accept, and deny states backed by `follows` and `follow_requests`.
+
+`ProfileView` opens `FollowRequestsView` for the current user's pending requests and polls the pending count every eight seconds. `FollowRequestsService` paginates 24 requests at a time. `UserSpotService` mutates follow relationships, and `AuthorPrivacyCache` is invalidated after graph changes.
 
 ### Bookmarks and likes
 
 Users save Spots (**bookmarks**) and react with **likes**; both feed ranking and profile grids.
+
+Likes and bookmarks are loaded as complete ID sets rather than truly paginated grids. Pro users receive bookmark collections; free users use a flat bookmark grid and have a 50-bookmark cap.
+
+### Privacy boundary
+
+`ProfileService` reads `users_public`, determines whether the viewer is self, following, or pending, and only requests a private author's Spots when `canView` is true. Supabase RLS and `can_view_author` / `can_view_spot` remain authoritative.
 
 ## Related docs
 
@@ -39,4 +47,5 @@ Users save Spots (**bookmarks**) and react with **likes**; both feed ranking and
 
 ## Open questions / TODOs
 
-- Map each social action to concrete tables/RPCs in a future pass: TODO: verify against `SpotSupabaseRepository` and migrations.
+- Remote follow notifications are not implemented; see [notifications.md](../engineering/notifications.md).
+- Likes and bookmark lists need real pagination for large accounts.

@@ -16,16 +16,19 @@ Matches `SpotPublishCoordinator`, `SpotSupabaseRepository`, and moderation migra
 
 ```mermaid
 flowchart TD
-  A[PostFlowViewModel submitPost] --> B[Build SpotPublishDraft]
-  B --> C[SpotPublishCoordinator.enqueue]
-  C --> D[Upload JPEGs to pending_images]
-  D --> E[moderate-image Edge Function]
-  E --> F{All assets approved?}
-  F -->|No| G[Toast error / draft retained]
-  F -->|Yes| H[publish_spot_with_approved_media_assets_v1 RPC]
-  H --> I{RPC success?}
-  I -->|No| J[Toast error]
-  I -->|Yes| K[spotDidPostSuccess notification]
+  A[PostFlowViewModel submitPost] --> B[Validate auth, input, entitlement]
+  B --> C[Persist local draft snapshot]
+  C --> D[SpotPublishCoordinator.enqueue]
+  D --> E[Reset composer and show global progress]
+  E --> F[Insert pending media_assets row]
+  F --> G[Upload JPEG to pending_images]
+  G --> H[moderate-image Edge Function]
+  H --> I{All assets approved?}
+  I -->|No| J[Safe failure toast; recovery not guaranteed]
+  I -->|Yes| K[publish_spot_with_approved_media_assets_v1 RPC]
+  K --> L{RPC success?}
+  L -->|No| M[Failure toast; approved assets may be unlinked]
+  L -->|Yes| N[spotDidPostSuccess and optimistic feed insert]
 ```
 
 ## Related docs

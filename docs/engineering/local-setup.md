@@ -18,17 +18,18 @@ Verified against `Spot.xcodeproj` build settings (deployment target and Swift ve
 
 | Requirement | Notes |
 | --- | --- |
-| **macOS + Xcode** | Recent Xcode recommended; exact minimum: **TODO: verify** team standard. |
-| **iOS deployment target** | Project uses **17.0** for some targets and **18.5** for others in `project.pbxproj`—open Xcode to see the active app target deployment. |
+| **macOS + Xcode** | Use an Xcode version that supports the installed iOS simulator runtime and iOS 17 deployment target. CI uses `macos-15`; distribution workflows select or require Xcode 26. |
+| **iOS deployment target** | App and test targets use iOS 17.0; project-level settings also contain 18.5 values, so inspect the active target when changing deployment support. |
 | **Swift** | **5.0** in project settings. |
-| **Supabase** | Project URL and anon key live in **`Spot/Info.plist`** under the `Supabase` dictionary (copy from your Supabase dashboard for local dev—do not commit real keys to public forks). |
+| **Supabase** | Local DEBUG selects staging in `Spot/Supabase/Supabase.swift`. Release workflows inject `Info.plist` values. |
+| **Firebase** | A valid gitignored `GoogleService-Info.plist` is needed for normal Firebase initialization; CI injects it from secrets. |
 | **Apple Developer** | For device runs, push, Associated Domains, and Sign in with Apple as enabled for the bundle ID. |
 
 ### Clone and open
 
 ```sh
 git clone <repository-url>
-cd spot
+cd <cloned-repository-directory>
 open Spot.xcodeproj
 ```
 
@@ -66,4 +67,4 @@ See [troubleshooting.md](troubleshooting.md).
 
 ## Open questions / TODOs
 
-- Pin one canonical “minimum Xcode” version for the team: TODO: confirm with owner.
+- Pin one canonical local Xcode version when the team standardizes it; workflow requirements remain authoritative for distribution.
