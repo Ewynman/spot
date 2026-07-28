@@ -40,7 +40,7 @@ jobs:
       - name: Restrict workflow dispatch branch
         if: github.event_name == 'workflow_dispatch'
         run: |
-          if [[ "${GITHUB_REF_NAME}" != release/* ]]; then
+          if [[ "${GITHUB_REF_NAME}" != "release/"* ]]; then
             echo "❌ Manual TestFlight deployment must run from a release/** branch."
             exit 1
           fi
