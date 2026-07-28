@@ -59,6 +59,7 @@ enum Constants {
         static let promptPermsOnNextLogin = "promptPermsOnNextLogin"
         static let homeTourAccepted = "homeTourAccepted"
         static let loggingProfile = "loggingProfile"
+        static let clearKeychainOnNextLaunch = "debugClearKeychainOnNextLaunch"
         static let lastSupabaseProjectReference = "lastSupabaseProjectReference"
         static let supabaseSessionResetReason = "supabaseSessionResetReason"
     }

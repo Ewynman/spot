@@ -40,6 +40,18 @@ Notification authorization uses UserNotifications and does not have a plist usag
 
 `Config/LoggingDefaults.plist` (bundled) seeds `LoggingConfig` / `UserDefaults` toggles—see [logging.md](logging.md).
 
+### Settings bundle authentication reset
+
+Debug builds replace the production-safe `Spot/Settings.bundle/Root.plist` with `scripts/DebugSettingsRoot.plist` after resources are copied. The Debug Settings bundle exposes **Clear Keychain on Next Launch** under Authentication Testing:
+
+1. Turn the switch on in the iOS Settings app.
+2. Fully quit Spot.
+3. Reopen Spot.
+
+Before constructing `AuthViewModel` or the Supabase client, a Debug build deletes its known authentication Keychain entries and immediately resets the switch to off. This clears the persisted Supabase session plus Spot’s account-hint, verification-recovery, legacy tokens, and project-scoped staging/production token cache entries. It does not delete unrelated app entries, passwords managed by Apple Password AutoFill, or other apps’ data.
+
+The reset call, deletion implementation, and Settings specifier are excluded from Release builds. Release continues to use the base Settings bundle and cannot invoke the destructive testing path.
+
 ## Related docs
 
 - [universal-links.md](universal-links.md)
