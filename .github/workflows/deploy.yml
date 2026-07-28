@@ -9,7 +9,7 @@ on:
 # Serialize deploys so concurrent runs cannot read the same build number.
 concurrency:
   group: deploy-firebase-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
