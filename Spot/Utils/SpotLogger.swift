@@ -191,14 +191,15 @@ final class SpotLogger {
             normalizedKey.contains("coordinate") {
             return "\"<redacted>\""
         }
-        if normalizedKey.contains("url"), let value = value as? String {
+        if normalizedKey.contains("url") {
+            let urlValue = (value as? URL)?.absoluteString ?? (value as? String)
             if normalizedKey.contains("host") {
-                return quoted(value)
+                return quoted(urlValue ?? "<redacted-url>")
             }
-            return quoted(redactedURL(value))
+            return quoted(urlValue.map(redactedURL) ?? "<redacted-url>")
         }
-        if normalizedKey.contains("userid") || normalizedKey == "uid" ||
-            normalizedKey.contains("spotid") || normalizedKey.contains("draftid") {
+        if normalizedKey == "uid" ||
+            (normalizedKey.hasSuffix("id") && (value is String || value is UUID)) {
             return quoted(shortIdentifier(String(describing: value)))
         }
 

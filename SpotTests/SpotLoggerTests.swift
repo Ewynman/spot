@@ -91,7 +91,9 @@ struct SpotLoggerTests {
                 "email": "person@example.com",
                 "latitude": 37.1234,
                 "signedURL": "https://example.com/private/file?token=secret",
+                "assetURL": URL(string: "https://example.com/private/typed")!,
                 "userId": "12345678-1234-1234-1234-123456789abc",
+                "authorId": "abcdefab-cdef-cdef-cdef-abcdefabcdef",
                 "errorMessage": "Failed for person@example.com at https://example.com/private",
                 "prefix": "private search",
                 "bodyPreview": Optional("private response") as Any,
@@ -102,7 +104,9 @@ struct SpotLoggerTests {
         #expect(!output.contains("person@example.com"))
         #expect(!output.contains("37.1234"))
         #expect(!output.contains("token=secret"))
+        #expect(!output.contains("/private/typed"))
         #expect(!output.contains("12345678-1234-1234-1234"))
+        #expect(!output.contains("abcdefab-cdef-cdef-cdef"))
         #expect(!output.contains("private search"))
         #expect(!output.contains("private response"))
         #expect(output.contains("userId: \"…56789abc\""))
