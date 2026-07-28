@@ -46,7 +46,7 @@ Verified file paths: `Spot/Info.plist`, `Spot/Spot.entitlements`.
 2. Fully quit Spot.
 3. Reopen Spot.
 
-Before constructing the Supabase client, Spot deletes generic-password Keychain items in its own application access group and immediately resets the switch to off. This clears the persisted Supabase session plus Spot’s account-hint, verification-recovery, and legacy token entries. It does not delete passwords managed by Apple Password AutoFill or other apps.
+Before constructing `AuthViewModel` or the Supabase client, Spot deletes its known authentication Keychain entries and immediately resets the switch to off. This clears the persisted Supabase session plus Spot’s account-hint, verification-recovery, and legacy token entries. It does not delete unrelated app entries, passwords managed by Apple Password AutoFill, or other apps’ data. This testing control must be removed or disabled before the App Store release candidate.
 
 ## Related docs
 
