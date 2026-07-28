@@ -11,13 +11,15 @@ import UIKit
 
 @main
 struct SpotApp: App {
-    @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var authViewModel: AuthViewModel
     @StateObject private var deepLinkState = DeepLinkState.shared
     @State private var showLaunchScreen = true
 
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
+        DebugKeychainReset.performIfRequested()
+        _authViewModel = StateObject(wrappedValue: AuthViewModel())
         configureGlobalBackButtonAppearance()
     }
 

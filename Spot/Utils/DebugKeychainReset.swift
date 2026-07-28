@@ -14,7 +14,7 @@ enum DebugKeychainReset {
     static func performIfRequested() -> Outcome? {
         performIfRequested(
             defaults: .standard,
-            deleteItems: deleteAllSpotGenericPasswordItems
+            deleteItems: deleteSpotAuthenticationItems
         )
     }
 
@@ -45,11 +45,62 @@ enum DebugKeychainReset {
         }
     }
 
-    private static func deleteAllSpotGenericPasswordItems() -> OSStatus {
-        let query: [String: Any] = [
+    static func deleteSpotAuthenticationItems(
+        deleteQuery: ([String: Any]) -> OSStatus = {
+            SecItemDelete($0 as CFDictionary)
+        }
+    ) -> OSStatus {
+        var deletedAnItem = false
+        for query in spotAuthenticationQueries() {
+            let status = deleteQuery(query)
+            switch status {
+            case errSecSuccess:
+                deletedAnItem = true
+            case errSecItemNotFound:
+                continue
+            default:
+                return status
+            }
+        }
+        return deletedAnItem ? errSecSuccess : errSecItemNotFound
+    }
+
+    static func spotAuthenticationQueries() -> [[String: Any]] {
+        [
+            serviceQuery("supabase.gotrue.swift"),
+            serviceQuery(
+                "com.edwardwynman.Spot.account-hint",
+                account: "last-account"
+            ),
+            serviceQuery(
+                "com.edwardwynman.Spot.verification-recovery",
+                account: "pending-signup"
+            ),
+            accountQuery("com.spotapp.spot.supabaseAccessToken"),
+            accountQuery("com.spotapp.spot.tokenExpiration")
+        ]
+    }
+
+    private static func serviceQuery(
+        _ service: String,
+        account: String? = nil
+    ) -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
         ]
-        return SecItemDelete(query as CFDictionary)
+        if let account {
+            query[kSecAttrAccount as String] = account
+        }
+        return query
+    }
+
+    private static func accountQuery(_ account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+        ]
     }
 }

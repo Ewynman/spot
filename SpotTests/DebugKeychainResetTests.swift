@@ -66,6 +66,48 @@ struct DebugKeychainResetTests {
         #expect(!defaults.bool(forKey: Constants.UserDefaultsKeys.clearKeychainOnNextLaunch))
     }
 
+    @Test func resetTargetsOnlyKnownSpotAuthenticationItems() {
+        let queries = DebugKeychainReset.spotAuthenticationQueries()
+        let services = queries.compactMap { $0[kSecAttrService as String] as? String }
+        let accounts = queries.compactMap { $0[kSecAttrAccount as String] as? String }
+
+        #expect(queries.count == 5)
+        #expect(services.contains("supabase.gotrue.swift"))
+        #expect(services.contains("com.edwardwynman.Spot.account-hint"))
+        #expect(services.contains("com.edwardwynman.Spot.verification-recovery"))
+        #expect(accounts.contains("com.spotapp.spot.supabaseAccessToken"))
+        #expect(accounts.contains("com.spotapp.spot.tokenExpiration"))
+        #expect(queries.allSatisfy {
+            ($0[kSecClass as String] as? String) == (kSecClassGenericPassword as String)
+        })
+    }
+
+    @Test func deletingKnownItemsAggregatesStatuses() {
+        var noItemCalls = 0
+        let noItems = DebugKeychainReset.deleteSpotAuthenticationItems { _ in
+            noItemCalls += 1
+            return errSecItemNotFound
+        }
+        #expect(noItems == errSecItemNotFound)
+        #expect(noItemCalls == 5)
+
+        var successCalls = 0
+        let deleted = DebugKeychainReset.deleteSpotAuthenticationItems { _ in
+            successCalls += 1
+            return successCalls == 2 ? errSecSuccess : errSecItemNotFound
+        }
+        #expect(deleted == errSecSuccess)
+        #expect(successCalls == 5)
+
+        var failureCalls = 0
+        let failed = DebugKeychainReset.deleteSpotAuthenticationItems { _ in
+            failureCalls += 1
+            return failureCalls == 2 ? errSecInteractionNotAllowed : errSecItemNotFound
+        }
+        #expect(failed == errSecInteractionNotAllowed)
+        #expect(failureCalls == 2)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "DebugKeychainResetTests.\(UUID().uuidString)"
         return UserDefaults(suiteName: suiteName)!
