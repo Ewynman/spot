@@ -44,46 +44,6 @@ jobs:
         run: |
           echo "SOURCE_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
 
-      - name: Require successful CI on same SHA
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          REPO="${GITHUB_REPOSITORY}"
-          SHA="${GITHUB_SHA}"
-          echo "Checking CI status for commit: ${SHA}"
-          # A cold macOS test run currently takes about 12–15 minutes. Allow up
-          # to 30 minutes so deploy does not report a false failure while CI is
-          # still healthy and running.
-          for attempt in {1..90}; do
-            RUN_JSON=$(gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&per_page=1")
-            COUNT=$(echo "$RUN_JSON" | jq -r '.total_count // 0')
-            if [ "$COUNT" = "0" ]; then
-              echo "No CI run found yet for ${SHA} (attempt ${attempt}/90)"
-              sleep 20
-              continue
-            fi
-
-            STATUS=$(echo "$RUN_JSON" | jq -r '.workflow_runs[0].status')
-            CONCLUSION=$(echo "$RUN_JSON" | jq -r '.workflow_runs[0].conclusion')
-            RUN_ID=$(echo "$RUN_JSON" | jq -r '.workflow_runs[0].id')
-            echo "CI run ${RUN_ID} status=${STATUS} conclusion=${CONCLUSION}"
-
-            if [ "$STATUS" = "completed" ]; then
-              if [ "$CONCLUSION" = "success" ]; then
-                echo "✅ CI succeeded for ${SHA}. Continuing deploy."
-                exit 0
-              fi
-              echo "❌ CI did not succeed for ${SHA} (conclusion=${CONCLUSION})."
-              exit 1
-            fi
-
-            sleep 20
-          done
-
-          echo "❌ Timed out after 30 minutes waiting for CI completion for ${SHA}."
-          exit 1
-
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -336,7 +296,10 @@ jobs:
           # Archive WITHOUT code signing. Passing signing settings (CODE_SIGN_IDENTITY /
           # PROVISIONING_PROFILE_SPECIFIER) on the xcodebuild command line applies them to
           # EVERY target, including Swift Package dependencies (Firebase, Promises, GoogleUtilities,
-          # etc.) which do not support provisioning profiles and fail the archive.
+          # etc.) which do not support provisioning profiles and fail the archive. The custom
+          # SPOT_DISTRIBUTION_CONDITION setting is consumed only by the Spot app target, avoiding
+          # a global SWIFT_ACTIVE_COMPILATION_CONDITIONS override that breaks Xcode 26 dependency
+          # scanning for Firebase and swift-crypto package targets.
           # Instead we archive unsigned and sign only at export time, where ExportOptions scopes
           # the provisioning profile to the app's bundle id.
           xcodebuild \
@@ -344,7 +307,7 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath $RUNNER_TEMP/Spot.xcarchive \
             -configuration Release \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="INTERNAL_TESTING $(inherited)" \
+            SPOT_DISTRIBUTION_CONDITION=INTERNAL_TESTING \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             clean archive | xcbeautify

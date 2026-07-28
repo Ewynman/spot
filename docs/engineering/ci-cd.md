@@ -99,6 +99,7 @@ The workflow trigger is not technically gated on the separate CI workflow succee
 - Automatically increments `CURRENT_PROJECT_VERSION` in Xcode project via `scripts/increment-build-number.sh`
 - **Pushes the build number bump to `main` before building** (prevents duplicate Firebase build numbers when upload succeeds but a later step fails)
 - Pins Firebase-distributed internal builds to staging Supabase project `aeurigbbohyxvtsfiyul`; the workflow fails if another project URL is embedded
+- Defines `INTERNAL_TESTING` through the Spot target's `SPOT_DISTRIBUTION_CONDITION` setting; it is not applied to Swift Package targets
 - Builds signed IPA for distribution
 - Generates release notes from merged PR title and description
 - Uploads to Firebase App Distribution with testers group
