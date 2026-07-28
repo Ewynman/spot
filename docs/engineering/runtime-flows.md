@@ -125,7 +125,7 @@ See the linked safety and feature docs before changing these paths.
 | Feed | `Spot/ViewModels/FeedViewModel.swift`, `Spot/Services/Feed/` |
 | Map | `Spot/ViewModels/MapViewModel.swift`, `Spot/Services/Map/`, `Spot/Views/Home/MapView.swift` |
 | Search | `Spot/ViewModels/SearchViewModel.swift`, `Spot/Services/Search/` |
-| Profile/social | `Spot/ViewModels/ProfileViewModel.swift`, `Spot/Services/ProfileService.swift`, `Spot/Services/FollowRequestsService.swift` |
+| Profile/social | `Spot/ViewModels/ProfileViewModel.swift`, `Spot/Views/Profile/ProfileService.swift`, `Spot/Services/FollowRequestsService.swift` |
 | Publish | `Spot/ViewModels/PostFlowViewModel.swift`, `Spot/Services/Spots/`, `Spot/Services/Supabase/SpotSupabaseRepository.swift` |
 | Deep links | `Spot/Services/DeepLinkRouter.swift`, `Spot/ViewModels/DeepLinkState.swift` |
 

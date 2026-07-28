@@ -14,7 +14,7 @@ Map UI lives under `Spot/Views/Home/MapView.swift`, `SharedSpotMap`, `MapControl
 
 ## Details
 
-### Purpose
+### Experience
 
 The **map** lets users discover Spots near a viewport: markers (and density visualization), selection, and a **spot drawer** (bottom card) for quick preview.
 

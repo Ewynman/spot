@@ -321,7 +321,7 @@ See `Spot/Services/SubscriptionManager.swift` for implementation details.
 
 - [app-store-review-notes.md](./app-store-review-notes.md) - General review notes
 - [../product/pro-subscription.md](../product/pro-subscription.md) - Product spec
-- [../engineering/subscriptions.md](../engineering/subscriptions.md) - Technical implementation (if exists)
+- [../diagrams/subscription-flow.md](../diagrams/subscription-flow.md) - Purchase and entitlement flow
 
 ---
 

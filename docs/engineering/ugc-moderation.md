@@ -25,7 +25,7 @@ be verified before each App Review submission; source control alone cannot prove
 | --- | --- | --- |
 | Pre-auth Terms gate | Unchecked checkbox blocks Apple Sign-In, Get Started, Log in | `WelcomeView` + `TermsAgreementCheckboxView` |
 | Registration-step Terms gate | Unchecked checkbox blocks "Continue" on the post-Sign-in-with-Apple username/profile-photo screen | `PostAuthSetupFlowView` + `TermsAgreementCheckboxView` |
-| Post-auth update gate | Blocking sheet on launch when active terms version changes | `RootView` → `TermsUpdateGateView` |
+| Post-auth update gate | Implemented but currently disabled pending production RPC verification | `RootView` → `TermsUpdateGateView` |
 | Report a Spot | Reason picker, optional details, optional block toggle | `SpotCard` "ellipsis" menu → `ReportSheet` |
 | Report a User | Reason picker, optional details, optional block toggle | `ProfileView` "ellipsis" menu (other user) → `ProfileReportSheet` |
 | Block a User | Confirmation alert, immediate feed removal | `ProfileView` "ellipsis" menu, also reachable from `ReportSheet`/`ProfileReportSheet` toggle |

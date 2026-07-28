@@ -53,8 +53,10 @@ The workflow uses three validation scripts in `scripts/`:
 ### `deploy.yml` - Firebase App Distribution Deployment (Test ENV)
 
 **Triggers:**
-- Merges/pushes to `main` (after CI passes)
+- Pushes to `main`
 - Manual workflow dispatch
+
+This trigger does not depend on the separate CI workflow. Repository branch protection and merge policy are responsible for preventing unvalidated changes from reaching `main`.
 
 **What it does:**
 - Automatically increments build number in `CURRENT_PROJECT_VERSION` (build number `+1` only)

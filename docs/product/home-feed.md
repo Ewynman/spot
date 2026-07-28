@@ -14,7 +14,7 @@ Primary implementation: `Spot/Services/Feed/FeedRepository.swift` using Supabase
 
 ## Details
 
-### Purpose
+### Experience
 
 The **home feed** is the default discovery surface after launch: a ranked, paginated list of Spots tailored to the viewer.
 

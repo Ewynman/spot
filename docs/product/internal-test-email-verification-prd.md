@@ -48,7 +48,7 @@ The closest equivalent to an internal `UT####` code is a staging-only server exc
 
 ## Current behavior and evidence
 
-### Client
+### Current client
 
 - `SignupView` calls `supabase.auth.signUp` and enters pending verification when no session is returned: `Spot/Views/Auth/SignupView.swift`.
 - `ConfirmEmailView` accepts six numeric characters and uses a number pad: `Spot/Views/Auth/ConfirmEmailView.swift`.
@@ -160,7 +160,7 @@ The following names are proposed; values must exist only in Supabase staging Fun
 
 Supabase-provided server credentials remain in the function environment. No service-role or secret key may be added to the iOS app.
 
-### Client
+### Proposed client
 
 The client implementation should:
 
@@ -197,7 +197,7 @@ If a legacy recovery record has no user ID, internal verification is unavailable
 | Firebase internal distribution | `INTERNAL_TESTING`, Release optimization | Staging | May be enabled |
 | TestFlight/App Store | Production Release | Production | Must be absent |
 
-Before this feature can serve Firebase testers, `.github/workflows/deploy.yml` must stop injecting production Supabase credentials and must define the reviewed internal-testing compilation condition. This environment change is a separate release-sensitive decision and must include artifact verification.
+Firebase already injects staging Supabase credentials. Before this feature can serve Firebase testers, the workflow must define a reviewed internal-testing compilation condition and verify both that condition and the staging project in the built artifact.
 
 ### Defense in depth
 
