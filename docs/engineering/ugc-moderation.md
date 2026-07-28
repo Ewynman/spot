@@ -64,6 +64,12 @@ All applied via Supabase migrations under `supabase/migrations/`.
 | `Spot/Models/Logs/ModerationServiceLogs.swift` | Structured logs |
 | `Spot/Models/Logs/TermsAcceptanceLogs.swift` | Structured logs |
 
+The post-auth updated-terms gate is temporarily disabled in `RootView` while
+the production deployment of the terms-acceptance RPCs is investigated. The
+pre-auth Terms of Use and Privacy Policy agreement remains visible. Re-enable
+the gate only after `record_terms_acceptance_v1` and
+`has_accepted_active_terms` are verified with an authenticated production user.
+
 `ReportSheet` retains its legacy reasons and bridges to `ModerationReportReason`
 through `ReportReason.moderationReason` so the existing entry point on
 `SpotCard` keeps working while routing through the new RPC.
