@@ -14,7 +14,7 @@ enum DebugKeychainReset {
     static func performIfRequested() -> Outcome? {
         performIfRequested(
             defaults: .standard,
-            deleteItems: deleteSpotAuthenticationItems
+            deleteItems: { deleteSpotAuthenticationItems() }
         )
     }
 
