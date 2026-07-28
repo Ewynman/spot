@@ -193,9 +193,9 @@ struct SettingsView: View {
                                 LoggingSettingsDetailView()
                             } label: {
                                 settingsRow(
-                                    title: "Console logging",
+                                    title: "Logging",
                                     icon: "ladybug",
-                                    subtitle: "Feed, upload, auth…"
+                                    subtitle: "Profiles 0–4 and device file"
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())

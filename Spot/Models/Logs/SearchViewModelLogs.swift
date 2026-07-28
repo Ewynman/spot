@@ -30,13 +30,13 @@ enum SearchViewModelLogs: SpotLog {
         switch self {
         case .searchQueryChanged: return .debug
         case .searchSegmentSwitched: return .info
-        case .searchUsersResults: return .info
-        case .searchLocationsSuggestions: return .info
-        case .searchVibesSuggestions: return .info
+        case .searchUsersResults: return .debug
+        case .searchLocationsSuggestions: return .debug
+        case .searchVibesSuggestions: return .debug
         case .openLocationGrid: return .debug
         case .openVibeGrid: return .debug
         case .openMultiVibeGrid: return .debug
-        case .gridLoadedPage: return .info
+        case .gridLoadedPage: return .debug
         case .gridLoadFailed: return .error
         case .loadedAllVibeTags: return .info
         case .applyVibeFiltersToLocation: return .debug

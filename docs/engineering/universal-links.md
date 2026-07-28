@@ -97,7 +97,7 @@ Simulator note: Universal Links can be finicky; **validate on device** before re
 ### Troubleshooting
 
 1. **Link opens Safari, not app** — AASA not reachable, wrong team/bundle, or entitlements not in installed build.
-2. **App opens but wrong route** — Check `DeepLinkRouter` logs (`DebugCategory.deepLink`); verify path is exactly `/s/{id}`.
+2. **App opens but wrong route** — Select logging profile 4 and check `DeepLinkRouter` logs; verify path is exactly `/s/{id}`.
 3. **Custom scheme no-op** — Confirm `CFBundleURLTypes` includes `spotapp`.
 
 ### Release checklist (links)

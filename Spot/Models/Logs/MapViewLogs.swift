@@ -47,9 +47,9 @@ enum MapViewLogs: SpotLog {
         case .visibleSpotsTrimmed: return .debug
         case .mapDrawerDismissed: return .debug
         case .mapSpotSwitchAnimated: return .debug
-        case .freshLocationRequested: return .info
-        case .freshLocationReceived: return .info
-        case .locationUpdateApplied: return .info
+        case .freshLocationRequested: return .debug
+        case .freshLocationReceived: return .debug
+        case .locationUpdateApplied: return .debug
         case .locationUpdateSkipped: return .debug
         case .memorySnapshot: return .debug
         }

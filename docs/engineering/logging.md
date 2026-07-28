@@ -2,44 +2,103 @@
 
 ## Purpose
 
-Describe structured logging via `SpotLogger`, log levels, and debug categories.
+Spot uses one structured logging path for console and DEBUG device-file output.
 
-## Audience
+## Pattern
 
-Engineers debugging features and writing new services.
+Define events in a `SpotLog` enum under `Spot/Models/Logs/`. Every log file owns a
+stable component tag, severity, and message:
 
-## Current status
+```swift
+enum AuthServiceLogs: SpotLog {
+    case sessionRefreshFailed
 
-Implementation: `Spot/Utils/SpotLogger.swift`, `Spot/Utils/LoggingConfig.swift`, per-feature log enums under `Spot/Models/Logs/`.
+    var tag: String { "AuthService" }
+    var level: LogLevel { .error }
+    var message: String { "Session refresh failed" }
+}
+```
 
-## Details
+Emit only through `SpotLogger`:
 
-### Pattern
+```swift
+SpotLogger.log(
+    AuthServiceLogs.sessionRefreshFailed,
+    details: [
+        "responseCode": 401,
+        "errorMessage": "Session expired",
+        "retrying": true
+    ]
+)
+```
 
-1. Define an enum conforming to **`SpotLog`** (tag, level, message) for a component.
-2. Emit with **`SpotLogger.log(_:details:)`** (and `info` / `error` helpers as appropriate).
+Console and file output use the same format:
 
-### Levels
+```text
+AuthService Session refresh failed
+[
+    errorMessage: "Session expired"
+    responseCode: 401
+    retrying: true
+]
+```
 
-`LogLevel`: **debug**, **info**, **error** — with ordering for filtering.
+The logger does not print the source filename, line, function, severity label, or
+an additional logger prefix. Apple Unified Logging still retains severity
+metadata for Xcode filtering.
 
-### Debug categories
+## Root logging profiles
 
-`DebugCategory` includes UI, navigation, feed, network, auth, image, location, performance, deepLink, moderation, privacy. Enable per category or use master switches / `UserDefaults` keys under `Constants.UserDefaultsKeys` (e.g. `logDeepLink`, `logAllDebugCategories`).
+`LoggingConfig` reads one `loggingProfile` integer from `UserDefaults`. DEBUG
+builds expose it under Settings → Debug → Logging.
 
-### Release behavior
+| Value | Profile | Behavior |
+|---|---|---|
+| 0 | Errors only | Error events |
+| 1 | Info + errors | Info and error events |
+| 2 | Debug + info + errors | All severities except known high-frequency debug tags |
+| 3 | UI only | Events emitted directly under `Spot/Views` |
+| 4 | All logs | Every event, including high-frequency diagnostics |
 
-`LoggingConfig` sets minimum level to **errors only** in non-DEBUG builds (see `#if DEBUG` branches).
+Profile 2 suppresses debug events from analytics, deep links, feed events and
+image hydration, location, map loading/markers/views, search, and Spot cards.
+Errors and info from those components still appear. Add a tag to that
+suppression set only when its debug events are demonstrably high frequency.
 
-### Map-only mode
+Non-DEBUG builds always use profile 0 regardless of saved DEBUG settings.
+`Spot/Config/LoggingDefaults.plist` controls the first-launch DEBUG default.
 
-`SpotLogger.mapOnlyLoggingEnabled` restricts noise during map debugging (see comments in `SpotLogger`).
+## Device file
 
-## Related docs
+In a DEBUG build without an attached debugger, emitted logs are also appended to:
 
-- [architecture.md](architecture.md)
-- [troubleshooting.md](troubleshooting.md)
+```text
+Application Support/Logs/spot-debug.txt
+```
 
-## Open questions / TODOs
+The file is protected until first device unlock, rotates at 1 MB, and retains
+three archives. File writing is compiled out of release builds. When Xcode is
+attached, the file sink stays off and logs go only to Apple Unified Logging.
 
-- None.
+## Privacy and noise rules
+
+`SpotLogger` centrally redacts credentials, tokens, emails, queries, precise
+coordinates, paths, and full URLs. User and Spot identifiers are shortened.
+Error text is scrubbed for embedded emails and URLs.
+
+Call sites must still follow these rules:
+
+- Do not pass passwords, access tokens, authorization headers, or secrets.
+- Prefer response codes and stable error categories over raw server payloads.
+- Do not log events on every render, animation frame, map pan, or location fix
+  unless the event is debug severity and profile 4 is required.
+- Consolidate multiple messages for one operation into one event with details.
+- Use stable tags and messages so logs remain searchable.
+
+## Implementation
+
+- `Spot/Utils/SpotLogger.swift`
+- `Spot/Utils/LoggingConfig.swift`
+- `Spot/Config/LoggingDefaults.plist`
+- `Spot/Models/Logs/`
+- `SpotTests/SpotLoggerTests.swift`

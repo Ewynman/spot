@@ -12,8 +12,10 @@ struct FeedFlags {
     /// Disable any persistent deduplication across app sessions
     static var disablePersistentDedupe: Bool = false
 
-    /// Enable comprehensive logging for feed diagnostics
-    static var enableDiagnosticLogging: Bool = false
+    /// Comprehensive feed diagnostics are part of profile 4 only.
+    static var enableDiagnosticLogging: Bool {
+        SpotLogger.profile == .all
+    }
 
     /// TTL for persistent seen tracking (in hours, 0 = disabled)
     static var persistentSeenTTL: TimeInterval = 24 * 7 // 7 days

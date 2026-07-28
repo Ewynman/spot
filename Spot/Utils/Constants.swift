@@ -58,19 +58,10 @@ enum Constants {
         static let lastKnownNotificationStatus = "lastKnownNotificationStatus"
         static let promptPermsOnNextLogin = "promptPermsOnNextLogin"
         static let homeTourAccepted = "homeTourAccepted"
-        static let debugLoggingEnabled = "debugLoggingEnabled"
-        static let logSpotCard = "logSpotCard"
-        static let logPrivacy = "logPrivacy"
-        static let logFeedComponent = "logFeedComponent"
-        static let logPostFlow = "logPostFlow"
-        static let logAuth = "logAuth"
-        static let logNetworkComponent = "logNetworkComponent"
-        static let logDeepLink = "logDeepLink"
+        static let loggingProfile = "loggingProfile"
         static let clearKeychainOnNextLaunch = "debugClearKeychainOnNextLaunch"
         static let lastSupabaseProjectReference = "lastSupabaseProjectReference"
         static let supabaseSessionResetReason = "supabaseSessionResetReason"
-        /// When true, `SpotLogger` treats all debug categories as on (per-area toggles are ignored).
-        static let logAllDebugCategories = "logAllDebugCategories"
     }
 
     enum Legal {
