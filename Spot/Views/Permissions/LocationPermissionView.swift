@@ -36,6 +36,7 @@ struct LocationPermissionView: View {
     @State private var navigateToSignup = false
     @State private var navigateToLogin = false
     @State private var navigateToPostAuthSetup = false
+    @State private var hasFinished = false
 
     init(
         authDestination: AuthDestination = .signup,
@@ -163,14 +164,23 @@ struct LocationPermissionView: View {
     }
 
     private func primaryAction() {
-        if isDenied {
+        permissionManager.updatePermissionStatuses()
+        switch LocationPermissionPolicy.primaryAction(for: permissionManager.locationStatus) {
+        case .complete:
+            // A stale parent decision can present this sheet after access was
+            // already granted. Complete immediately instead of waiting for an
+            // authorization change that will never occur.
+            goToAuthDestination()
+        case .openSettings:
             permissionManager.openLocationSettings()
-        } else {
+        case .requestSystemPermission:
             permissionManager.requestLocationPermission()
         }
     }
 
     private func goToAuthDestination() {
+        guard !hasFinished else { return }
+        hasFinished = true
         if let onComplete {
             onComplete()
             return
