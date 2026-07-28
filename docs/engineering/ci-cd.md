@@ -380,6 +380,7 @@ If Xcode Cloud starts building again:
 
 **Deploy safeguards:**
 - **Concurrency:** Only one deploy runs at a time (`deploy-firebase-main` group)
+- **CI gate:** Deployment waits up to 30 minutes for the `ci.yml` push run on the same source SHA to succeed
 - **Skip bump commits:** Pushes with message `Bump build number to … [skip ci]` do not re-trigger deploy
 - **Skip CI on bumps:** `ci.yml` skips validation on `[skip ci]` commits
 - **Push before build:** The incremented build number is committed and pushed to `main` before archiving/uploading to Firebase
