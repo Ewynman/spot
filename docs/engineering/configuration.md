@@ -38,6 +38,16 @@ Verified file paths: `Spot/Info.plist`, `Spot/Spot.entitlements`.
 
 `Config/LoggingDefaults.plist` (bundled) seeds `LoggingConfig` / `UserDefaults` toggles—see [logging.md](logging.md).
 
+### Settings bundle authentication reset
+
+`Spot/Settings.bundle/Root.plist` exposes **Clear Keychain on Next Launch** under Authentication Testing. It is a one-shot testing control:
+
+1. Turn the switch on in the iOS Settings app.
+2. Fully quit Spot.
+3. Reopen Spot.
+
+Before constructing the Supabase client, Spot deletes generic-password Keychain items in its own application access group and immediately resets the switch to off. This clears the persisted Supabase session plus Spot’s account-hint, verification-recovery, and legacy token entries. It does not delete passwords managed by Apple Password AutoFill or other apps.
+
 ## Related docs
 
 - [universal-links.md](universal-links.md)

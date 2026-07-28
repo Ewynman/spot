@@ -42,6 +42,8 @@ User-initiated logout uses Supabase’s **local** sign-out scope. It removes the
 - Login fields use `.emailAddress`, `.username`, `.password`, and `.newPassword` content types as appropriate so Apple Password AutoFill can offer credentials managed by the operating system.
 - Sign in with Apple requests use a cryptographically random nonce. The request receives the SHA-256 nonce while Supabase receives the raw nonce with the Apple ID token.
 
+For testing, the Settings bundle’s **Clear Keychain on Next Launch** switch triggers `DebugKeychainReset` before the global Supabase client is initialized. The one-shot reset removes Spot-owned generic-password Keychain items and turns itself off. A full app quit and relaunch is required.
+
 ### New-device SSO and passkeys
 
 Current supported new-device paths are Sign in with Apple and iCloud Password AutoFill. Spot does not synchronize its own Supabase refresh tokens or raw credentials.
