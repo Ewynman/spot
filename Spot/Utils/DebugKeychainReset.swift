@@ -12,12 +12,17 @@ enum DebugKeychainReset {
     /// can be restored first. The preference is always reset for one-shot use.
     @discardableResult
     static func performIfRequested() -> Outcome? {
+        #if DEBUG
         performIfRequested(
             defaults: .standard,
             deleteItems: { deleteSpotAuthenticationItems() }
         )
+        #else
+        nil
+        #endif
     }
 
+    #if DEBUG
     @discardableResult
     static func performIfRequested(
         defaults: UserDefaults,
@@ -103,4 +108,5 @@ enum DebugKeychainReset {
             kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
         ]
     }
+    #endif
 }

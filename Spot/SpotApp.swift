@@ -18,7 +18,9 @@ struct SpotApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
+        #if DEBUG
         DebugKeychainReset.performIfRequested()
+        #endif
         _authViewModel = StateObject(wrappedValue: AuthViewModel())
         configureGlobalBackButtonAppearance()
     }

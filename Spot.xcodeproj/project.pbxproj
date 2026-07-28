@@ -164,6 +164,7 @@
 				642844092E20429B00DC9E8A /* Sources */,
 				6428440A2E20429B00DC9E8A /* Frameworks */,
 				6428440B2E20429B00DC9E8A /* Resources */,
+				D34B6A012F40000100DB6A01 /* Install Debug Settings */,
 			);
 			buildRules = (
 			);
@@ -317,6 +318,31 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D34B6A012F40000100DB6A01 /* Install Debug Settings */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/DebugSettingsRoot.plist",
+			);
+			name = "Install Debug Settings";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/Root.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nif [ \"${CONFIGURATION}\" != \"Debug\" ]; then\n  exit 0\nfi\n\nSOURCE_PLIST=\"${SRCROOT}/scripts/DebugSettingsRoot.plist\"\nDESTINATION_PLIST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Settings.bundle/Root.plist\"\n\nif [ ! -f \"${DESTINATION_PLIST}\" ]; then\n  echo \"error: Settings.bundle/Root.plist was not copied before debug customization\"\n  exit 1\nfi\n\n/bin/cp \"${SOURCE_PLIST}\" \"${DESTINATION_PLIST}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		642844092E20429B00DC9E8A /* Sources */ = {
