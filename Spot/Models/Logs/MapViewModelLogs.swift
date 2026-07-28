@@ -23,7 +23,7 @@ enum MapViewModelLogs: SpotLog {
         case .mapLoadedAllSpots: return .info
         case .loadAllSpotsFailed: return .error
         case .viewportFetchStarted: return .debug
-        case .viewportFetchFinished: return .info
+        case .viewportFetchFinished: return .debug
         case .viewportFetchCancelled: return .debug
         case .visibleSpotsMerged: return .debug
         case .visibleSpotsTrimmed: return .debug

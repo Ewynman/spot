@@ -10,6 +10,13 @@ import Testing
 @testable import Spot
 
 struct SpotLoggerTests {
+    private enum TestLog: SpotLog {
+        case sessionRefreshFailed
+
+        var tag: String { "AuthService" }
+        var level: LogLevel { .error }
+        var message: String { "Session refresh failed" }
+    }
 
     // MARK: - SpotLog protocol conformance
 
@@ -53,15 +60,61 @@ struct SpotLoggerTests {
 
     @Test func logFormattedOutputWithoutDetails() {
         let output = SpotLogger.body(for: SpotServiceLogs.spotFetched, details: [:])
-        #expect(output == "SpotLogger: SpotService\nFetched spot")
+        #expect(output == "SpotService Fetched spot")
     }
 
     @Test func logFormattedOutputWithDetails() {
-        let output = SpotLogger.body(for: SpotServiceLogs.spotFetched, details: ["id": "abc123", "statusCode": 200])
-        #expect(output.hasPrefix("SpotLogger: SpotService\nFetched spot\n[\n"))
-        // Details are sorted alphabetically, each indented with 5 spaces
-        #expect(output.contains("     id: abc123"))
-        #expect(output.contains("     statusCode: 200"))
-        #expect(output.hasSuffix("\n]"))
+        let output = SpotLogger.body(
+            for: TestLog.sessionRefreshFailed,
+            details: [
+                "responseCode": 401,
+                "errorMessage": "Session expired",
+                "retrying": true
+            ]
+        )
+        #expect(
+            output == """
+            AuthService Session refresh failed
+            [
+                errorMessage: "Session expired"
+                responseCode: 401
+                retrying: true
+            ]
+            """
+        )
+    }
+
+    @Test func sensitiveDetailsAreRedactedOrShortened() {
+        let output = SpotLogger.body(
+            for: TestLog.sessionRefreshFailed,
+            details: [
+                "email": "person@example.com",
+                "latitude": 37.1234,
+                "signedURL": "https://example.com/private/file?token=secret",
+                "userId": "12345678-1234-1234-1234-123456789abc",
+                "errorMessage": "Failed for person@example.com at https://example.com/private"
+            ]
+        )
+
+        #expect(!output.contains("person@example.com"))
+        #expect(!output.contains("37.1234"))
+        #expect(!output.contains("token=secret"))
+        #expect(!output.contains("12345678-1234-1234-1234"))
+        #expect(output.contains("userId: \"…56789abc\""))
+    }
+
+    @Test func profilesApplyExpectedFilters() {
+        let serviceFile = "/app/Services/AuthService.swift"
+        let viewFile = "/app/Views/LoginView.swift"
+
+        #expect(SpotLogger.shouldEmit(level: .error, tag: "AuthService", file: serviceFile, profile: .errorsOnly))
+        #expect(!SpotLogger.shouldEmit(level: .info, tag: "AuthService", file: serviceFile, profile: .errorsOnly))
+        #expect(SpotLogger.shouldEmit(level: .info, tag: "AuthService", file: serviceFile, profile: .information))
+        #expect(!SpotLogger.shouldEmit(level: .debug, tag: "AuthService", file: serviceFile, profile: .information))
+        #expect(SpotLogger.shouldEmit(level: .debug, tag: "AuthService", file: serviceFile, profile: .debugging))
+        #expect(!SpotLogger.shouldEmit(level: .debug, tag: "LocationManager", file: serviceFile, profile: .debugging))
+        #expect(SpotLogger.shouldEmit(level: .debug, tag: "LoginView", file: viewFile, profile: .uiOnly))
+        #expect(!SpotLogger.shouldEmit(level: .error, tag: "AuthService", file: serviceFile, profile: .uiOnly))
+        #expect(SpotLogger.shouldEmit(level: .debug, tag: "LocationManager", file: serviceFile, profile: .all))
     }
 }

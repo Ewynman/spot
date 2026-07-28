@@ -33,9 +33,9 @@ enum MapMarkerLogs: SpotLog {
         case .markerDeselected: return .debug
         case .animationBatchStarted: return .debug
         case .animationBatchFinished: return .debug
-        case .userMarkerAvatarLoaded: return .info
-        case .userMarkerAvatarFallback: return .info
-        case .userMarkerConfigured: return .info
+        case .userMarkerAvatarLoaded: return .debug
+        case .userMarkerAvatarFallback: return .debug
+        case .userMarkerConfigured: return .debug
         case .userMarkerCustomFailed: return .error
         case .softClusterShown: return .debug
         case .overlapBucketResolved: return .debug

@@ -30,13 +30,13 @@ enum FeedSupabaseLogs: SpotLog {
 
     var level: LogLevel {
         switch self {
-        case .rpcSucceeded, .statusFetched, .primaryImageSigned, .mapRPCSucceeded,
+        case .rpcSucceeded, .statusFetched,
              .loadInitialPreserveOldContent, .loadInitialUsedSeenFallback,
              .loadInitialAutoFallback, .loadMoreNoNewRows,
              .feedProfileFetched, .feedProfileRecomputed:
             return .info
-        case .mapRPCCancelled:
-            // Pan/zoom-driven cancels are expected; debug, not error.
+        case .primaryImageSigned, .mapRPCSucceeded, .mapRPCCancelled:
+            // Image hydration and map viewport calls can happen many times.
             return .debug
         case .rpcFailed, .statusFailed, .primaryImageSignFailed, .mapRPCFailed,
              .feedProfileFetchFailed, .feedProfileRecomputeFailed:

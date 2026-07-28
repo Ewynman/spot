@@ -2,23 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>debugLoggingEnabled</key>
-	<true/>
-	<key>logAllDebugCategories</key>
-	<false/>
-	<key>logSpotCard</key>
-	<false/>
-	<key>logPrivacy</key>
-	<false/>
-	<key>logFeedComponent</key>
-	<false/>
-	<key>logPostFlow</key>
-	<false/>
-	<key>logAuth</key>
-	<false/>
-	<key>logNetworkComponent</key>
-	<false/>
-	<key>logDeepLink</key>
-	<false/>
+	<key>loggingProfile</key>
+	<integer>1</integer>
 </dict>
 </plist>

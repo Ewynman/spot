@@ -8,97 +8,35 @@
 			<key>Type</key>
 			<string>PSGroupSpecifier</string>
 			<key>Title</key>
-			<string>Debug</string>
+			<string>Debug Logging</string>
 			<key>FooterText</key>
-			<string>Disables all app logs when turned off.</string>
+			<string>DEBUG builds only. App Store and TestFlight builds always emit errors only.</string>
 		</dict>
 		<dict>
 			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
+			<string>PSMultiValueSpecifier</string>
 			<key>Title</key>
-			<string>Enable App Logs</string>
+			<string>Log Profile</string>
 			<key>Key</key>
-			<string>debugLoggingEnabled</string>
+			<string>loggingProfile</string>
 			<key>DefaultValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSGroupSpecifier</string>
-			<key>Title</key>
-			<string>Log Presets</string>
-			<key>FooterText</key>
-			<string>These are debug-only and take effect on next app launch.</string>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>SpotCard Logging</string>
-			<key>Key</key>
-			<string>logSpotCard</string>
-			<key>DefaultValue</key>
-			<false/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>Privacy Logging</string>
-			<key>Key</key>
-			<string>logPrivacy</string>
-			<key>DefaultValue</key>
-			<false/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>Feed Component Logging</string>
-			<key>Key</key>
-			<string>logFeedComponent</string>
-			<key>DefaultValue</key>
-			<false/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>Post Flow Logging</string>
-			<key>Key</key>
-			<string>logPostFlow</string>
-			<key>DefaultValue</key>
-			<false/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>Auth Logging</string>
-			<key>Key</key>
-			<string>logAuth</string>
-			<key>DefaultValue</key>
-			<false/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>Network Component Logging</string>
-			<key>Key</key>
-			<string>logNetworkComponent</string>
-			<key>DefaultValue</key>
-			<false/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>Deep Link Logging</string>
-			<key>Key</key>
-			<string>logDeepLink</string>
-			<key>DefaultValue</key>
-			<false/>
+			<integer>1</integer>
+			<key>Titles</key>
+			<array>
+				<string>0 — Errors only</string>
+				<string>1 — Info + errors</string>
+				<string>2 — Debug + info + errors</string>
+				<string>3 — UI only</string>
+				<string>4 — All logs</string>
+			</array>
+			<key>Values</key>
+			<array>
+				<integer>0</integer>
+				<integer>1</integer>
+				<integer>2</integer>
+				<integer>3</integer>
+				<integer>4</integer>
+			</array>
 		</dict>
 	</array>
 	<key>StringsTable</key>

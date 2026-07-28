@@ -14,17 +14,23 @@ import UserNotifications
 class AppDelegate: NSObject, UIApplicationDelegate {
     private var memoryWarningObserver: NSObjectProtocol?
 
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        LoggingConfig.applyFromUserDefaults()
+    }
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        LoggingConfig.configure()
+        SpotLogger.log(AppDelegateLogs.appLaunched)
+
         // Skip Firebase initialisation during unit tests – GoogleService-Info.plist
         // is not present in the repository and FirebaseApp.configure() would abort.
         if !SpotLaunchConfiguration.isUnitTestMode {
             if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
                 FirebaseApp.configure()
                 Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
-                Crashlytics.crashlytics().log("AppDelegate didFinishLaunching")
                 #if !DEBUG
                 Analytics.setAnalyticsCollectionEnabled(true)
                 #endif
@@ -33,9 +39,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             }
         }
 
-        // Configure logging defaults.
-        LoggingConfig.configure()
-        
         // Register notification categories and set delegate
         Task { @MainActor in
             NotificationService.shared.registerNotificationCategories()

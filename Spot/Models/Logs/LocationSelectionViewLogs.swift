@@ -32,14 +32,14 @@ enum LocationSelectionViewLogs: SpotLog {
         case .noCurrentLocationAvailable: return .debug
         case .gotCurrentLocation: return .info
         case .nearbyPlaceSearchFailed: return .error
-        case .foundNearbyPlaces: return .info
+        case .foundNearbyPlaces: return .debug
         case .searchingPlaces: return .debug
         case .anchoredPlaceMatched: return .info
         case .placesQueryFailed: return .debug
         case .searchPlacesFailed: return .error
-        case .foundLocalSearchResults: return .info
+        case .foundLocalSearchResults: return .debug
         case .noLocalResultsRetryingGlobal: return .debug
-        case .foundGlobalSearchResults: return .info
+        case .foundGlobalSearchResults: return .debug
         case .userSelectedLocation: return .info
         case .reverseGeocodeFailed: return .debug
         case .upsertPlaceFailed: return .debug

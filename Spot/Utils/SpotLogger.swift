@@ -1,16 +1,14 @@
 import Foundation
 import os
+#if DEBUG
+import Darwin
+#endif
 
-// MARK: - SpotLog Protocol
+// MARK: - Structured log definitions
 
-/// A structured log definition. Conform an enum to this protocol to describe
-/// all log events for a given class, then emit them with `SpotLogger.log(_:details:)`.
 protocol SpotLog {
-    /// The name of the originating class, shown as the log tag.
     var tag: String { get }
-    /// Severity level for this log entry.
     var level: LogLevel { get }
-    /// Human-readable description of the event.
     var message: String { get }
 }
 
@@ -19,389 +17,326 @@ enum LogLevel: String, CaseIterable, Comparable {
     case info = "INFO"
     case error = "ERROR"
 
-    // For filtering: debug < info < error
     static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
         let order: [LogLevel] = [.debug, .info, .error]
         return order.firstIndex(of: lhs)! < order.firstIndex(of: rhs)!
     }
 }
 
-/// Debug log categories for fine-grained control
-enum DebugCategory: String, CaseIterable {
-    case ui = "UI"                    // UI interactions (taps, appears, etc.)
-    case navigation = "Navigation"   // Navigation events
-    case feed = "Feed"               // Feed loading, ranking, blending
-    case network = "Network"         // API calls, remote data operations
-    case auth = "Auth"               // Authentication events
-    case image = "Image"             // Image loading, caching
-    case location = "Location"       // Location services
-    case performance = "Performance" // Performance metrics
-    case deepLink = "DeepLink"       // Deep linking
-    case moderation = "Moderation"   // Content moderation
-    case privacy = "Privacy"         // Privacy filtering
-    
-    static var enabledCategories: Set<DebugCategory> = []
-    
-    static func enable(_ category: DebugCategory) {
-        enabledCategories.insert(category)
-    }
-    
-    static func disable(_ category: DebugCategory) {
-        enabledCategories.remove(category)
-    }
-    
-    static func enableAll() {
-        enabledCategories = Set(DebugCategory.allCases)
-    }
-    
-    static func disableAll() {
-        enabledCategories.removeAll()
-    }
-    
-    var isEnabled: Bool {
-        return DebugCategory.enabledCategories.contains(self)
-    }
-}
+/// Root logging profiles exposed by the DEBUG settings screen.
+///
+/// Profile 2 intentionally omits known high-frequency debug diagnostics.
+/// Profile 4 is the explicit opt-in for those noisy events.
+enum LoggingProfile: Int, CaseIterable, Identifiable {
+    case errorsOnly = 0
+    case information = 1
+    case debugging = 2
+    case uiOnly = 3
+    case all = 4
 
-/// Component-specific logging flags for major files/components
-struct ComponentLogging {
-    // UI Components
-    static var spotCard: Bool = false
-    static var profileView: Bool = false
-    static var searchView: Bool = false
-    static var feedView: Bool = false
-    
-    // Services
-    static var authorPrivacyCache: Bool = false
-    static var feedRepository: Bool = false
-    static var feedRanker: Bool = false
-    static var spotService: Bool = false
-    static var authService: Bool = false
-    static var imageService: Bool = false
-    static var deepLinkRouter: Bool = false
-    
-    // ViewModels
-    static var authViewModel: Bool = false
-    static var likesViewModel: Bool = false
-    static var bookmarksViewModel: Bool = false
-    
-    // Post Flow
-    static var postFlow: Bool = false
-    static var locationSelection: Bool = false
-    static var photoSelection: Bool = false
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .errorsOnly: return "0 — Errors only"
+        case .information: return "1 — Info + errors"
+        case .debugging: return "2 — Debug + info + errors"
+        case .uiOnly: return "3 — UI only"
+        case .all: return "4 — All logs"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .errorsOnly: return "Failures that require investigation."
+        case .information: return "Important app activity and failures."
+        case .debugging: return "Development detail without high-frequency debug events."
+        case .uiOnly: return "Events emitted directly by SwiftUI views."
+        case .all: return "Every event, including noisy diagnostics."
+        }
+    }
 }
 
 final class SpotLogger {
     static let shared = SpotLogger()
     private init() {}
 
-    // MARK: - Configuration
-    static var minimumLevel: LogLevel = .info // Default to info, debug requires category enablement
-    static var enableAllDebug: Bool = false   // Master switch for all debug logs
-    /// When enabled, suppresses all SpotLogger output except logs needed
-    /// for map debugging: map UI/model/marker/filter logs,
-    /// LocationManager logs, and Supabase map viewport RPC logs.
-    ///
-    /// This intentionally does not affect Apple/MapKit system console
-    /// messages such as `default.csv`, `PerfPowerTelemetry`, or
-    /// `CAMetalLayer`; those are not emitted through SpotLogger.
-    static var mapOnlyLoggingEnabled: Bool = false
-    private static let defaults = UserDefaults.standard
+    private(set) static var profile: LoggingProfile = .errorsOnly
+    private static let detailsIndentation = "    "
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.spotapp.spot",
+        category: "SpotLogger"
+    )
+    private static let noisyTags: Set<String> = [
+        "AnalyticsService",
+        "DeepLinkRouter",
+        "FeedEventService",
+        "FeedSupabase",
+        "ImageService",
+        "LocationManager",
+        "LocationSelectionView",
+        "MapMarker",
+        "MapView",
+        "MapViewModel",
+        "SearchViewModel",
+        "SpotCard"
+    ]
 
-    #if DEBUG
-    static var debugLoggingEnabled: Bool {
-        get {
-            if defaults.object(forKey: Constants.UserDefaultsKeys.debugLoggingEnabled) == nil {
-                defaults.set(true, forKey: Constants.UserDefaultsKeys.debugLoggingEnabled)
-            }
-            return defaults.bool(forKey: Constants.UserDefaultsKeys.debugLoggingEnabled)
-        }
-        set {
-            defaults.set(newValue, forKey: Constants.UserDefaultsKeys.debugLoggingEnabled)
-        }
-    }
-    #endif
-
-    static func setMinimumLevel(_ level: LogLevel) {
-        minimumLevel = level
+    static func setProfile(_ newProfile: LoggingProfile) {
+        profile = newProfile
+        FeedFlags.enableDiagnosticLogging = newProfile == .all
     }
 
-    #if DEBUG
-    static func setDebugLoggingEnabled(_ isEnabled: Bool) {
-        debugLoggingEnabled = isEnabled
-    }
-    #endif
-
-    // MARK: - Structured Log Entry
-
-    /// Indentation prefix applied to each key-value pair in the details block.
-    private static let detailsIndentation = "     "
-
-    /// Emit a structured log defined by a `SpotLog`-conforming enum case.
+    /// Emits one log through the shared logger.
     ///
     /// Output format:
     /// ```
-    /// SpotLogger: <tag>
-    /// <message>
+    /// <tag> <message>
     /// [
-    ///      key: value
+    ///     key: value
     /// ]
     /// ```
-    static func log(_ entry: some SpotLog, details: [String: Any] = [:], file: String = #file, function: String = #function, line: Int = #line) {
-        guard entry.level >= minimumLevel else { return }
-        guard shouldEmit(entry: entry, details: details, file: file) else { return }
-        log(entry.level, message: body(for: entry, details: details), file: file, function: function, line: line)
+    static func log(
+        _ entry: some SpotLog,
+        details: [String: Any] = [:],
+        file: String = #file
+    ) {
+        guard shouldEmit(entry: entry, file: file) else { return }
+        emit(entry.level, message: body(for: entry, details: details))
     }
 
-    /// Returns the formatted body string for a structured log entry.
-    ///
-    /// The output begins with a `SpotLogger: <tag>` header line followed by the
-    /// entry's message. When `details` is non-empty, a sorted key-value block is
-    /// appended between `[` and `]` delimiters.
-    ///
-    /// - Parameters:
-    ///   - entry: A `SpotLog`-conforming value that provides the tag and message.
-    ///   - details: Optional structured metadata to attach to the log.
-    /// - Returns: The fully-formatted log body string.
-    ///
-    /// Exposed `internal` so it can be verified directly in unit tests.
+    /// Exposed internally so formatting and privacy behavior can be unit tested.
     static func body(for entry: some SpotLog, details: [String: Any]) -> String {
-        let header = "SpotLogger: \(entry.tag)"
-        if details.isEmpty {
-            return "\(header)\n\(entry.message)"
-        }
-        let lines = details
-            .map { key, value -> String in
-                let v: String
-                if let date = value as? Date {
-                    v = date.description
-                } else if let arr = value as? [Any] {
-                    v = arr.map { String(describing: $0) }.joined(separator: ", ")
-                } else {
-                    v = String(describing: value)
-                }
-                return "\(detailsIndentation)\(key): \(v)"
-            }
-            .sorted()
-            .joined(separator: "\n")
-        return "\(header)\n\(entry.message)\n[\n\(lines)\n]"
-    }
+        let header = "\(entry.tag) \(entry.message)"
+        guard !details.isEmpty else { return header }
 
-    // MARK: - Public Logging Methods
-    
-    // INFO - Always enabled for important events
-    static func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.info, message: composeMessage(title: "", details: ["message": message]), file: file, function: function, line: line)
-    }
-
-    static func info(_ title: String, details: [String: Any], file: String = #file, function: String = #function, line: Int = #line) {
-        log(.info, message: composeMessage(title: title, details: details), file: file, function: function, line: line)
-    }
-
-    // ERROR - Always enabled
-    static func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.error, message: composeMessage(title: "", details: ["message": message]), file: file, function: function, line: line)
-    }
-
-    static func error(_ title: String, details: [String: Any], file: String = #file, function: String = #function, line: Int = #line) {
-        log(.error, message: composeMessage(title: title, details: details), file: file, function: function, line: line)
-    }
-
-    // DEBUG - Category-based, requires explicit enablement
-    static func debug(_ category: DebugCategory, _ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        guard shouldLogDebug(category: category, file: file) else { return }
-        log(.debug, message: composeMessage(title: "", details: ["category": category.rawValue, "message": message]), file: file, function: function, line: line)
-    }
-
-    static func debug(_ category: DebugCategory, _ title: String, details: [String: Any], file: String = #file, function: String = #function, line: Int = #line) {
-        guard shouldLogDebug(category: category, file: file) else { return }
-        var enhancedDetails = details
-        enhancedDetails["category"] = category.rawValue
-        log(.debug, message: composeMessage(title: title, details: enhancedDetails), file: file, function: function, line: line)
-    }
-
-    // Convenience debug methods (backward compatibility - defaults to UI category)
-    static func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        debug(.ui, message, file: file, function: function, line: line)
-    }
-
-    static func debug(_ title: String, details: [String: Any], file: String = #file, function: String = #function, line: Int = #line) {
-        debug(.ui, title, details: details, file: file, function: function, line: line)
-    }
-
-    // MARK: - Private Logging Implementation
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.spotapp.spot", category: "SpotLogger")
-
-    private static func shouldLogDebug(category: DebugCategory, file: String) -> Bool {
-        #if DEBUG
-        guard debugLoggingEnabled else { return false }
-        #endif
-        // Always log if master switch is on
-        if enableAllDebug { return true }
-        // Check component-specific flag
-        if isComponentEnabled(file: file) { return true }
-        // Log if category is enabled
-        return category.isEnabled
-    }
-    
-    private static func isComponentEnabled(file: String) -> Bool {
-        let fileName = URL(fileURLWithPath: file).lastPathComponent
-        switch fileName {
-        case "SpotCard.swift": return ComponentLogging.spotCard
-        case "ProfileView.swift": return ComponentLogging.profileView
-        case "SearchView.swift": return ComponentLogging.searchView
-        case "HomepageView.swift", "FeedView.swift": return ComponentLogging.feedView
-        case "AuthorPrivacyCache.swift": return ComponentLogging.authorPrivacyCache
-        case "FeedRepository.swift": return ComponentLogging.feedRepository
-        case "FeedRanker.swift": return ComponentLogging.feedRanker
-        case "SpotService.swift": return ComponentLogging.spotService
-        case "AuthService.swift": return ComponentLogging.authService
-        case "ImageService.swift": return ComponentLogging.imageService
-        case "DeepLinkRouter.swift": return ComponentLogging.deepLinkRouter
-        case "AuthViewModel.swift": return ComponentLogging.authViewModel
-        case "LikesViewModel.swift": return ComponentLogging.likesViewModel
-        case "BookmarksViewModel.swift": return ComponentLogging.bookmarksViewModel
-        case "PostFlowView.swift": return ComponentLogging.postFlow
-        case "LocationSelectionView.swift": return ComponentLogging.locationSelection
-        case "PhotoSelectionView.swift": return ComponentLogging.photoSelection
-        default: return false
-        }
-    }
-
-    private static func log(_ level: LogLevel, message: String, file: String, function: String, line: Int) {
-        #if DEBUG
-        // Master "console logging" switch suppresses verbose output but never hides errors.
-        if level != .error {
-            guard debugLoggingEnabled else { return }
-        }
-        #endif
-        guard level >= minimumLevel else { return }
-        guard shouldEmitRawLog(message: message, file: file) else { return }
-        let fileName = URL(fileURLWithPath: file).lastPathComponent
-        let logMessage = "[SpotLogger][\(level.rawValue)] \(fileName):\(line) | \(function) | \(message)"
-
-        // Use unified logging so Xcode's Type filter (Debug / Info / Error) works correctly.
-        // Do NOT add a print() fallback here — print() bypasses OSLog type metadata and
-        // would appear in the Xcode console even when the Type filter excludes that level.
-        switch level {
-        case .debug:
-            logger.debug("\(logMessage, privacy: .public)")
-        case .info:
-            logger.info("\(logMessage, privacy: .public)")
-        case .error:
-            logger.error("\(logMessage, privacy: .public)")
-        }
-    }
-
-    private static func shouldEmit(entry: some SpotLog, details: [String: Any], file: String) -> Bool {
-        guard mapOnlyLoggingEnabled else { return true }
-
-        if entry.tag.hasPrefix("Map") || entry.tag == "LocationManager" {
-            return true
-        }
-
-        // The map data pipeline currently reuses FeedSupabaseLogs for
-        // `get_map_spots_v1`; keep only that subset visible.
-        if entry.tag == "FeedSupabase", entry.message.contains("get_map_spots_v1") {
-            return true
-        }
-
-        return isMapRelatedFile(file)
-    }
-
-    private static func shouldEmitRawLog(message: String, file: String) -> Bool {
-        guard mapOnlyLoggingEnabled else { return true }
-
-        if isMapRelatedFile(file) {
-            return true
-        }
-
-        if message.contains("SpotLogger: Map") ||
-            message.contains("SpotLogger: LocationManager") ||
-            message.contains("get_map_spots_v1") {
-            return true
-        }
-
-        return false
-    }
-
-    private static func isMapRelatedFile(_ file: String) -> Bool {
-        let fileName = URL(fileURLWithPath: file).lastPathComponent
-        if fileName.hasPrefix("Map") || fileName.contains("Map") {
-            return true
-        }
-        switch fileName {
-        case "SharedSpotMap.swift",
-             "LocationManager.swift",
-             "MemoryDebugLogger.swift":
-            return true
-        case "FeedAPI.swift", "MapViewportLoader.swift":
-            // The raw-message path still checks `get_map_spots_v1`; allow
-            // the structured path to preserve map viewport RPC logs.
-            return false
-        default:
-            return false
-        }
-    }
-
-    // MARK: - Compose message with JSON details
-    private static func composeMessage(title: String, details: [String: Any]) -> String {
-        // Pretty multi-line details block
         let lines = details
             .map { key, value in
-                let v: String
-                if let date = value as? Date {
-                    v = date.description
-                } else if let arr = value as? [Any] {
-                    v = arr.map { String(describing: $0) }.joined(separator: ", ")
-                } else {
-                    v = String(describing: value)
-                }
-                return "     \(key): \(v)"
+                "\(detailsIndentation)\(key): \(formatted(value, forKey: key))"
             }
             .sorted()
             .joined(separator: "\n")
-        
-        // If title is empty, only show details block
-        if title.isEmpty {
-            return "[\n\(lines)\n]"
+        return "\(header)\n[\n\(lines)\n]"
+    }
+
+    // MARK: - Filtering
+
+    static func shouldEmit(
+        level: LogLevel,
+        tag: String,
+        file: String,
+        profile: LoggingProfile
+    ) -> Bool {
+        let isUI = file.contains("/Views/")
+        switch profile {
+        case .errorsOnly:
+            return level == .error
+        case .information:
+            return level == .info || level == .error
+        case .debugging:
+            if level != .debug { return true }
+            return !noisyTags.contains(tag)
+        case .uiOnly:
+            return isUI
+        case .all:
+            return true
         }
-        return "\(title)\n[\n\(lines)\n]"
     }
 
-    // MARK: - Convenience: Logs with Spot payload
-    static func info(_ title: String, spot: Spot, details: [String: Any] = [:], file: String = #file, function: String = #function, line: Int = #line) {
-        log(.info, message: composeMessage(title: title, details: merge(details, with: spot)), file: file, function: function, line: line)
-    }
-    
-    static func error(_ title: String, spot: Spot, details: [String: Any] = [:], file: String = #file, function: String = #function, line: Int = #line) {
-        log(.error, message: composeMessage(title: title, details: merge(details, with: spot)), file: file, function: function, line: line)
-    }
-    
-    static func debug(_ category: DebugCategory, _ title: String, spot: Spot, details: [String: Any] = [:], file: String = #file, function: String = #function, line: Int = #line) {
-        guard shouldLogDebug(category: category, file: file) else { return }
-        log(.debug, message: composeMessage(title: title, details: merge(details, with: spot)), file: file, function: function, line: line)
+    private static func shouldEmit(entry: some SpotLog, file: String) -> Bool {
+        shouldEmit(level: entry.level, tag: entry.tag, file: file, profile: profile)
     }
 
-    private static func merge(_ base: [String: Any], with spot: Spot) -> [String: Any] {
-        var d = base
-        d["spotId"] = spot.safeId
-        d["userId"] = spot.userId ?? "nil"
-        d["username"] = spot.username ?? "nil"
-        d["likes"] = spot.likes ?? 0
-        d["createdAt"] = spot.createdAt ?? Date.distantPast
-        d["imageURL"] = spot.imageURL ?? "nil"
-        d["thumbnailURL"] = spot.thumbnailURL ?? "nil"
-        d["locationName"] = spot.locationName ?? "nil"
-        return d
+    // MARK: - Output
+
+    private static func emit(_ level: LogLevel, message: String) {
+        switch level {
+        case .debug:
+            logger.debug("\(message, privacy: .public)")
+        case .info:
+            logger.info("\(message, privacy: .public)")
+        case .error:
+            logger.error("\(message, privacy: .public)")
+        }
+
+        #if DEBUG
+        DebugFileLogWriter.shared.write(message)
+        #endif
+    }
+
+    // MARK: - Privacy-safe detail formatting
+
+    private static func formatted(_ value: Any, forKey key: String) -> String {
+        let normalizedKey = key.lowercased()
+
+        if ["password", "token", "secret", "authorization", "query"]
+            .contains(where: normalizedKey.contains) ||
+            (normalizedKey.contains("email") && value is String) ||
+            normalizedKey.contains("path") {
+            return "\"<redacted>\""
+        }
+        if normalizedKey.contains("latitude") || normalizedKey.contains("longitude") ||
+            normalizedKey.hasSuffix("lat") || normalizedKey.hasSuffix("lon") ||
+            normalizedKey.contains("coordinate") {
+            return "\"<redacted>\""
+        }
+        if normalizedKey.contains("url"), let value = value as? String {
+            if normalizedKey.contains("host") {
+                return quoted(value)
+            }
+            return quoted(redactedURL(value))
+        }
+        if normalizedKey.contains("userid") || normalizedKey == "uid" ||
+            normalizedKey.contains("spotid") || normalizedKey.contains("draftid") {
+            return quoted(shortIdentifier(String(describing: value)))
+        }
+
+        switch value {
+        case let string as String:
+            return quoted(redactedText(string))
+        case let date as Date:
+            return quoted(ISO8601DateFormatter().string(from: date))
+        case let array as [Any]:
+            return "[" + array.map { formatted($0, forKey: key) }.joined(separator: ", ") + "]"
+        case let dictionary as [String: Any]:
+            let contents = dictionary.keys.sorted().map { nestedKey in
+                "\(nestedKey): \(formatted(dictionary[nestedKey]!, forKey: nestedKey))"
+            }.joined(separator: ", ")
+            return "[\(contents)]"
+        default:
+            return String(describing: value)
+        }
+    }
+
+    private static func quoted(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+        return "\"\(escaped)\""
+    }
+
+    private static func redactedURL(_ value: String) -> String {
+        guard let components = URLComponents(string: value),
+              let scheme = components.scheme,
+              let host = components.host else {
+            return "<redacted-url>"
+        }
+        return "\(scheme)://\(host)/…"
+    }
+
+    private static func shortIdentifier(_ value: String) -> String {
+        guard value.count > 8 else { return value }
+        return "…\(value.suffix(8))"
+    }
+
+    private static func redactedText(_ value: String) -> String {
+        let patterns = [
+            (#"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"#, "<redacted-email>"),
+            (#"https?://\S+"#, "<redacted-url>")
+        ]
+        return patterns.reduce(value) { result, replacement in
+            result.replacingOccurrences(
+                of: replacement.0,
+                with: replacement.1,
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
     }
 }
 
-// MARK: - DateFormatter Extension
-extension DateFormatter {
-    static let logFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter
-    }()
+#if DEBUG
+private enum DebuggerDetector {
+    static var isAttached: Bool {
+        var processInfo = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var name = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        let nameCount = name.count
+        let result = name.withUnsafeMutableBufferPointer {
+            sysctl($0.baseAddress, u_int(nameCount), &processInfo, &size, nil, 0)
+        }
+        return result == 0 && (processInfo.kp_proc.p_flag & P_TRACED) != 0
+    }
 }
+
+/// Writes DEBUG logs only when the process is not attached to Xcode.
+private final class DebugFileLogWriter {
+    static let shared = DebugFileLogWriter()
+
+    private let queue = DispatchQueue(label: "com.spotapp.debug-file-logger", qos: .utility)
+    private let fileManager = FileManager.default
+    private let maximumBytes: UInt64 = 1_000_000
+    private let retainedFiles = 3
+
+    private init() {}
+
+    func write(_ message: String) {
+        guard !DebuggerDetector.isAttached else { return }
+        queue.async {
+            self.append(message)
+        }
+    }
+
+    private func append(_ message: String) {
+        guard let fileURL = currentFileURL() else { return }
+        rotateIfNeeded(fileURL, adding: message.utf8.count + 2)
+        let data = Data("\(message)\n\n".utf8)
+
+        if !fileManager.fileExists(atPath: fileURL.path) {
+            fileManager.createFile(
+                atPath: fileURL.path,
+                contents: data,
+                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+            )
+            return
+        }
+
+        guard let handle = try? FileHandle(forWritingTo: fileURL) else { return }
+        handle.seekToEndOfFile()
+        handle.write(data)
+        handle.closeFile()
+    }
+
+    private func currentFileURL() -> URL? {
+        guard let applicationSupport = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+
+        let directory = applicationSupport.appendingPathComponent("Logs", isDirectory: true)
+        do {
+            try fileManager.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+            )
+            return directory.appendingPathComponent("spot-debug.txt")
+        } catch {
+            return nil
+        }
+    }
+
+    private func rotateIfNeeded(_ fileURL: URL, adding byteCount: Int) {
+        let attributes = try? fileManager.attributesOfItem(atPath: fileURL.path)
+        let currentSize = (attributes?[.size] as? NSNumber)?.uint64Value ?? 0
+        guard currentSize + UInt64(byteCount) > maximumBytes else { return }
+
+        let directory = fileURL.deletingLastPathComponent()
+        let oldest = directory.appendingPathComponent("spot-debug-\(retainedFiles).txt")
+        try? fileManager.removeItem(at: oldest)
+
+        for index in stride(from: retainedFiles - 1, through: 1, by: -1) {
+            let source = directory.appendingPathComponent("spot-debug-\(index).txt")
+            let destination = directory.appendingPathComponent("spot-debug-\(index + 1).txt")
+            if fileManager.fileExists(atPath: source.path) {
+                try? fileManager.moveItem(at: source, to: destination)
+            }
+        }
+
+        let firstArchive = directory.appendingPathComponent("spot-debug-1.txt")
+        try? fileManager.moveItem(at: fileURL, to: firstArchive)
+    }
+}
+#endif
