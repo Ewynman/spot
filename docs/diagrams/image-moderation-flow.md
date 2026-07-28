@@ -10,7 +10,7 @@ Engineering, safety.
 
 ## Current status
 
-Architectural; matches [../engineering/image-moderation.md](../engineering/image-moderation.md).
+Verified for the Spot-image path. Profile avatars currently bypass this sequence.
 
 ## Details
 
@@ -24,15 +24,26 @@ sequenceDiagram
   participant DB as Supabase DB
 
   User->>App: Selects image
-  App->>Function: Submit image for moderation
+  App->>DB: Insert pending media_assets row
+  App->>Storage: Upload to pending_images
+  App->>Function: Send mediaAssetId with user JWT
+  Function->>DB: Verify caller owns asset
+  Function->>Storage: Read pending object
   Function->>Azure: Analyze image
   Azure-->>Function: Category severities
-  Function-->>App: Approved or blocked
   alt Blocked
+    Function->>DB: Mark rejected and record event
+    Function->>Storage: Remove pending object
+    Function-->>App: 422 approved=false
     App->>User: Show safe rejection message
+  else Moderation unavailable
+    Function->>DB: Mark failed where possible
+    Function-->>App: 503 retryable
   else Approved
-    App->>Storage: Upload / promote media
-    App->>DB: Save via RPC
+    Function->>Storage: Promote to approved bucket
+    Function->>DB: Mark approved and record event
+    Function-->>App: 200 approved=true
+    App->>DB: Publish via approved-assets RPC
   end
 ```
 
@@ -42,4 +53,5 @@ sequenceDiagram
 
 ## Open questions / TODOs
 
-- None.
+- Route profile avatars through this sequence.
+- Add cleanup for unlinked approved and failed assets.

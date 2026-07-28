@@ -10,7 +10,7 @@ Product, UX, engineering, support.
 
 ## Current status
 
-Based on `Spot/Managers/HomeTourManager.swift` (`HomeTourManager`, `SpotFirstRunOnboardingManager`).
+Verified against `SpotFirstRunOnboardingManager` and its production host in `BottomTabNavigationView` on 2026-07-28.
 
 ## Details
 
@@ -20,8 +20,9 @@ Onboarding orients new users to **what a Spot is**, **vibe tags**, **likes/bookm
 
 ### Entry points and behavior
 
-1. **`HomeTourManager`** — Short tour after first session post-signup when `startIfNeeded(isFirstSessionAfterSignup:)` is true and `homeTourAccepted` is false in `UserDefaults`. Steps: username, location, vibe, like/save coach (`HomeTourManager.Step`).
-2. **`SpotFirstRunOnboardingManager`** — Longer multi-step coach (`SpotFirstRunOnboardingManager.Step`: welcome, spot card, details, vibe, like, bookmark, creator, map tab, user location, markers, marker preview, finale). Completion/skips tracked under `spotFirstRunOnboarding.*` keys in `UserDefaults`.
+`SpotFirstRunOnboardingManager` is the active production coach. `BottomTabNavigationView` evaluates it after authentication for a first-session candidate (no liked or bookmarked Spots). Steps are: welcome, Spot card, details, vibe, like, bookmark, creator, map tab, user location, markers, marker preview, and finale. Completion or skip is tracked per user under `spotFirstRunOnboarding.*` keys in `UserDefaults`.
+
+`HomeTourManager` remains in source and unit tests for migration compatibility, but `HomeTourHost` is not mounted in production navigation. The active manager migrates legacy `hasSeenHomeTour.*` state so returning users are not shown duplicate coaching.
 
 ### What onboarding teaches
 
@@ -31,13 +32,15 @@ Onboarding orients new users to **what a Spot is**, **vibe tags**, **likes/bookm
 - **Follow** creators.
 - **Map tab**, **user location**, **markers**, **marker preview** → bridge into map discovery.
 
+At the user-location step, onboarding can present the location permission sheet. Completing or skipping the coach can present the notification pre-prompt after a 600 ms delay when authorization is still undetermined. Neither permission blocks authentication or access to the tab shell.
+
 ### Pro tour
 
 The codebase includes flows for **Pro** (paywall, StoreKit). **Do not change the existing Pro purchase / tour UX** unless a task explicitly asks for it—per team rule preserved in `.cursor/rules/project.mdc`.
 
 ### Distinction: “normal” onboarding vs Pro
 
-- **Normal onboarding** — `HomeTourManager` / `SpotFirstRunOnboardingManager` for core app literacy.
+- **Normal onboarding** — `SpotFirstRunOnboardingManager` for core app literacy.
 - **Pro** — Subscription paywall and entitlements; separate from first-run coach content.
 
 ## Related docs
@@ -45,7 +48,8 @@ The codebase includes flows for **Pro** (paywall, StoreKit). **Do not change the
 - [user-flows.md](user-flows.md)
 - [map-experience.md](map-experience.md)
 - [../engineering/architecture.md](../engineering/architecture.md)
+- [../engineering/notifications.md](../engineering/notifications.md)
 
 ## Open questions / TODOs
 
-- Exact UI triggers wiring `startIfNeeded` from which screen: TODO: verify in `RootView` / tab shell.
+- None.

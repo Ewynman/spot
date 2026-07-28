@@ -22,7 +22,7 @@ Aligned with in-app naming and common Supabase/iOS terms used in this repo.
 | **Feed** | Home scrolling list of Spots from `FeedRepository` / `get_home_feed_v1`. |
 | **Map marker / pin** | Map annotation representing one or more Spots (clustering may apply). |
 | **Spot drawer / bottom drawer** | Bottom sheet/card on the map showing the selected Spot preview. |
-| **Draft** | In-progress Spot before publish (local or server persistence: TODO: verify exact draft storage). |
+| **Draft** | Locally persisted in-progress Spot managed by `PostDraftStore` (autosave or user-saved). |
 | **Pro** | Paid subscription tier; product ID `spotPro` (yearly) in `SpotProProducts.swift`. |
 | **Universal Link** | `https` link on allowed hosts (e.g. `spotapp.online`) that opens the app via Associated Domains. |
 | **Moderation** | Automated image safety checks (Azure Content Safety in DB migrations) before approved storage paths. |

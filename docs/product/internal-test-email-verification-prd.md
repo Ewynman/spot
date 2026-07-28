@@ -9,7 +9,7 @@ Provide authorized internal testers with a memorable non-production verification
 - **Stage:** Discovery and proposal
 - **Priority:** P2 internal quality tooling
 - **Owner:** TODO
-- **Last reviewed:** 2026-07-27
+- **Last reviewed:** 2026-07-28
 - **Approval:** Product, Security, and Engineering approval required before implementation
 - **Implementation:** Not started
 - **Backend verification:** Supabase proof of concept still required
@@ -54,15 +54,15 @@ The closest equivalent to an internal `UT####` code is a staging-only server exc
 - `ConfirmEmailView` accepts six numeric characters and uses a number pad: `Spot/Views/Auth/ConfirmEmailView.swift`.
 - `AuthViewModel.verifySignupEmailOTP` calls `supabase.auth.verifyOTP(email:token:type:.signup)`, then completes profile setup and synchronization: `Spot/Services/Auth/AuthViewModel.swift`.
 - Verification recovery currently persists the normalized email and start time, but not the pending Supabase user ID: `Spot/Services/Auth/AuthCredentialStores.swift`.
-- Local DEBUG builds select staging, while Release builds select production or injected production configuration: `Spot/Supabase/Supabase.swift`.
+- Local DEBUG builds select staging. Release builds prefer workflow-injected configuration: Firebase injects staging and TestFlight injects production.
 
 ### Distribution
 
-- Firebase App Distribution currently builds a Release artifact and injects production Supabase configuration: `.github/workflows/deploy.yml`.
-- TestFlight builds also use production Supabase configuration: `.github/workflows/testflight.yml`.
+- Firebase App Distribution builds a Release artifact but injects and validates **staging** Supabase configuration: `.github/workflows/deploy.yml`.
+- TestFlight builds inject **production** Supabase configuration: `.github/workflows/testflight.yml`.
 - There is no dedicated `INTERNAL_TESTING` Swift compilation condition.
 
-Therefore, a `#if DEBUG` feature would work only for local DEBUG builds. It would not be available to Firebase App Distribution testers, and enabling it there before environment isolation would target production.
+Therefore, a `#if DEBUG` feature would work only for local DEBUG builds. Firebase App Distribution now targets staging, but an internal verification client still needs an explicit build/runtime gate because Firebase artifacts are Release builds.
 
 ### Supabase
 

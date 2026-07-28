@@ -2,12 +2,12 @@
 
 ## Overview
 
-**Spot** is a SwiftUI iOS app for social **place discovery**: users share and browse **Spots** (saved place recommendations with photos, location, and **vibe tags**). The stack centers on **Supabase** (Auth, Postgres, Storage) with **Firebase** used for analytics, crash reporting, and App Check. See **[docs/README.md](docs/README.md)** for the full documentation index.
+**Spot** is a SwiftUI iOS app for social **place discovery**: users share and browse **Spots** (saved place recommendations with photos, location, and **vibe tags**). The stack centers on **Supabase** (Auth, Postgres, Storage) with **Firebase** used for analytics and crash reporting. Firebase App Check is linked but is not currently initialized in app code. See **[docs/README.md](docs/README.md)** for the full documentation index.
 
 ## Quick start
 
 1. Clone the repository and open **`Spot.xcodeproj`** in Xcode.
-2. Configure **`Spot/Info.plist`** → `Supabase` with your project **`url`** and **`anonKey`** from the [Supabase dashboard](https://supabase.com/dashboard) (never commit real keys to a public fork).
+2. Local DEBUG builds use the staging configuration in **`Spot/Supabase/Supabase.swift`**. Release workflows inject the intended Supabase project into **`Spot/Info.plist`**. See [environment variables](docs/engineering/environment-variables.md) before changing either path.
 3. Select the **Spot** scheme and an **iPhone Simulator** (or device), then Run (**⌘R**).
 
 ## Repository structure
@@ -24,7 +24,7 @@
 
 ## Requirements
 
-- **macOS** with **Xcode** (recent release recommended; minimum version: TODO: verify team standard).
+- **macOS** with an Xcode release that supports the project's iOS 17 deployment target and installed simulator runtimes. CI uses the default Xcode on `macos-15`; distribution workflows select or require Xcode 26 when available.
 - **Apple Developer** account for device testing, Sign in with Apple, push, and Associated Domains as used by the app.
 - **Supabase** project access for backend configuration.
 
@@ -32,7 +32,7 @@ iOS deployment targets vary by target in the project (e.g. **17.0** / **18.5** i
 
 ## Configuration
 
-- **Supabase** — `Spot/Info.plist` under the `Supabase` dictionary (`url`, `anonKey`). Loaded in `Spot/Supabase/Supabase.swift`.
+- **Supabase** — DEBUG selects staging in `Spot/Supabase/Supabase.swift`; Release prefers CI-injected `Spot/Info.plist` values and falls back to the environment enum.
 - **Share / Universal Links** — `Spot/Info.plist` → `SpotURLs` (`shareURLBase`, `universalLinkDomains`, `customScheme`); see [docs/engineering/configuration.md](docs/engineering/configuration.md).
 - **Entitlements** — `Spot/Spot.entitlements` (Associated Domains, Sign in with Apple).
 
@@ -71,7 +71,7 @@ See [docs/engineering/testing.md](docs/engineering/testing.md) for philosophy an
 
 ## Security and safety
 
-Authentication and **Row Level Security (RLS)** on Supabase are authoritative for data access. **Image moderation** is required for Spot and profile media. The app **does not** use Firebase Firestore or Firebase Storage for user or spot data ([docs/engineering/data-plane.md](docs/engineering/data-plane.md)). See [docs/engineering/image-moderation.md](docs/engineering/image-moderation.md). Operational response: [docs/operations/incident-response.md](docs/operations/incident-response.md).
+Authentication and **Row Level Security (RLS)** on Supabase are authoritative for data access. **Image moderation** is required for Spot and profile media. Spot images use the moderation path; profile avatars currently bypass it, which is a documented safety gap. The app **does not** use Firebase Firestore or Firebase Storage for user or Spot data ([docs/engineering/data-plane.md](docs/engineering/data-plane.md)). See [docs/engineering/image-moderation.md](docs/engineering/image-moderation.md). Operational response: [docs/operations/incident-response.md](docs/operations/incident-response.md).
 
 ## Universal Links
 
@@ -83,4 +83,4 @@ High-level checklists: [docs/engineering/release-process.md](docs/engineering/re
 
 ## Support
 
-User-facing support and policy links: see [docs/product/support-and-policies.md](docs/product/support-and-policies.md) and in-app Settings (TODO: verify exact URLs in code).
+User-facing support and policy links are verified in [docs/product/support-and-policies.md](docs/product/support-and-policies.md) and exposed in Settings.

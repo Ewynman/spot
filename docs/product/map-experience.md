@@ -27,10 +27,14 @@ Markers use branded colors from `Constants.Colors` (map marker greens, cluster f
 - Tapping a spot opens or updates the drawer.
 - Tapping a **different** spot should **replace** the selection and drawer content for the new Spot.
 - **Panning/zooming** away from the selected spot sufficiently should **dismiss** the drawer (policy encoded in map view model / coordinator—keep in sync with tests).
+- A region center change above approximately `1e-5`, or a span change above 1.5%, is meaningful. Programmatic camera changes suppress dismissal for 0.55 seconds.
+- The drawer itself uses `MapSpotPreviewCard` and the shared `SpotCard`; there is no separate full-detail navigation from the drawer.
 
 ### Pro filtering
 
-Pro-only map filters (if present) must remain **clearly gated** behind entitlement checks and covered by tests where possible.
+Pro-only filters cover vibe, saved, liked, and following. `MapFilterGate` hides filter controls for non-Pro users. Filters are applied client-side to viewport RPC results.
+
+The Following filter is a known limitation: `MapView` currently passes an empty followed-user ID set, so that filter cannot return matching markers until social graph state is wired into the map.
 
 ### Location permission
 
@@ -56,8 +60,7 @@ flowchart TD
   D -->|Yes| E[Select Spot]
   E --> F[Open spot drawer]
   F --> G{User taps another pin?}
-  G -->|Yes| H[Close existing drawer]
-  H --> I[Open drawer for new Spot]
+  G -->|Yes| H[Replace selected Spot and drawer content]
   F --> J{User pans or zooms away?}
   J -->|Yes| K[Close drawer]
   F --> L{User dismisses drawer?}
@@ -72,4 +75,4 @@ flowchart TD
 
 ## Open questions / TODOs
 
-- Exact numeric thresholds for “panned away” dismiss: see implementation next to `MapDrawerDismissReason` (or equivalent).
+- Wire followed-user IDs into the Pro Following filter.

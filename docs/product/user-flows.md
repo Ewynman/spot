@@ -10,51 +10,61 @@ Design, product, engineering, QA.
 
 ## Current status
 
-High-level flows match `RootView`, auth, tabs, `DeepLinkState`, and onboarding managers in the codebase.
+Verified against `SpotApp`, `RootView`, the tab shell, `DeepLinkState`, and active onboarding wiring on 2026-07-28.
 
 ## Details
 
 ### Flows covered
 
-- First launch → auth check → onboarding (if applicable) → main tabs.
-- Sign in (email flow and Sign in with Apple: see auth views under `Spot/Views/Auth`).
-- Onboarding coach (`HomeTourManager`, `SpotFirstRunOnboardingManager`).
-- Browse home feed, open Spot detail from feed.
-- Map: browse, tap pin, spot drawer, navigate to full detail if offered.
-- Create post → publish (with moderation gate).
-- Profile, follow, Pro paywall, Universal Link open.
+- First launch → branded splash → auth/session gate → required profile setup → main tabs.
+- Email signup with six-digit verification, email login, and Sign in with Apple.
+- Active first-run coach (`SpotFirstRunOnboardingManager`).
+- Home feed, map spot drawer, Search, shared Spot card presentation, and profile/social flows.
+- Create Spot → local draft → background publish → moderation gate.
+- Pro paywall and purchase return, Universal Link open, and unavailable states.
 
 ### High-level app flow
 
 ```mermaid
 flowchart TD
-  A[Launch Spot] --> B{Authenticated?}
-  B -->|No| C[Show auth / welcome screen]
-  C --> D[Sign in / Sign up]
-  D --> E[Create or load profile]
-  B -->|Yes| E
-  E --> F{Completed onboarding?}
-  F -->|No| G[Run onboarding / home tour as applicable]
-  F -->|Yes| H[Open main app]
-  G --> H
-  H --> I[Home feed]
-  H --> J[Map]
-  H --> K[Post]
-  H --> L[Profile]
+  A[Launch Spot] --> B[Branded splash]
+  B --> C{Auth state}
+  C -->|Loading| B
+  C -->|Pending verification| D[Confirm email OTP]
+  C -->|Signed out| E[Welcome or Welcome back]
+  E --> F[Email signup/login or Sign in with Apple]
+  F --> C
+  C -->|Authenticated and verified| G{Apple profile setup needed?}
+  G -->|Yes| H[Choose username and optional photo]
+  G -->|No| I[Open main tabs]
+  H --> I
+  I --> J{First-run coach needed?}
+  J -->|Yes| K[SpotFirstRunOnboarding overlay]
+  J -->|No| L[Normal app]
+  K --> L
+  L --> M[Home]
+  L --> N[Map]
+  L --> O[Post]
+  L --> P[Search]
+  L --> Q[Profile]
 ```
 
 ### Deep link (Universal Link) user intent
 
 User taps a shared Spot link → iOS opens Spot → router resolves route → Spot detail or unavailable state (see [../diagrams/universal-links-flow.md](../diagrams/universal-links-flow.md)).
 
+Spot detail is the shared `SpotCard` presentation, not a separate detail screen. Home renders it inline, Map hosts it in the spot drawer, Search and Profile show it over their grids, and deep links show it over the tab shell.
+
 ## Related docs
 
 - [onboarding.md](onboarding.md)
 - [posting-flow.md](posting-flow.md)
 - [map-experience.md](map-experience.md)
+- [search-experience.md](search-experience.md)
+- [../engineering/runtime-flows.md](../engineering/runtime-flows.md)
 - [../diagrams/README.md](../diagrams/README.md)
 - [../diagrams/app-launch-auth-flow.md](../diagrams/app-launch-auth-flow.md)
 
 ## Open questions / TODOs
 
-- Exact “Sign in with Apple only” vs email matrix: TODO: verify against `WelcomeView` / auth policy.
+- None for the top-level route map; feature-specific limitations are tracked in their respective docs.

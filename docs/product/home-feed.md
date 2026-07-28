@@ -21,21 +21,27 @@ The **home feed** is the default discovery surface after launch: a ranked, pagin
 ### Ranking behavior
 
 - **Server-side candidate set and ranking** via `get_home_feed_v1` (authoritative for production feed).
-- **Client** signs primary images for display and manages `FeedLoadState` (initial load, load more, empty reasons, errors, refresh toasts).
+- **Client** hydrates rows, signs primary images for display, and manages `FeedLoadState` (initial load, load more, empty reasons, errors, refresh toasts).
 - **`FeedDiversity`** — after hydration, the first home page is lightly reordered using `user_feed_profiles` signal strength so a single liked vibe does not fill the entire window when other tags exist in the page (`Spot/Services/Feed/FeedDiversity.swift`).
-- **`FeedRanker`** — on-device scoring documented in tests / non-RPC experiments; not the sole source of truth for shipped feed unless product changes that.
+- **`FeedRanker`** — on-device scoring with tests but no production call site; it is not part of the shipped feed path.
 
 ### Signals (may influence ranking)
 
-Exact weighting is **server-defined** in Postgres/RPC. Likely inputs include creator relationship, vibes, recency, location, and user actions—**TODO: verify** in SQL migration or function definition for `get_home_feed_v1`.
+Exact weighting is **server-defined** in Postgres/RPC. The client passes `p_limit`, viewer latitude/longitude, a batch ID, and a seen-fallback flag. The repository does not contain the complete authoritative base definition of `get_home_feed_v1`, so exact weights cannot be reconstructed from this checkout.
 
-Plausible client/server inputs to keep in mind:
+Verified surrounding data and client inputs include:
 
 - Creator identity and follow graph
 - Vibe tags
 - Location / distance
 - Likes, bookmarks, follows
 - Impressions / dedupe (`feed_impressions` mentioned in `FeedRepository`)
+
+### Pagination and telemetry
+
+The page size is 24. Pagination is not offset-based: each load-more request asks the server for another impression-aware batch and the client deduplicates IDs. Two consecutive empty load-more results, or a partial seen-fallback page, ends pagination.
+
+`FeedEventService` records impression, two-second visibility, long dwell, and quick-skip events through `record_feed_event_v1`. The initial hydrated page is diversified on-device; subsequent pages preserve server order.
 
 ### Privacy and safety
 
@@ -54,4 +60,5 @@ Plausible client/server inputs to keep in mind:
 
 ## Open questions / TODOs
 
-- Document exact RPC parameters and scoring once reviewed in Supabase SQL: TODO: verify in database repo / migrations.
+- Commit the authoritative base feed and map RPC definitions as migrations so ranking and visibility behavior can be reviewed from source control.
+- Make home-feed image signing bucket-aware for moderated media; current batch signing assumes the legacy `spots` bucket.

@@ -1,244 +1,111 @@
 # Notifications
 
-**Owner**: Engineering  
-**Last Updated**: 2026-07-02
+## Purpose
 
-## Overview
+Document notification permission, delivery, action handling, and current production limitations.
 
-Spot implements a local notification system for social events, specifically follow requests and follow acceptances. Users are prompted to grant notification permissions after completing the first-run onboarding tour.
+## Audience
 
-## Architecture
+Engineering, product, QA, and operations.
 
-### Permission Request Flow
+## Current status
 
-1. User completes the first-run onboarding tour (all steps through `.finale`) **OR** skips the tour
-2. After 600ms delay, `BottomTabNavigationView` checks notification permission status
-3. If status is `.notDetermined`, presents `NotificationPermissionView` sheet
-4. User grants or denies permissions through the system dialog
-5. Permission status is tracked in `PermissionManager.notificationStatus`
+Spot registers UserNotifications categories and can schedule local notifications. It does **not** register for remote notifications, store APNs tokens, or have a push backend. Notification action events are posted but are not consumed by production navigation.
 
-**Important**: Notification permissions are requested regardless of whether the user completes or skips onboarding, ensuring all users have the opportunity to enable notifications.
+## Permission flow
 
-### Notification Service
+1. The user completes or skips `SpotFirstRunOnboardingManager`.
+2. After 600 ms, `BottomTabNavigationView` checks authorization.
+3. If status is `.notDetermined`, it presents `NotificationPermissionView`.
+4. `PermissionManager` requests system authorization and tracks the result.
 
-**Location**: `Spot/Services/NotificationService.swift`
+Permission is contextual and does not block authentication or the tab shell.
 
-The `NotificationService` singleton manages local notification delivery and action handling:
+## Registration and delivery
 
-- **Categories**:
-  - `FOLLOW_REQUEST` — New incoming follow request
-  - `FOLLOW_ACCEPTED` — Your follow request was accepted
+`AppDelegate.application(_:didFinishLaunchingWithOptions:)`:
 
-- **Actions**:
-  - Accept Follow Request (foreground)
-  - View Follow Request (foreground)
-  - View Profile (foreground)
+- calls `NotificationService.shared.registerNotificationCategories()`;
+- sets `UNUserNotificationCenter.current().delegate`;
+- shows banner, sound, and badge for foreground local notifications.
 
-### Notification Types
+Registered categories:
 
-#### Follow Request Accepted ✅
+| Category | Actions |
+| --- | --- |
+| `FOLLOW_REQUEST` | Accept, View |
+| `FOLLOW_ACCEPTED` | View profile |
 
-**Trigger**: When a user accepts another user's follow request  
-**Implementation**: Client-side local notification  
-**Status**: ✅ Implemented
+`NotificationService` contains helpers for follow-request-received and follow-accepted local notifications.
 
-When User B accepts User A's follow request:
-- `FollowRequestsService.accept()` is called
-- Service fetches User B's username from database
-- `NotificationService.notifyFollowRequestAccepted()` sends a local notification
-- User A receives: "Follow Request Accepted — [username] accepted your follow request"
+## Current behavior
 
-**Code Path**:
+### Follow request received
+
+The scheduling helper exists but has no call site when another user creates a request. The profile flow polls the pending-request count; it does not schedule a notification. Cross-device delivery requires a push backend.
+
+### Follow request accepted
+
+`FollowRequestsService.accept()` schedules a local “accepted” notification on the device performing the acceptance. That is the acceptor's device, not reliably the original requester's device. This is not a substitute for server-triggered push and should not be described as notifying the requester.
+
+## Action handling
+
+The `UNUserNotificationCenterDelegate` extension in `Spot/AppDelegate.swift` maps taps/actions to:
+
+- `.navigateToFollowRequests`;
+- `.navigateToFollowRequestsAndAccept`;
+- `.navigateToProfile`.
+
+No production view currently observes these events. Tapping an action foregrounds the app, but the intended navigation is not wired.
+
+## Security requirements for future push
+
+A production implementation needs:
+
+1. APNs registration and token rotation handling in the app.
+2. An RLS-protected device-token table keyed to the authenticated user and installation.
+3. Server-triggered delivery after authoritative database changes.
+4. Server-held APNs credentials; never a service-role or APNs private key in the client.
+5. Generic notification copy that does not expose private content on a lock screen.
+6. Token removal on sign-out/account deletion and invalid-token feedback handling.
+7. Navigation that revalidates auth, relationship, and content visibility rather than trusting payload IDs.
+
+## Flow
+
+```mermaid
+flowchart TD
+  A[Complete or skip first-run coach] --> B{Authorization undetermined?}
+  B -->|Yes| C[Show notification pre-prompt]
+  C --> D[Request system authorization]
+  B -->|No| E[Continue]
+  D --> E
+  F[Local notification action] --> G[AppDelegate maps action]
+  G --> H[Post navigation event]
+  H --> I[Known gap: no production consumer]
 ```
-FollowRequestsView (Accept button) 
-  → FollowRequestsService.accept()
-  → notifyFollowRequestAcceptedByCurrentUser()
-  → NotificationService.notifyFollowRequestAccepted()
-```
-
-#### Follow Request Received ⚠️
-
-**Trigger**: When a user receives a new follow request  
-**Implementation**: ⚠️ **Requires backend implementation**  
-**Status**: ⚠️ Infrastructure ready, but needs backend trigger
-
-**Current Limitation**: The client cannot detect when another user sends a follow request without:
-1. Polling the `follow_requests` table (inefficient, battery-draining)
-2. Real-time subscriptions (Supabase Realtime, but still client-initiated)
-3. Backend push notifications (proper solution)
-
-**Recommended Production Implementation**:
-
-Use Supabase Edge Functions or database triggers to send push notifications when a follow request is created:
-
-1. **Database Trigger** (PostgreSQL):
-```sql
-CREATE OR REPLACE FUNCTION notify_follow_request_received()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Call Edge Function to send push notification
-  PERFORM net.http_post(
-    url := 'https://[project].supabase.co/functions/v1/send-notification',
-    headers := jsonb_build_object('Authorization', 'Bearer [service_role_key]'),
-    body := jsonb_build_object(
-      'type', 'follow_request_received',
-      'target_user_id', NEW.target_user_id,
-      'requester_id', NEW.requester_id
-    )
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER on_follow_request_created
-  AFTER INSERT ON follow_requests
-  FOR EACH ROW
-  WHEN (NEW.status = 'pending')
-  EXECUTE FUNCTION notify_follow_request_received();
-```
-
-2. **Edge Function** (`supabase/functions/send-notification/index.ts`):
-```typescript
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
-serve(async (req) => {
-  const { type, target_user_id, requester_id } = await req.json()
-  
-  // Fetch requester username
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
-  
-  const { data: requester } = await supabase
-    .from('users')
-    .select('username')
-    .eq('id', requester_id)
-    .single()
-  
-  // Fetch target user's push token (would need to be stored in database)
-  const { data: targetUser } = await supabase
-    .from('user_push_tokens')
-    .select('token')
-    .eq('user_id', target_user_id)
-    .single()
-  
-  if (!targetUser?.token) {
-    return new Response(JSON.stringify({ error: 'No push token' }), { status: 400 })
-  }
-  
-  // Send push notification via APNs (Apple Push Notification service)
-  // Implementation depends on push notification provider (e.g., Firebase, OneSignal, direct APNs)
-  
-  return new Response(JSON.stringify({ success: true }))
-})
-```
-
-3. **Client Setup**:
-   - Store device push token in `user_push_tokens` table after permission grant
-   - Register for remote notifications in `AppDelegate.application(_:didRegisterForRemoteNotificationsWithDeviceToken:)`
-   - Handle remote notifications in `UNUserNotificationCenterDelegate` methods
-
-### Notification Actions
-
-#### App-Side Handling
-
-**Location**: `AppDelegate+UNUserNotificationCenterDelegate`
-
-When a user taps a notification or action button:
-
-1. `userNotificationCenter(_:didReceive:withCompletionHandler:)` is called
-2. Action identifier is matched to `NotificationService.NotificationAction` cases
-3. Navigation is triggered via `NotificationCenter` posts:
-   - `.navigateToFollowRequests` — Opens Follow Requests screen
-   - `.navigateToFollowRequestsAndAccept` — Opens Follow Requests and auto-accepts
-   - `.navigateToProfile` — Opens a specific user's profile
-
-#### Navigation Handling
-
-Navigation events are posted via `NotificationCenter.default.post()`. Consumers (e.g., `ProfileView`, `BottomTabNavigationView`) can observe these notifications and respond accordingly.
-
-**Example**:
-```swift
-.onReceive(NotificationCenter.default.publisher(for: .navigateToFollowRequests)) { _ in
-    // Switch to Profile tab and navigate to Follow Requests
-    selectedTab = 4
-    showFollowRequests = true
-}
-```
-
-## Security Considerations
-
-- Notification content never includes sensitive data (user IDs are in `userInfo`, not body)
-- All notification actions require foreground activation (user must unlock device)
-- Database RLS policies ensure users can only accept follow requests directed to them
-- Service-role keys must never be included in client-side code
-
-## Future Enhancements
-
-### Required for Production
-
-- [ ] Implement push notification backend (Edge Functions + APNs)
-- [ ] Store device push tokens in database
-- [ ] Handle remote notification registration in AppDelegate
-- [ ] Add database trigger for follow request creation
-- [ ] Add notification preferences UI (allow users to mute specific notification types)
-
-### Optional
-
-- [ ] Comment notifications (when commenting is implemented)
-- [ ] Batch notifications (e.g., "3 new follow requests")
-- [ ] Rich notifications with profile pictures
-- [ ] Notification history in-app
-- [ ] Notification sounds customization
 
 ## Testing
 
-### Manual Testing
+Current useful checks:
 
-1. **Permission Grant After Completing Onboarding**:
-   - Sign up for a new account
-   - Complete onboarding tour through all steps
-   - After finale, notification permission sheet should appear
-   - Grant permissions → verify `PermissionManager.notificationStatus == .authorized`
+- complete and skip onboarding paths both offer permission when undetermined;
+- category identifiers and action mappings remain stable;
+- foreground local delivery uses banner, sound, and badge;
+- denied authorization does not block app use.
 
-2. **Permission Grant After Skipping Onboarding**:
-   - Sign up for a new account
-   - Start onboarding tour
-   - Tap "Skip" button on any step
-   - After 600ms, notification permission sheet should appear
-   - Grant permissions → verify `PermissionManager.notificationStatus == .authorized`
+Do not write a test that claims the requester receives a follow-accepted notification until remote delivery exists. End-to-end action navigation should remain marked unavailable until consumers are wired.
 
-2. **Follow Request Accepted Notification**:
-   - User A sends follow request to User B (private account)
-   - User B accepts the request
-   - User A should receive local notification: "Follow Request Accepted — [User B username] accepted your follow request"
-   - Tap notification → should navigate to User B's profile
+## Known limitations
 
-3. **Notification Actions**:
-   - Long-press on a follow request notification
-   - Verify action buttons appear: "Accept", "View"
-   - Tap "Accept" → should navigate to Follow Requests screen
-   - Tap "View Profile" on follow accepted notification → should navigate to profile
+- Local notifications only; no APNs device-token registration or backend.
+- Follow-request-received helper has no trigger.
+- Follow-accepted local notification is scheduled on the wrong user's device for the intended social event.
+- Action navigation events have no production consumers.
+- No notification preference UI or notification history.
 
-### Automated Testing
+## Related docs
 
-Current test coverage:
-- ✅ `PermissionManager.requestNotificationPermission()` unit tests
-- ✅ Onboarding flow includes notification permission prompt
-- ❌ **Missing**: End-to-end UI tests for notification flow (requires simulator notification delivery)
-
-## Known Limitations
-
-1. **Follow Request Received Notifications**: Requires backend implementation (see above)
-2. **No Comment Notifications**: Commenting feature not yet implemented
-3. **No Like Notifications**: Intentionally excluded per product requirements
-4. **Local Notifications Only**: Production app should use remote push notifications for reliability and backend triggering
-
-## References
-
-- [Apple Human Interface Guidelines — Notifications](https://developer.apple.com/design/human-interface-guidelines/notifications)
-- [UserNotifications Framework](https://developer.apple.com/documentation/usernotifications)
-- [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
-- [Apple Push Notification Service](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server)
+- [runtime-flows.md](runtime-flows.md)
+- [networking-and-auth.md](networking-and-auth.md)
+- [../product/onboarding.md](../product/onboarding.md)
+- [../product/profiles-and-social.md](../product/profiles-and-social.md)

@@ -20,13 +20,20 @@ Spot exposes:
 - **Privacy policy** — `https://spotapp.online/privacy` (signup, paywall, Settings → Legal).
 - **Terms of Use** — `https://spotapp.online/terms` (signup, paywall, Settings → Legal).
 
-Safety workflows (block users, report content) live under profile/settings flows—implementation details in respective Swift files.
+Safety entry points:
+
+- **Report a Spot** — `SpotCard` menu → `ReportSheet`.
+- **Report a profile** — another user's profile menu → `ProfileReportSheet`.
+- **Block a user** — profile or report confirmation; the feed removes that author's Spots immediately.
+- **Manage blocks** — Settings → `BlockedUsersView`.
+- **Delete account** — Settings, confirmation, and password or Sign in with Apple reauthentication.
 
 ## Related docs
 
 - [../operations/app-store-review-notes.md](../operations/app-store-review-notes.md)
 - [../operations/incident-response.md](../operations/incident-response.md)
+- [../engineering/ugc-moderation.md](../engineering/ugc-moderation.md)
 
 ## Open questions / TODOs
 
-- Replace this section with concrete links once verified in the app bundle / website.
+- External website availability remains an operational check even though the configured URLs are verified in code.

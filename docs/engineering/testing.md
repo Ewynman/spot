@@ -32,12 +32,12 @@ Matches `.cursor/rules/project.mdc` and Xcode schemes **Spot**, **SpotTests**, *
 - Auth gating and session edge cases (unit where mockable).
 - Posting flow state machine and moderation client behavior.
 - Draft behavior when testable without device-only APIs.
-- Supabase repository behavior behind protocols/mocks (**TODO: verify** mock coverage depth).
+- Supabase repository behavior behind protocols/mocks; no live Supabase calls in unit tests.
 - **Map drawer** selection / dismiss policy (`MapDiscoveryDrawerPolicyTests`, panel height tests, etc.).
 - **Data plane guard** — `DataPlaneGuardTests` ensures no legacy Firebase Firestore/Storage upload code under `Spot/`.
 - Onboarding managers (`HomeTourManagerTests`, etc.).
 - **Pro** gating helpers (`ProEntitlementChecker`, subscription manager error paths).
-- **Universal Links** parsing (`DeepLinkRouter` tests if present—**TODO: verify** file names).
+- **Universal Links** parsing in `DeepLinkRouterTests`.
 - **Private accounts** — `AuthorPrivacyCacheTests`, `FollowRequestsServiceTests`, and `PrivateAccountIntegrationTests` cover privacy filtering, follow requests, and content visibility. See [../testing/private-account-tests.md](../testing/private-account-tests.md) for details.
 
 ### Commands
@@ -66,6 +66,17 @@ Add previews for new or heavily changed UI when practical to speed design review
 - [../diagrams/testing-release-flow.md](../diagrams/testing-release-flow.md)
 - [../testing/private-account-tests.md](../testing/private-account-tests.md)
 
-## Open questions / TODOs
+### Release smoke priorities
 
-- List top 10 critical UI smoke tests by identifier: TODO: verify in `SpotUITests`.
+1. Cold launch signed out and with a restored session.
+2. Email signup, OTP recovery, login, and logout.
+3. First-run coach complete and skip paths.
+4. Home feed load, refresh, and load more.
+5. Map pin selection, replacement, and pan-away drawer dismissal.
+6. Search user/location/vibe result flows.
+7. Private profile request, accept/deny, and block visibility.
+8. Draft save/resume and one moderated Spot publish.
+9. Pro purchase/restore and gated-feature entry points.
+10. Cold/warm Universal Link with available and unavailable Spots.
+
+CI runs `SpotTests`; UI tests remain a manual/release responsibility unless a dedicated workflow is added.

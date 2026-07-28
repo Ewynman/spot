@@ -30,20 +30,37 @@ Postgres with RLS policies defined in migrations (e.g. `20260502120000_security_
 
 ### Storage
 
-Private buckets for pending and approved images (`pending_images`, `approved_spot_images`, `approved_profile_images`) per `20260504100000_image_moderation_azure_v1.sql`.
+Private buckets for pending and approved images (`pending_images`, `approved_spot_images`, `approved_profile_images`) per `20260504100000_image_moderation_azure_v1.sql`, plus legacy `spots` and public `avatars` paths still used by client code.
 
 ### Edge Functions
 
-Image moderation pipeline references Edge Function **`moderate-image`** in repository comments—**TODO: verify** deployed function names and secrets in Supabase dashboard.
+The versioned Edge Function is **`moderate-image`** under `supabase/functions/moderate-image/`. Deployment and secret presence must be verified independently in each project.
+
+### Key RPCs and functions
+
+| Function | Role |
+| --- | --- |
+| `get_home_feed_v1`, `get_home_feed_status_v1` | Ranked feed and empty/caught-up state |
+| `get_map_spots_v1` | Viewport discovery |
+| `record_feed_event_v1`, `recompute_my_feed_profile_v1` | Feed telemetry and profile recomputation |
+| `publish_spot_with_approved_media_assets_v1` | Atomic publish from approved assets |
+| `submit_content_report` | Authenticated UGC report |
+| `delete_my_account` | Account and relational-data deletion |
+| `sync_current_user_v1` | Authenticated profile synchronization |
+| `is_username_available` | Privacy-limited signup availability result |
+| `record_terms_acceptance_v1`, `has_accepted_active_terms` | Terms version state |
+
+Some base feed/map RPC definitions are not fully represented in committed migrations. Treat that as a reproducibility gap.
 
 ### Local vs production
 
-- **Production**: project matching deployed `Info.plist` values for your build flavor.
-- **Local Supabase**: optional CLI for schema iteration—**TODO: verify** if team uses local stack or remote dev project only.
+- **Local DEBUG and Firebase distribution**: staging project.
+- **TestFlight and App Store**: production project injected by the release workflow.
+- A local Supabase stack is not part of the documented standard path; use staging unless the team deliberately establishes one.
 
 ### MCP
 
-Cursor may use Supabase MCP for migrations in some workflows; production changes still go through reviewed SQL migrations in `supabase/migrations/`.
+Supabase changes require reviewed SQL under `supabase/migrations/` and application through the Supabase MCP to the linked project. Test staging before production.
 
 ### Safety for schema changes
 
@@ -60,4 +77,4 @@ Cursor may use Supabase MCP for migrations in some workflows; production changes
 
 ## Open questions / TODOs
 
-- Full inventory of RPCs and Edge Functions: TODO: generate from Supabase project or SQL search.
+- Export or recreate missing authoritative base feed/map function definitions as migrations.

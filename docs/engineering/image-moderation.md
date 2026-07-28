@@ -10,7 +10,7 @@ Engineers, safety, review.
 
 ## Current status
 
-Postgres migration `20260504100000_image_moderation_azure_v1.sql` defines **`media_assets`**, Azure provider fields, and related policies. Client coordinates with Edge moderation and RPC publish.
+The Spot-image path is implemented through `supabase/functions/moderate-image/index.ts`. The profile-image schema exists, but the current iOS avatar uploader bypasses moderation; see the explicit gap below.
 
 ## Details
 
@@ -21,29 +21,46 @@ Postgres migration `20260504100000_image_moderation_azure_v1.sql` defines **`med
 ### Client responsibilities
 
 - Upload to pending storage only for new moderated assets.
-- Poll or await moderation completion per post-flow implementation.
+- Invoke the function with the owned `mediaAssetId` and await its response.
 - Show **safe** rejection messages when blocked.
 
 ### Server / function responsibilities
 
-- Call **Azure Content Safety** (or configured provider) with server-held credentials.
+- Validate the caller JWT and `media_assets.owner_id`.
+- Call **Azure Content Safety** with server-held credentials.
 - Persist scores and outcomes on `media_assets` / `media_moderation_events`.
+- Promote approved objects from pending to the appropriate approved bucket.
 - Gate final publish on approved status.
 
 ### Threshold policy
 
-Category thresholds may live in Edge Function code or SQL—**TODO: verify** in function source (repo path if mirrored, else dashboard).
+Default Azure severity thresholds use a 0–6 scale and block at or above:
+
+| Asset kind | Sexual | Violence | Hate | Self-harm |
+| --- | ---: | ---: | ---: | ---: |
+| `spot_image` | 4 | 4 | 4 | 4 |
+| `profile_image` | 2 | 4 | 4 | 4 |
+
+`MODERATION_THRESHOLDS_JSON` can override defaults in the deployed function environment. Policy changes require safety review and tests.
 
 ### Block / allow
 
 - **Blocked** — user sees non-graphic explanation; no public approved path.
 - **Allowed** — promote to approved bucket paths and allow RPC completion.
 
+The function returns JSON containing `approved: boolean`. Policy rejection returns HTTP 422. Provider, configuration, or Storage failures return retryable HTTP 503. The client intentionally maps these to non-graphic user messages.
+
+### Current profile-image gap
+
+`SupabaseUserService.uploadProfileAvatarJPEG` writes directly to the public `avatars` bucket. It does not create `media_assets`, invoke `moderate-image`, or use `approved_profile_images`.
+
+The product requirement remains that every profile image must be moderated, but that requirement is **not currently met**. Do not use the profile upload implementation as a pattern for new image flows.
+
 ### Logging
 
 Use `SpotLogger` moderation category and repository logs; avoid logging raw image bytes or PII.
 
-### Sequence (target architecture)
+### Sequence (implemented Spot-image path)
 
 ```mermaid
 sequenceDiagram
@@ -55,15 +72,26 @@ sequenceDiagram
   participant DB as Supabase DB
 
   User->>App: Selects image
-  App->>Function: Submit image for moderation
+  App->>DB: Insert owned pending media_assets row
+  App->>Storage: Upload to pending_images
+  App->>Function: Submit mediaAssetId with user JWT
+  Function->>DB: Verify owner and pending asset
+  Function->>Storage: Read pending object
   Function->>Azure: Analyze image
   Azure-->>Function: Category severities
-  Function-->>App: Approved or blocked
   alt Blocked
+    Function->>DB: Mark rejected and record event
+    Function->>Storage: Delete pending object
+    Function-->>App: 422 approved=false
     App->>User: Show safe rejection message
+  else Provider or storage failure
+    Function->>DB: Mark failed where possible
+    Function-->>App: 503 retryable failure
   else Approved
-    App->>Storage: Complete upload / promotion
-    App->>DB: Save profile or Spot via RPC
+    Function->>Storage: Promote to approved bucket
+    Function->>DB: Mark approved and record event
+    Function-->>App: 200 approved=true
+    App->>DB: Publish Spot via approved-assets RPC
   end
 ```
 
@@ -75,4 +103,6 @@ sequenceDiagram
 
 ## Open questions / TODOs
 
-- Exact category thresholds and copy strings: TODO: verify in Edge Function implementation.
+- Migrate profile avatars to the implemented moderation architecture.
+- Add cleanup for approved-but-unlinked and failed media.
+- Verify deployed threshold overrides separately in each Supabase environment.

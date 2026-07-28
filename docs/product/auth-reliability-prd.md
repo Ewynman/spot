@@ -6,12 +6,12 @@ Make account creation, email verification, login, and session restoration reliab
 
 ## Status
 
-- **Priority:** P0 release blocker
+- **Priority:** P0 reliability requirements; implementation substantially landed, live-environment validation remains release-blocking
 - **Owner:** TODO
 - **Target:** Before release candidate approval
-- **Last reviewed:** 2026-07-27
+- **Last reviewed:** 2026-07-28
 - **Evidence basis:** Repository audit. Live staging and production Supabase configuration still requires verification.
-- **Client implementation:** In progress on the authentication reliability branch
+- **Client implementation:** Editorial auth, OTP recovery, typed username availability, email-only login, and session-preserving fresh-install handling are present
 - **Approved UX:** Option A editorial welcome plus create-account, OTP, returning-account, and email-login flow
 
 ## Problem statement
@@ -22,16 +22,15 @@ Current tester reports:
 2. Credentials for a newly created account do not work.
 3. Every attempted username is reported as taken.
 
-The repository audit found code paths that can produce all three symptoms:
+The original audit identified credible causes, but the current repository has addressed several:
 
-- `FreshInstallDetector` deliberately signs out a valid Keychain session when its UserDefaults install marker is absent.
-- Debug builds use staging while distributed Release builds are intended to use production. Sessions and accounts are scoped to the Supabase project, so switching environments looks like a logout and credentials created in one environment do not exist in the other.
-- Username availability treats every RPC error as `false`, which the UI presents as “Username is already taken.”
-- The required `is_username_available` and `resolve_login_email` RPC definitions are not present in committed migrations.
-- Pending email verification exists only in memory. Relaunching before OTP completion loses the verification screen.
-- Login collapses unconfirmed-email and most other authentication failures into “Incorrect email/username or password.”
+- `FreshInstallDetector` now preserves the Keychain session and resets only install-scoped caches.
+- DEBUG and Firebase builds use staging; TestFlight/App Store builds use production. Accounts remain environment-scoped, so artifact misrouting still looks like missing credentials.
+- Username availability uses typed outcomes and `20260727210000_username_availability_v1.sql` versions `is_username_available`.
+- Pending verification email and timestamp are stored in Keychain by `AuthVerificationRecoveryStore` with a 72-hour lifetime.
+- Login is intentionally email-only. Unverified-email failures have distinct recovery copy; a public username-to-email resolver is not part of the approved design.
 
-These findings establish credible code-level causes but do not prove which one occurred in a specific production incident. Runtime telemetry and live Supabase checks are required.
+Live staging/production Auth settings, migration parity, and upgrade behavior still require runtime verification; source review cannot prove a historical tester incident.
 
 ## Goals
 
@@ -58,9 +57,9 @@ These findings establish credible code-level causes but do not prove which one o
 
 - The Supabase SDK stores its session in Keychain and emits the local session at startup: `Spot/Supabase/Supabase.swift`.
 - `AuthViewModel` restores authentication from `supabase.auth.authStateChanges`: `Spot/Services/Auth/AuthViewModel.swift`.
-- `FreshInstallDetector.handleFreshInstall()` checks a UserDefaults marker. If the marker is missing but Keychain still contains a session, it calls `supabase.auth.signOut()`: `Spot/Utils/FreshInstallDetector.swift`.
+- `FreshInstallDetector.handleFreshInstall()` checks a UserDefaults marker and resets feed, deep-link, onboarding/permission markers, and related install-scoped caches without signing out the Supabase session.
 - Debug builds select staging. Release builds select production or an injected plist configuration. Different Supabase projects have different account stores and Keychain session keys: `Spot/Supabase/Supabase.swift`.
-- Firebase App Distribution and TestFlight workflows intend to inject production configuration: `.github/workflows/deploy.yml` and `.github/workflows/testflight.yml`.
+- Firebase App Distribution injects and validates staging configuration. TestFlight requires production configuration: `.github/workflows/deploy.yml` and `.github/workflows/testflight.yml`.
 
 A genuine in-place update should preserve both UserDefaults and Keychain. Therefore, repeated logout on every update suggests at least one of:
 
@@ -71,20 +70,20 @@ A genuine in-place update should preserve both UserDefaults and Keychain. Theref
 
 ### Username availability
 
-`SignupView.validateAndSignUp()` asks `AuthViewModel.isUsernameAvailable()`. That method catches every error and returns `false`; the view always translates `false` to “Username is already taken”:
+`SignupView` uses `AuthViewModel.usernameAvailability` to distinguish available, taken, invalid, and temporarily unavailable outcomes. Final uniqueness remains database-enforced:
 
 - `Spot/Views/Auth/SignupView.swift`
 - `Spot/Services/Auth/AuthViewModel.swift`
 
-The client invokes `is_username_available`, but no definition is committed under `supabase/migrations/`. This can make every username appear taken when the function is missing, not deployed, not granted to `anon`, or temporarily unavailable.
+The client invokes `is_username_available`, defined by `20260727210000_username_availability_v1.sql`. Deployment and grants still need verification in both projects.
 
 ### Newly created account login
 
 - Email/password signup requires a six-digit signup OTP in the current UI.
-- Pending verification email and state are memory-only in `AuthViewModel`.
-- If the app terminates before verification, relaunch returns to the signed-out welcome flow.
-- Attempting login before confirmation can return Supabase’s email-not-confirmed error, but `LoginView` presents the generic incorrect-credentials message.
-- Username login invokes `resolve_login_email`, whose definition is also absent from committed migrations.
+- Pending verification email and timestamp persist in Keychain through `AuthVerificationRecoveryStore`; passwords and OTPs are not stored.
+- Relaunch within the recovery lifetime restores `ConfirmEmailView`.
+- `LoginView` distinguishes the unverified-email case from generic invalid credentials.
+- Login accepts email only. `resolve_login_email` is intentionally not implemented because returning account email from public username resolution would create enumeration risk.
 - The profile synchronization RPC is versioned in `20260702120000_sync_current_user_security_definer_v1.sql`, but deployment to both live projects must be confirmed.
 
 ## Product requirements
@@ -310,7 +309,7 @@ The app is not authentication-ready for release until:
 | Cross-device login | Sign in with Apple and Password AutoFill now; passkeys after Supabase setup | Product/Engineering |
 | Email confirmation mode | Six-digit OTP, matching the approved UI | TODO: verify Supabase |
 | Verification recovery storage | Device-local Keychain email + timestamp only | Engineering |
-| Username normalization | One client/database contract, case-insensitive | TODO: approve with database migration |
+| Username normalization | Implemented as lowercased/trimmed with shared syntax and database uniqueness | Product/Engineering |
 
 ## Live verification checklist
 
@@ -318,7 +317,7 @@ These items cannot be established from repository code alone:
 
 - Confirm the distributed failing build’s embedded Supabase project.
 - Confirm `is_username_available` exists and is callable by the intended role in staging and production.
-- Confirm whether any `resolve_login_email` implementation exists outside migrations; remove or security-review it.
+- Confirm no deployed anonymous username-to-email resolver remains from an earlier experiment.
 - Confirm `sync_current_user_v1` is applied in both projects.
 - Confirm email confirmation and OTP template settings in both projects.
 - Reproduce the update logout while capturing structured auth and install logs.
@@ -333,6 +332,7 @@ These items cannot be established from repository code alone:
 - `Spot/Views/Auth/ConfirmEmailView.swift`
 - `Spot/Utils/FreshInstallDetector.swift`
 - `supabase/migrations/20260702120000_sync_current_user_security_definer_v1.sql`
+- `supabase/migrations/20260727210000_username_availability_v1.sql`
 - [Networking and auth](../engineering/networking-and-auth.md)
 - [Supabase environment strategy](../engineering/supabase-environment-strategy.md)
 - [Database and RLS](../engineering/database-and-rls.md)
