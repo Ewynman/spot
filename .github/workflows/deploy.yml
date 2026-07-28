@@ -336,7 +336,10 @@ jobs:
           # Archive WITHOUT code signing. Passing signing settings (CODE_SIGN_IDENTITY /
           # PROVISIONING_PROFILE_SPECIFIER) on the xcodebuild command line applies them to
           # EVERY target, including Swift Package dependencies (Firebase, Promises, GoogleUtilities,
-          # etc.) which do not support provisioning profiles and fail the archive.
+          # etc.) which do not support provisioning profiles and fail the archive. The custom
+          # SPOT_DISTRIBUTION_CONDITION setting is consumed only by the Spot app target, avoiding
+          # a global SWIFT_ACTIVE_COMPILATION_CONDITIONS override that breaks Xcode 26 dependency
+          # scanning for Firebase and swift-crypto package targets.
           # Instead we archive unsigned and sign only at export time, where ExportOptions scopes
           # the provisioning profile to the app's bundle id.
           xcodebuild \
@@ -344,7 +347,7 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath $RUNNER_TEMP/Spot.xcarchive \
             -configuration Release \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="INTERNAL_TESTING $(inherited)" \
+            SPOT_DISTRIBUTION_CONDITION=INTERNAL_TESTING \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             clean archive | xcbeautify
