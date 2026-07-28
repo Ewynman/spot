@@ -119,6 +119,7 @@ enum SupabaseConfiguration {
 // MARK: - Global Supabase Client
 
 let supabase: SupabaseClient = {
+    DebugKeychainReset.performIfRequested()
     let config = SupabaseConfiguration.load()
     
     #if DEBUG

@@ -26,6 +26,24 @@
 			<key>Type</key>
 			<string>PSGroupSpecifier</string>
 			<key>Title</key>
+			<string>Authentication Testing</string>
+			<key>FooterText</key>
+			<string>Turn this on, fully quit Spot, then reopen it. The next launch clears Spot login and session data from Keychain, resets this switch, and returns to the signed-out flow.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Clear Keychain on Next Launch</string>
+			<key>Key</key>
+			<string>debugClearKeychainOnNextLaunch</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
 			<string>Log Presets</string>
 			<key>FooterText</key>
 			<string>These are debug-only and take effect on next app launch.</string>

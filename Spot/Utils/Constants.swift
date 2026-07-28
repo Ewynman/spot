@@ -66,6 +66,7 @@ enum Constants {
         static let logAuth = "logAuth"
         static let logNetworkComponent = "logNetworkComponent"
         static let logDeepLink = "logDeepLink"
+        static let clearKeychainOnNextLaunch = "debugClearKeychainOnNextLaunch"
         /// When true, `SpotLogger` treats all debug categories as on (per-area toggles are ignored).
         static let logAllDebugCategories = "logAllDebugCategories"
     }
