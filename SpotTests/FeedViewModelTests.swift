@@ -21,9 +21,8 @@ struct FeedViewModelTests {
         let spot1 = makeSpot(id: "a", lat: 40.0, lon: -74.0)
         let spot2 = makeSpot(id: "b", lat: nil, lon: nil)
         vm.spots = [spot1, spot2]
-        #expect(vm.validSpots.count == 2)
-        #expect(vm.validSpots[0].id == "a")
-        #expect(vm.validSpots[1].id == "b")
+        let validSpots = vm.validSpots
+        #expect(validSpots.map(\.id) == ["a", "b"])
     }
 
     @Test func validMapSpotsFiltersOutSpotsWithoutCoordinates() {
