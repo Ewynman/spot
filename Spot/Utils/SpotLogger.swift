@@ -287,6 +287,7 @@ private final class DebugFileLogWriter {
     private let maximumBytes: UInt64 = 1_000_000
     private let retainedFiles = 3
     private var cachedFileURL: URL?
+    private var backupExclusionApplied = false
 
     private init() {}
 
@@ -308,10 +309,11 @@ private final class DebugFileLogWriter {
                 contents: data,
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
-            excludeFromBackup(fileURL)
+            excludeFromBackupIfNeeded(fileURL)
             return
         }
 
+        excludeFromBackupIfNeeded(fileURL)
         guard let handle = try? FileHandle(forWritingTo: fileURL) else { return }
         handle.seekToEndOfFile()
         handle.write(data)
@@ -335,11 +337,18 @@ private final class DebugFileLogWriter {
         return fileURL
     }
 
-    private func excludeFromBackup(_ fileURL: URL) {
+    private func excludeFromBackupIfNeeded(_ fileURL: URL) {
+        guard !backupExclusionApplied else { return }
+
         var resourceValues = URLResourceValues()
         resourceValues.isExcludedFromBackup = true
         var mutableFileURL = fileURL
-        try? mutableFileURL.setResourceValues(resourceValues)
+        do {
+            try mutableFileURL.setResourceValues(resourceValues)
+            backupExclusionApplied = true
+        } catch {
+            // Logging must never fail because backup metadata could not be set.
+        }
     }
 
     private func rotateIfNeeded(_ fileURL: URL, adding byteCount: Int) {

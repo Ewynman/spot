@@ -15,8 +15,6 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 	<key>SpotURLs</key>
 	<dict>
 		<key>customScheme</key>
@@ -29,8 +27,6 @@
 			<string>www.spotapp.online</string>
 		</array>
 	</dict>
-	<key>UIFileSharingEnabled</key>
-	<true/>
 	<key>Supabase</key>
 	<dict>
 		<key>anonKey</key>

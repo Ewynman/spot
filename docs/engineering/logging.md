@@ -80,9 +80,11 @@ The file is protected until first device unlock, rotates at 1 MB, and retains
 three archives. File writing is compiled out of release builds. When Xcode is
 attached, the file sink stays off and logs go only to Apple Unified Logging.
 
-`UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` expose the
-Documents directory at Files → On My iPhone → Spot and through Finder when the
-device is connected to a Mac. Log files are excluded from device backups.
+The Debug target’s `UIFileSharingEnabled` and
+`LSSupportsOpeningDocumentsInPlace` build settings expose the Documents
+directory at Files → On My iPhone → Spot and through Finder when the device is
+connected to a Mac. Release builds do not expose Documents. Log files are
+excluded from device backups.
 
 ## Privacy and noise rules
 
