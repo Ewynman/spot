@@ -14,8 +14,8 @@ This directory contains GitHub Actions workflows for the Spot iOS app.
 - Runs comprehensive PR validation including:
   - **API Breaking Change Detection**: Scans for changes to public Swift APIs
   - **Documentation Validation**: Checks if documentation needs updates
-  - **Unit Tests**: Runs full test suite using the `SpotTests` scheme
-  - **Code Coverage Enforcement**: Validates 80% minimum coverage on changed files
+  - **Unit Tests**: Runs the full `SpotTests` suite with one serial test worker
+  - **Code Coverage Enforcement**: Validates 80% minimum coverage on changed non-view files
 - Uses macOS 15 runners and reports the selected Xcode version at runtime
 - Boots an iPhone simulator and executes tests
 - Enables code coverage collection
@@ -37,7 +37,8 @@ The workflow uses three validation scripts in `scripts/`:
    - Provides suggestions for which docs may need updates
 
 3. **`validate-coverage.sh`**
-   - Enforces 80% minimum coverage on changed production files
+   - Enforces 80% minimum coverage on changed non-view production files
+   - Excludes `Spot/Views/`, which belongs to the separate UI-test coverage boundary
    - Uses `xcrun xccov` to extract coverage from `.xcresult` bundles
    - Fails PR if coverage threshold not met
    - Shows detailed per-file coverage breakdown
@@ -185,6 +186,8 @@ SIM_ID=$(xcrun simctl list devices available | grep "iPhone" | head -n 1 | sed -
 xcodebuild \
   -scheme SpotTests \
   -destination "id=$SIM_ID" \
+  -parallel-testing-enabled NO \
+  -maximum-parallel-testing-workers 1 \
   -enableCodeCoverage YES \
   test | xcbeautify
 ```

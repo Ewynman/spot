@@ -49,7 +49,9 @@ echo ""
 echo -e "${BLUE}Getting changed files...${NC}"
 git fetch origin "${BASE_BRANCH##*/}" --depth=1 2>/dev/null || true
 
-CHANGED_FILES=$(git diff --name-only "${BASE_BRANCH}" -- '*.swift' | grep -E '^Spot/' | grep -v 'SpotTests/' | grep -v 'SpotUITests/' || true)
+# SwiftUI view execution is measured by the separate SpotUITests scheme, not by
+# this unit-test job. Enforce unit coverage on changed non-view production code.
+CHANGED_FILES=$(git diff --name-only "${BASE_BRANCH}" -- '*.swift' | grep -E '^Spot/' | grep -v '^Spot/Views/' | grep -v 'SpotTests/' | grep -v 'SpotUITests/' || true)
 
 if [ -z "$CHANGED_FILES" ]; then
     echo -e "${GREEN}✓ No production Swift files changed - skipping coverage check${NC}"
