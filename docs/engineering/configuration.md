@@ -21,6 +21,7 @@ Verified file paths: `Spot/Info.plist`, `Spot/Spot.entitlements`.
 | `CFBundleURLTypes` | Custom URL scheme **`spotapp`** for deep links. |
 | `SpotURLs` | `shareURLBase`, `universalLinkDomains`, `customScheme` read by `URLConfiguration`. |
 | `Supabase` | Release-workflow-injected `url` and `anonKey`; DEBUG uses `SupabaseEnvironment` in `Supabase.swift`. |
+| `UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace` | Expose `Documents/Logs` in Files and Finder for detached DEBUG log retrieval. |
 | Generated usage descriptions | Camera, photo-library, and location strings are set through Xcode `INFOPLIST_KEY_*` build settings in `project.pbxproj`. |
 
 Notification authorization uses UserNotifications and does not have a plist usage-description key. Notification categories and the delegate are registered by `AppDelegate`.
