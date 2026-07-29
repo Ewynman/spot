@@ -61,7 +61,8 @@ This trigger does not depend on the separate CI workflow. Repository branch prot
 **What it does:**
 - Automatically increments build number in `CURRENT_PROJECT_VERSION` (build number `+1` only)
 - Pushes build number update to `main` before building (prevents duplicate Firebase build numbers)
-- Extracts release notes from merged PR (title + body)
+- Resolves the merged PR associated with the deployed commit
+- Converts the PR's `Changes` section to concise plain-text Firebase release notes (Markdown and checklist boilerplate are removed)
 - Injects Firebase configuration (`GoogleService-Info.plist`) from secrets
 - Installs Apple signing assets into a temporary CI keychain (never the login keychain)
 - Archives unsigned, then exports a **signed Ad Hoc IPA** for distribution
@@ -93,6 +94,7 @@ See [docs/engineering/firebase-distribution-setup.md](../../docs/engineering/fir
 - Build number is committed and pushed before archiving to prevent duplicate Firebase builds
 - Concurrent deploys are serialized via the `deploy-firebase-main` concurrency group
 - Bump commits (`Bump build number to ... [skip ci]`) do not re-trigger CI or deploy workflows
+- Firebase App Distribution treats release notes as plain text; `scripts/format-firebase-release-notes.py` keeps the tester notes and rendered Actions summary readable
 
 ---
 

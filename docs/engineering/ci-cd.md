@@ -88,7 +88,7 @@ The workflow trigger is not technically gated on the separate CI workflow succee
 1. **Checkout:** Pull repository code with full history
 2. **Version Management:** Auto-increment build number
 3. **Version Commit:** Push build number update back to `main`
-4. **Release Notes:** Extract PR information for release notes
+4. **Release Notes:** Resolve the PR associated with the deployed commit and convert its `Changes` section to plain text
 5. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
 6. **Supabase Configuration:** Inject and verify staging project credentials
 7. **Code Signing:** Install certificates and provisioning profiles
@@ -101,7 +101,8 @@ The workflow trigger is not technically gated on the separate CI workflow succee
 - Pins Firebase-distributed internal builds to staging Supabase project `aeurigbbohyxvtsfiyul`; the workflow fails if another project URL is embedded
 - Defines `INTERNAL_TESTING` through the Spot target's `SPOT_DISTRIBUTION_CONDITION` setting; it is not applied to Swift Package targets
 - Builds signed IPA for distribution
-- Generates release notes from merged PR title and description
+- Generates concise release notes from the associated merged PR title and `Changes` section
+- Removes Markdown, automated PR metadata, testing details, and checklist boilerplate because Firebase App Distribution displays release notes as plain text
 - Uploads to Firebase App Distribution with testers group
 - Skips re-deploy on bump commits (`Bump build number to … [skip ci]`)
 
@@ -368,7 +369,7 @@ If Xcode Cloud starts building again:
 4. **Deployment workflow triggers** (`deploy.yml`):
    - Build number auto-increments (e.g., 7 → 8)
    - **Build number is pushed to `main` before archive/upload** so a failed deploy cannot leave the repo stale and cause duplicate Firebase build numbers
-   - Release notes generated from PR
+   - Plain-text release notes generated from the merged PR associated with the deployed commit
    - App is built and signed
    - IPA uploaded to Firebase App Distribution
 5. Testers receive notification in Firebase App Distribution

@@ -17,6 +17,7 @@ jobs:
     runs-on: macos-15
     permissions:
       contents: write
+      pull-requests: read
 
     # Deploy on merges/direct pushes to main, but skip automated bump commits.
     if: |
@@ -119,33 +120,47 @@ jobs:
       - name: Extract release notes from merged PR
         id: release_notes
         run: |
-          # Get the last merged PR info
-          LAST_PR=$(gh pr list --state merged --limit 1 --json number,title,body,mergedAt --jq '.[0]')
+          set -euo pipefail
+
+          # Resolve the PR associated with the deployed commit. Using the latest
+          # merged PR can attach unrelated notes when merges happen close together.
+          LAST_PR=$(
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/commits/${SOURCE_SHA}/pulls" \
+              --jq '[.[] | select(.merged_at != null)] | first // empty' \
+              || true
+          )
 
           if [ -z "$LAST_PR" ] || [ "$LAST_PR" = "null" ]; then
-            echo "No recent PR found, using commit message"
-            NOTES="Build ${{ steps.increment_build.outputs.new_build }}: $(git log -1 --pretty=%s)"
-            echo "$NOTES" > release_notes.txt
-          else
-            PR_NUMBER=$(echo "$LAST_PR" | jq -r '.number')
-            PR_TITLE=$(echo "$LAST_PR" | jq -r '.title')
-            PR_BODY=$(echo "$LAST_PR" | jq -r '.body' | head -c 500)
-
-            # Create release notes with proper formatting
+            echo "No merged PR is associated with ${SOURCE_SHA}; using its commit message"
             {
-              echo "Build ${{ steps.increment_build.outputs.new_build }} - PR #${PR_NUMBER}: ${PR_TITLE}"
-              echo ""
-              echo "${PR_BODY}"
+              echo "Build ${{ steps.increment_build.outputs.new_build }}"
+              echo "$(git log -1 --pretty=%s "$SOURCE_SHA")"
               echo ""
               echo "Commit: ${SOURCE_SHA}"
-              echo "Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            } > release_notes.txt
+          else
+            PR_NUMBER=$(jq -r '.number' <<< "$LAST_PR")
+            PR_TITLE=$(jq -r '.title' <<< "$LAST_PR")
+            jq -r '.body // ""' <<< "$LAST_PR" \
+              | ./scripts/format-firebase-release-notes.py \
+              > "$RUNNER_TEMP/formatted_release_body.txt"
+
+            {
+              echo "Build ${{ steps.increment_build.outputs.new_build }} • PR #${PR_NUMBER}"
+              echo "${PR_TITLE}"
+              if [ -s "$RUNNER_TEMP/formatted_release_body.txt" ]; then
+                echo ""
+                cat "$RUNNER_TEMP/formatted_release_body.txt"
+              fi
+              echo ""
+              echo "Commit: ${SOURCE_SHA}"
             } > release_notes.txt
           fi
 
-          # Also output for GitHub
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          cat release_notes.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Firebase release notes:"
+          cat release_notes.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -429,9 +444,13 @@ jobs:
           echo "**Commit**: ${SOURCE_SHA}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          cat release_notes.txt >> $GITHUB_STEP_SUMMARY || echo "No release notes" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          if [ -f release_notes.txt ]; then
+            while IFS= read -r line; do
+              printf '> %s\n' "$line"
+            done < release_notes.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "> No release notes" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Clean up keychain and provisioning profile
         if: always()
