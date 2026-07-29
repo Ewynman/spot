@@ -308,6 +308,7 @@ private final class DebugFileLogWriter {
                 contents: data,
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
+            excludeFromBackup(fileURL)
             return
         }
 
@@ -329,23 +330,16 @@ private final class DebugFileLogWriter {
             return nil
         }
 
-        let directory = documents.appendingPathComponent("Logs", isDirectory: true)
-        do {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
-            )
-            var resourceValues = URLResourceValues()
-            resourceValues.isExcludedFromBackup = true
-            var mutableDirectory = directory
-            try mutableDirectory.setResourceValues(resourceValues)
-            let fileURL = directory.appendingPathComponent("spot-debug.txt")
-            cachedFileURL = fileURL
-            return fileURL
-        } catch {
-            return nil
-        }
+        let fileURL = documents.appendingPathComponent("spot-debug.txt")
+        cachedFileURL = fileURL
+        return fileURL
+    }
+
+    private func excludeFromBackup(_ fileURL: URL) {
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        var mutableFileURL = fileURL
+        try? mutableFileURL.setResourceValues(resourceValues)
     }
 
     private func rotateIfNeeded(_ fileURL: URL, adding byteCount: Int) {
