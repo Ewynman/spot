@@ -125,6 +125,21 @@ Increments the build number (`CURRENT_PROJECT_VERSION`) in the Xcode project.
 
 **Note:** This script is also run automatically by the `deploy.yml` workflow on every deployment.
 
+### `format-firebase-release-notes.py`
+
+Converts a GitHub pull request body from Markdown to concise plain text for Firebase App Distribution.
+
+```bash
+printf '## Changes\n- Improve release notes\n' \
+  | ./scripts/format-firebase-release-notes.py
+```
+
+The formatter prefers the `Changes` section, removes automation metadata and Markdown decoration, omits testing/checklist sections, and limits the result to 1,200 characters. Run its tests with:
+
+```bash
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+```
+
 ## Running Locally
 
 All scripts can be run locally before pushing to verify your changes will pass CI:
@@ -163,6 +178,7 @@ These scripts are integrated into GitHub Actions workflows:
 
 ### Deployment (`.github/workflows/deploy.yml`)
 - **Build number increment** runs automatically
+- **Firebase release notes** are formatted as plain text
 - Builds and signs the app
 - Uploads to Firebase App Distribution
 - Commits build number change back to main
