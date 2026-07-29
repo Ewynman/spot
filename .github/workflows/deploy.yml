@@ -4,6 +4,17 @@ on:
   push:
     branches:
       - main
+    # Do not spend a build number or publish an unchanged IPA for repository
+    # maintenance. A mixed change still deploys when any non-ignored file changes.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".agents/**"
+      - ".cursor/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".gitignore"
+      - ".xcode-cloud-disabled"
+      - "LICENSE*"
   workflow_dispatch:  # Allow manual triggers
 
 # Serialize deploys so concurrent runs cannot read the same build number.

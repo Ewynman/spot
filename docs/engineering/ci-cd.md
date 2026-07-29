@@ -73,10 +73,12 @@ See `.github/workflows/README.md` for detailed workflow documentation.
 #### Deployment workflow: `deploy.yml`
 
 **Triggers:**
-- Push to `main`
+- Push to `main` with at least one non-documentation/non-housekeeping file change
 - Manual workflow dispatch
 
 The workflow trigger is not technically gated on the separate CI workflow succeeding. Branch protection and merge policy must enforce validation before code reaches `main`.
+
+Documentation, Markdown, agent configuration, ignore-file, and license-only pushes are filtered out before a workflow run is created. Mixed changes still deploy when they contain any app, test, build, script, backend, or workflow change. Manual dispatch bypasses the push path filter for intentional rebuilds.
 
 **Environment:**
 - Runner: macOS 15
@@ -105,6 +107,7 @@ The workflow trigger is not technically gated on the separate CI workflow succee
 - Removes Markdown, automated PR metadata, testing details, and checklist boilerplate because Firebase App Distribution displays release notes as plain text
 - Uploads to Firebase App Distribution with testers group
 - Skips re-deploy on bump commits (`Bump build number to … [skip ci]`)
+- Skips documentation and repository-maintenance-only pushes so they do not increment the build number or publish an unchanged IPA
 
 **Required secrets:**
 - `GOOGLE_SERVICE_INFO_PLIST_BASE64` - Firebase GoogleService-Info.plist file (base64 encoded)
@@ -381,7 +384,7 @@ If Xcode Cloud starts building again:
 
 **Deploy safeguards:**
 - **Concurrency:** Only one deploy runs at a time (`deploy-firebase-main` group)
-- **CI gate:** Deployment waits up to 30 minutes for the `ci.yml` push run on the same source SHA to succeed
+- **Path filter:** Documentation and repository-maintenance-only pushes do not create Firebase deploy runs
 - **Skip bump commits:** Pushes with message `Bump build number to … [skip ci]` do not re-trigger deploy
 - **Skip CI on bumps:** `ci.yml` skips validation on `[skip ci]` commits
 - **Push before build:** The incremented build number is committed and pushed to `main` before archiving/uploading to Firebase

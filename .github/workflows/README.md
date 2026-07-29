@@ -53,8 +53,10 @@ The workflow uses three validation scripts in `scripts/`:
 ### `deploy.yml` - Firebase App Distribution Deployment (Test ENV)
 
 **Triggers:**
-- Pushes to `main`
+- Pushes to `main` that include an app, test, build, script, backend, or workflow change
 - Manual workflow dispatch
+
+Documentation and repository-maintenance-only pushes are ignored, so they do not consume a build number or publish an unchanged IPA. A mixed change still deploys when it includes any non-ignored file. Manual dispatch remains available for an intentional rebuild.
 
 This trigger does not depend on the separate CI workflow. Repository branch protection and merge policy are responsible for preventing unvalidated changes from reaching `main`.
 
@@ -95,6 +97,7 @@ See [docs/engineering/firebase-distribution-setup.md](../../docs/engineering/fir
 - Concurrent deploys are serialized via the `deploy-firebase-main` concurrency group
 - Bump commits (`Bump build number to ... [skip ci]`) do not re-trigger CI or deploy workflows
 - Firebase App Distribution treats release notes as plain text; `scripts/format-firebase-release-notes.py` keeps the tester notes and rendered Actions summary readable
+- Documentation/Markdown, agent configuration, ignore-file, and license-only changes do not trigger a Firebase build
 
 ---
 
