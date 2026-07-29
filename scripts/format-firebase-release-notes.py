@@ -48,12 +48,12 @@ def _plain_text(markdown: str) -> str:
     # Keep link labels, but discard image/link destinations and Markdown decoration.
     text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-    text = re.sub(r"^\s*#{1,6}\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*[-*+]\s+\[[ xX]\]\s+", "• ", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*[-*+]\s+", "• ", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*\d+[.)]\s+", "• ", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*>\s?", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*```[^\n]*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^[ \t]*#{1,6}[ \t]+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+", "• ", text, flags=re.MULTILINE)
+    text = re.sub(r"^[ \t]*[-*+][ \t]+", "• ", text, flags=re.MULTILINE)
+    text = re.sub(r"^[ \t]*\d+[.)][ \t]+", "• ", text, flags=re.MULTILINE)
+    text = re.sub(r"^[ \t]*>[ \t]?", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^[ \t]*```[^\n]*$", "", text, flags=re.MULTILINE)
     text = re.sub(r"[*_~`]", "", text)
     text = html.unescape(text)
 
