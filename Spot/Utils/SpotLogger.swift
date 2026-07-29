@@ -286,6 +286,7 @@ private final class DebugFileLogWriter {
     private let fileManager = FileManager.default
     private let maximumBytes: UInt64 = 1_000_000
     private let retainedFiles = 3
+    private var cachedFileURL: URL?
 
     private init() {}
 
@@ -317,21 +318,31 @@ private final class DebugFileLogWriter {
     }
 
     private func currentFileURL() -> URL? {
-        guard let applicationSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
+        if let cachedFileURL {
+            return cachedFileURL
+        }
+
+        guard let documents = fileManager.urls(
+            for: .documentDirectory,
             in: .userDomainMask
         ).first else {
             return nil
         }
 
-        let directory = applicationSupport.appendingPathComponent("Logs", isDirectory: true)
+        let directory = documents.appendingPathComponent("Logs", isDirectory: true)
         do {
             try fileManager.createDirectory(
                 at: directory,
                 withIntermediateDirectories: true,
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
-            return directory.appendingPathComponent("spot-debug.txt")
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            var mutableDirectory = directory
+            try mutableDirectory.setResourceValues(resourceValues)
+            let fileURL = directory.appendingPathComponent("spot-debug.txt")
+            cachedFileURL = fileURL
+            return fileURL
         } catch {
             return nil
         }
