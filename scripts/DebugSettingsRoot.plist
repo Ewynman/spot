@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Debug Logging</string>
+			<key>FooterText</key>
+			<string>DEBUG builds only. App Store and TestFlight builds always emit errors only.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSMultiValueSpecifier</string>
+			<key>Title</key>
+			<string>Log Profile</string>
+			<key>Key</key>
+			<string>loggingProfile</string>
+			<key>DefaultValue</key>
+			<integer>1</integer>
+			<key>Titles</key>
+			<array>
+				<string>0 — Errors only</string>
+				<string>1 — Info + errors</string>
+				<string>2 — Debug + info + errors</string>
+				<string>3 — UI only</string>
+				<string>4 — All logs</string>
+			</array>
+			<key>Values</key>
+			<array>
+				<integer>0</integer>
+				<integer>1</integer>
+				<integer>2</integer>
+				<integer>3</integer>
+				<integer>4</integer>
+			</array>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Authentication Testing</string>
+			<key>FooterText</key>
+			<string>Turn this on, fully quit Spot, then reopen it. The next launch clears Spot login and session data from Keychain, resets this switch, and returns to the signed-out flow.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Clear Keychain on Next Launch</string>
+			<key>Key</key>
+			<string>debugClearKeychainOnNextLaunch</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+	</array>
+	<key>StringsTable</key>
+	<string>Root</string>
+</dict>
+</plist>

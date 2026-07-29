@@ -73,10 +73,12 @@ See `.github/workflows/README.md` for detailed workflow documentation.
 #### Deployment workflow: `deploy.yml`
 
 **Triggers:**
-- Push to `main`
+- Push to `main` with at least one non-documentation/non-housekeeping file change
 - Manual workflow dispatch
 
 The workflow trigger is not technically gated on the separate CI workflow succeeding. Branch protection and merge policy must enforce validation before code reaches `main`.
+
+Documentation, Markdown, agent configuration, ignore-file, and license-only pushes are filtered out before a workflow run is created. Mixed changes still deploy when they contain any app, test, build, script, backend, or workflow change. Manual dispatch bypasses the push path filter for intentional rebuilds.
 
 **Environment:**
 - Runner: macOS 15
@@ -88,7 +90,7 @@ The workflow trigger is not technically gated on the separate CI workflow succee
 1. **Checkout:** Pull repository code with full history
 2. **Version Management:** Auto-increment build number
 3. **Version Commit:** Push build number update back to `main`
-4. **Release Notes:** Extract PR information for release notes
+4. **Release Notes:** Resolve the PR associated with the deployed commit and convert its `Changes` section to plain text
 5. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
 6. **Supabase Configuration:** Inject and verify staging project credentials
 7. **Code Signing:** Install certificates and provisioning profiles
@@ -99,10 +101,13 @@ The workflow trigger is not technically gated on the separate CI workflow succee
 - Automatically increments `CURRENT_PROJECT_VERSION` in Xcode project via `scripts/increment-build-number.sh`
 - **Pushes the build number bump to `main` before building** (prevents duplicate Firebase build numbers when upload succeeds but a later step fails)
 - Pins Firebase-distributed internal builds to staging Supabase project `aeurigbbohyxvtsfiyul`; the workflow fails if another project URL is embedded
+- Defines `INTERNAL_TESTING` through the Spot target's `SPOT_DISTRIBUTION_CONDITION` setting; it is not applied to Swift Package targets
 - Builds signed IPA for distribution
-- Generates release notes from merged PR title and description
+- Generates concise release notes from the associated merged PR title and `Changes` section
+- Removes Markdown, automated PR metadata, testing details, and checklist boilerplate because Firebase App Distribution displays release notes as plain text
 - Uploads to Firebase App Distribution with testers group
 - Skips re-deploy on bump commits (`Bump build number to … [skip ci]`)
+- Skips documentation and repository-maintenance-only pushes so they do not increment the build number or publish an unchanged IPA
 
 **Required secrets:**
 - `GOOGLE_SERVICE_INFO_PLIST_BASE64` - Firebase GoogleService-Info.plist file (base64 encoded)
@@ -367,7 +372,7 @@ If Xcode Cloud starts building again:
 4. **Deployment workflow triggers** (`deploy.yml`):
    - Build number auto-increments (e.g., 7 → 8)
    - **Build number is pushed to `main` before archive/upload** so a failed deploy cannot leave the repo stale and cause duplicate Firebase build numbers
-   - Release notes generated from PR
+   - Plain-text release notes generated from the merged PR associated with the deployed commit
    - App is built and signed
    - IPA uploaded to Firebase App Distribution
 5. Testers receive notification in Firebase App Distribution
@@ -379,6 +384,7 @@ If Xcode Cloud starts building again:
 
 **Deploy safeguards:**
 - **Concurrency:** Only one deploy runs at a time (`deploy-firebase-main` group)
+- **Path filter:** Documentation and repository-maintenance-only pushes do not create Firebase deploy runs
 - **Skip bump commits:** Pushes with message `Bump build number to … [skip ci]` do not re-trigger deploy
 - **Skip CI on bumps:** `ci.yml` skips validation on `[skip ci]` commits
 - **Push before build:** The incremented build number is committed and pushed to `main` before archiving/uploading to Firebase
