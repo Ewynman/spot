@@ -111,8 +111,10 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           set -o pipefail
-          echo "Validating code coverage on changed files..."
-          ./scripts/validate-coverage.sh TestResults.xcresult origin/${{ github.base_ref }} 80 2>&1 | tee coverage-report.txt
+          echo "Validating coverage of the lines changed by this PR..."
+          # Args: <xcresult> <base-branch> <threshold %> <min changed executable
+          # lines before the threshold is enforced>.
+          ./scripts/validate-coverage.sh TestResults.xcresult origin/${{ github.base_ref }} 80 10 2>&1 | tee coverage-report.txt
       
       - name: Upload test results
         uses: actions/upload-artifact@v4

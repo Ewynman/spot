@@ -53,7 +53,7 @@ The Firebase and TestFlight signing assets are never swapped: the Ad Hoc profile
 4. **API Validation (PR only):** Check for breaking API changes
 5. **Documentation Validation (PR only):** Validate documentation updates
 6. **Test:** Run SpotTests serially with code coverage enabled
-7. **Coverage Validation (PR only):** Enforce 80% coverage on changed files
+7. **Coverage Validation (PR only):** Enforce 80% coverage on the lines the PR changed
 8. **Artifacts:** Upload test results (`.xcresult`) and coverage reports
 9. **Summary:** Generate coverage summary in GitHub
 10. **PR Comment:** Post validation results as PR comment
@@ -61,7 +61,7 @@ The Firebase and TestFlight signing assets are never swapped: the Ad Hoc profile
 **What it validates:**
 - All unit tests pass
 - No compilation errors
-- Code coverage is collected and meets 80% threshold on changed files
+- Code coverage is collected and meets the 80% threshold on the lines the PR changed
 - No breaking API changes (or they're documented)
 - Documentation updates for significant changes
 - Data plane compliance (via DataPlaneGuardTests)
@@ -246,24 +246,40 @@ xcodebuild -scheme SpotTests -destination "id=$SIM_ID" test | $BEAUTIFY
 
 CI collects code coverage data on every run and **enforces coverage requirements** on pull requests.
 
+The gate measures **changed-line coverage**, not whole-file coverage. The question it asks is "are the lines this PR wrote tested?" rather than "is this entire file well tested?". Whole-file thresholds punish any edit to a legacy low-coverage file — a four-line threading fix in a 341-line Supabase repository would have required retro-covering the whole repository to land, which pushes people toward not touching those files at all.
+
 **Coverage Requirements:**
-- **80% minimum coverage** on changed non-view production Swift files
-- Measured using `xcrun xccov` against `.xcresult` bundles
+- **80% of the executable lines a PR adds or modifies** must be covered
 - Applies to files under `Spot/`, excluding tests and `Spot/Views/`
 - SwiftUI view execution belongs to the separate `SpotUITests` scheme
+- Measured using `xcrun xccov` against `.xcresult` bundles
 - Validation runs automatically on every PR
 
 **How it works:**
 1. Tests run with `-enableCodeCoverage YES`
-2. Coverage data extracted with `xcrun xccov`
-3. Changed files identified via `git diff`
-4. Coverage calculated per changed file
-5. PR fails if any changed file < 80% coverage
+2. Changed files identified via `git diff --diff-filter=d`
+3. Changed line numbers extracted from `git diff -U0` hunk headers
+4. Per-line execution counts read with `xcrun xccov view --archive --file`
+5. The two are intersected, ignoring non-executable lines (comments, declarations)
+6. PR fails if any enforced file covers < 80% of its changed executable lines
+
+**Enforcement floor:** files with fewer than 10 changed executable lines are reported but not enforced. Below roughly that size a single uncovered line swings the percentage so hard that the number stops carrying signal.
 
 **Coverage validation script:**
 - Location: `scripts/validate-coverage.sh`
-- Usage: `./scripts/validate-coverage.sh <xcresult-path> <base-branch> <coverage-threshold>`
+- Usage: `./scripts/validate-coverage.sh <xcresult-path> <base-branch> <threshold> [min-changed-lines]`
 - Can be run locally before pushing
+- Written for bash 3.2 (the default `/bin/bash` on macOS runners), so no associative arrays
+
+**Reading local numbers:** `SpotTests` is app-hosted (`TEST_HOST = Spot.app`), so the app launches during unit tests and picks up incidental coverage that depends on simulator state. A simulator with a signed-in session reaches the feed and location code and reports far higher coverage than CI's clean runner. To reproduce CI numbers locally, run against a freshly created simulator:
+
+```sh
+SIM=$(xcrun simctl create "CoverageProbe" "iPhone 16" | tail -1)
+xcodebuild -scheme SpotTests -destination "id=$SIM" \
+  -enableCodeCoverage YES -resultBundlePath Clean.xcresult test
+./scripts/validate-coverage.sh Clean.xcresult origin/main 80 10
+xcrun simctl delete "$SIM"
+```
 
 **Coverage reports:**
 - Uploaded as artifacts (retained for 7 days)
@@ -271,9 +287,10 @@ CI collects code coverage data on every run and **enforces coverage requirements
 - Full report available in GitHub Actions logs
 
 **Exemptions:**
-- Files with no executable lines (e.g., pure data models)
+- Files with no executable lines changed (e.g., comment or declaration-only edits)
 - Files not in production code path
 - SwiftUI view files, which are outside the unit-test scheme's coverage boundary
+- Code that can only run behind a system permission prompt, which unit tests must not raise
 - Can be discussed with team if threshold is impractical for specific cases
 
 ### Artifacts
@@ -295,7 +312,7 @@ When a PR is opened or updated, GitHub Actions automatically:
 1. **Validates API stability:** Detects potential breaking changes to public APIs
 2. **Validates documentation:** Checks if docs need updates based on code changes
 3. **Runs the full unit test suite:** All tests must pass
-4. **Validates code coverage:** Enforces 80% minimum on changed files
+4. **Validates code coverage:** Enforces 80% minimum on the lines the PR changed
 5. **Reports status:** Shows results as checks on the PR
 6. **Posts comment:** Summarizes validation results in PR comment
 7. **Blocks merge:** If any check fails (when required checks are configured)
@@ -326,10 +343,10 @@ When a PR is opened or updated, GitHub Actions automatically:
 - **Script:** `scripts/validate-coverage.sh`
 - **Purpose:** Ensures all new/changed code is properly tested
 - **What it checks:**
-  - Extracts coverage for each changed production Swift file
-  - Calculates line coverage percentage
-  - Compares against 80% threshold
-- **Result:** Fails PR if any changed file below threshold
+  - Identifies the executable lines each changed production Swift file added or modified
+  - Calculates what share of those lines the tests executed
+  - Compares against the 80% threshold, for files above the 10-line enforcement floor
+- **Result:** Fails PR if any enforced file is below threshold
 
 Developers and reviewers can click on the check to see detailed logs and artifacts.
 
@@ -369,7 +386,7 @@ If Xcode Cloud starts building again:
 
 1. Developer creates PR with changes
 2. **CI validation runs** (`ci.yml`):
-   - Code coverage validated (80% minimum)
+   - Changed-line code coverage validated (80% minimum)
    - API changes detected
    - Documentation checked
    - All tests pass

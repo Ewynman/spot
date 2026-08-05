@@ -89,6 +89,67 @@ struct LocationManagerDelegateTests {
         }
     }
 
+    /// The delegate hop is defensive: CoreLocation should always call back on
+    /// main, but a fix arriving from anywhere else must still land in published
+    /// state rather than being dropped. Delivering off-main is the exact shape
+    /// of the failure this PR fixes, so it is worth pinning down.
+    @Test func fixDeliveredOffTheMainThreadStillReachesPublishedState() async {
+        let defaults = UserDefaults.standard
+        let previous = defaults.dictionary(forKey: Self.cacheKey)
+        defaults.removeObject(forKey: Self.cacheKey)
+        defer {
+            if let previous {
+                defaults.set(previous, forKey: Self.cacheKey)
+            } else {
+                defaults.removeObject(forKey: Self.cacheKey)
+            }
+        }
+
+        let manager = LocationManager()
+
+        await Task.detached {
+            manager.locationManager(
+                CLLocationManager(),
+                didUpdateLocations: [CLLocation(latitude: 35.6762, longitude: 139.6503)]
+            )
+        }.value
+
+        // The off-main path schedules the update onto the main actor, so give
+        // it a bounded window to arrive instead of assuming it already has.
+        for _ in 0..<200 {
+            if manager.userLocation != nil { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+
+        #expect(manager.userLocation?.coordinate.latitude == 35.6762)
+    }
+
+    // MARK: - Authorization
+
+    @Test func authorizationChangeFromDelegateIsMirroredIntoPublishedState() {
+        withCleanLocationCache { sender in
+            let manager = LocationManager()
+            manager.locationManagerDidChangeAuthorization(sender)
+
+            #expect(manager.authorizationStatus == sender.authorizationStatus)
+        }
+    }
+
+    /// A denial must be recorded without starting location updates, so the map
+    /// can show its permission CTA instead of waiting on a fix that will never
+    /// arrive.
+    @Test func deniedAuthorizationIsRecordedWithoutStartingUpdates() {
+        withCleanLocationCache { _ in
+            let manager = LocationManager()
+            let denied = StubAuthorizationManager(stubbedStatus: .denied)
+
+            manager.locationManagerDidChangeAuthorization(denied)
+
+            #expect(manager.authorizationStatus == .denied)
+            #expect(manager.userLocation == nil)
+        }
+    }
+
     // MARK: - Cross-session persistence
 
     @Test func fixFromDelegateSeedsTheNextInstanceFromDisk() {
@@ -183,4 +244,17 @@ struct LocationManagerDelegateTests {
             createdAt: Date()
         )
     }
+}
+
+/// Lets a test drive an authorization status the simulator will not report on
+/// its own, without calling the real request APIs that raise a system prompt.
+private final class StubAuthorizationManager: CLLocationManager {
+    private let stubbedStatus: CLAuthorizationStatus
+
+    init(stubbedStatus: CLAuthorizationStatus) {
+        self.stubbedStatus = stubbedStatus
+        super.init()
+    }
+
+    override var authorizationStatus: CLAuthorizationStatus { stubbedStatus }
 }
