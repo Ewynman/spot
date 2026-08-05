@@ -286,6 +286,8 @@ private final class DebugFileLogWriter {
     private let fileManager = FileManager.default
     private let maximumBytes: UInt64 = 1_000_000
     private let retainedFiles = 3
+    private var cachedFileURL: URL?
+    private var backupExclusionApplied = false
 
     private init() {}
 
@@ -307,9 +309,11 @@ private final class DebugFileLogWriter {
                 contents: data,
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
+            excludeFromBackupIfNeeded(fileURL)
             return
         }
 
+        excludeFromBackupIfNeeded(fileURL)
         guard let handle = try? FileHandle(forWritingTo: fileURL) else { return }
         handle.seekToEndOfFile()
         handle.write(data)
@@ -317,23 +321,33 @@ private final class DebugFileLogWriter {
     }
 
     private func currentFileURL() -> URL? {
-        guard let applicationSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
+        if let cachedFileURL {
+            return cachedFileURL
+        }
+
+        guard let documents = fileManager.urls(
+            for: .documentDirectory,
             in: .userDomainMask
         ).first else {
             return nil
         }
 
-        let directory = applicationSupport.appendingPathComponent("Logs", isDirectory: true)
+        let fileURL = documents.appendingPathComponent("spot-debug.txt")
+        cachedFileURL = fileURL
+        return fileURL
+    }
+
+    private func excludeFromBackupIfNeeded(_ fileURL: URL) {
+        guard !backupExclusionApplied else { return }
+
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        var mutableFileURL = fileURL
         do {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
-            )
-            return directory.appendingPathComponent("spot-debug.txt")
+            try mutableFileURL.setResourceValues(resourceValues)
+            backupExclusionApplied = true
         } catch {
-            return nil
+            // Logging must never fail because backup metadata could not be set.
         }
     }
 

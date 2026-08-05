@@ -27,6 +27,23 @@ struct SpotLoggerTests {
         #expect(!entry.message.isEmpty)
     }
 
+    @Test func loggingProfilesHaveStableUserFacingCopy() {
+        #expect(LoggingProfile.allCases.map(\.title) == [
+            "0 — Errors only",
+            "1 — Info + errors",
+            "2 — Debug + info + errors",
+            "3 — UI only",
+            "4 — All logs"
+        ])
+        #expect(LoggingProfile.allCases.map(\.summary) == [
+            "Failures that require investigation.",
+            "Important app activity and failures.",
+            "Development detail without high-frequency debug events.",
+            "Events emitted directly by SwiftUI views.",
+            "Every event, including noisy diagnostics."
+        ])
+    }
+
     // MARK: - SpotServiceLogs cases
 
     @Test func spotServiceLogsLevels() {

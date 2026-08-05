@@ -73,12 +73,18 @@ Non-DEBUG builds always use profile 0 regardless of saved DEBUG settings.
 In a DEBUG build without an attached debugger, emitted logs are also appended to:
 
 ```text
-Application Support/Logs/spot-debug.txt
+Documents/spot-debug.txt
 ```
 
 The file is protected until first device unlock, rotates at 1 MB, and retains
 three archives. File writing is compiled out of release builds. When Xcode is
 attached, the file sink stays off and logs go only to Apple Unified Logging.
+
+The Debug target’s `UIFileSharingEnabled` and
+`LSSupportsOpeningDocumentsInPlace` build settings expose the Documents
+directory at Files → On My iPhone → Spot and through Finder when the device is
+connected to a Mac. Release builds do not expose Documents. Log files are
+excluded from device backups.
 
 ## Privacy and noise rules
 

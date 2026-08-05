@@ -52,7 +52,7 @@ The Firebase and TestFlight signing assets are never swapped: the Ad Hoc profile
 3. **Cache:** Restore Swift Package Manager dependencies
 4. **API Validation (PR only):** Check for breaking API changes
 5. **Documentation Validation (PR only):** Validate documentation updates
-6. **Test:** Run SpotTests scheme with code coverage enabled
+6. **Test:** Run SpotTests serially with code coverage enabled
 7. **Coverage Validation (PR only):** Enforce 80% coverage on changed files
 8. **Artifacts:** Upload test results (`.xcresult`) and coverage reports
 9. **Summary:** Generate coverage summary in GitHub
@@ -218,6 +218,8 @@ SIM_ID=$(xcrun simctl list devices available | grep "iPhone" | head -n 1 | sed -
 xcodebuild \
   -scheme SpotTests \
   -destination "id=$SIM_ID" \
+  -parallel-testing-enabled NO \
+  -maximum-parallel-testing-workers 1 \
   -enableCodeCoverage YES \
   test | xcbeautify
 ```
@@ -236,6 +238,7 @@ xcodebuild -scheme SpotTests -destination "id=$SIM_ID" test | $BEAUTIFY
 - **Xcode version:** Default Xcode on the macos-15 runner
 - **Swift version:** Provided by the default Xcode on the runner
 - **Simulator:** iPhone 16 (`platform=iOS Simulator,name=iPhone 16`)
+- **Execution:** Serial unit-test workers to prevent simulator worker crashes from producing false mass failures
 - **Caching:** Swift Package Manager dependencies cached between runs
 - **Code coverage:** Always enabled (`-enableCodeCoverage YES`)
 
@@ -244,9 +247,10 @@ xcodebuild -scheme SpotTests -destination "id=$SIM_ID" test | $BEAUTIFY
 CI collects code coverage data on every run and **enforces coverage requirements** on pull requests.
 
 **Coverage Requirements:**
-- **80% minimum coverage** on all changed production Swift files
+- **80% minimum coverage** on changed non-view production Swift files
 - Measured using `xcrun xccov` against `.xcresult` bundles
-- Only applies to files under `Spot/` (excludes test files)
+- Applies to files under `Spot/`, excluding tests and `Spot/Views/`
+- SwiftUI view execution belongs to the separate `SpotUITests` scheme
 - Validation runs automatically on every PR
 
 **How it works:**
@@ -269,6 +273,7 @@ CI collects code coverage data on every run and **enforces coverage requirements
 **Exemptions:**
 - Files with no executable lines (e.g., pure data models)
 - Files not in production code path
+- SwiftUI view files, which are outside the unit-test scheme's coverage boundary
 - Can be discussed with team if threshold is impractical for specific cases
 
 ### Artifacts
