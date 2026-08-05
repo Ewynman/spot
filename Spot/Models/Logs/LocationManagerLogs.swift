@@ -16,16 +16,19 @@ enum LocationManagerLogs: SpotLog {
     case startUpdatingLocation
     case stopUpdatingLocation
     case simulatorOverrideApplied
+    case managerInitialized
+    case offMainThreadInitialization
+    case pendingOneShotDrained
 
     var tag: String { "LocationManager" }
     var level: LogLevel {
         switch self {
-        case .locationUpdateFailed: return .error
+        case .locationUpdateFailed, .offMainThreadInitialization: return .error
         case .authorizationChanged, .authorizationRequested,
              .oneShotLocationRequested, .startUpdatingLocation, .stopUpdatingLocation,
-             .simulatorOverrideApplied:
+             .simulatorOverrideApplied, .managerInitialized:
             return .info
-        case .locationFixReceived: return .debug
+        case .locationFixReceived, .pendingOneShotDrained: return .debug
         }
     }
     var message: String {
@@ -38,6 +41,10 @@ enum LocationManagerLogs: SpotLog {
         case .startUpdatingLocation: return "startUpdatingLocation called"
         case .stopUpdatingLocation: return "stopUpdatingLocation called"
         case .simulatorOverrideApplied: return "Simulator location override applied"
+        case .managerInitialized: return "LocationManager initialized"
+        case .offMainThreadInitialization:
+            return "LocationManager built CLLocationManager off the main thread; delegate callbacks will never fire"
+        case .pendingOneShotDrained: return "Drained pending one-shot location request after authorization"
         }
     }
 }

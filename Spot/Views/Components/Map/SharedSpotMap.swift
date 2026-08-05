@@ -309,7 +309,7 @@ struct SharedSpotMap: UIViewRepresentable {
 
             guard let marker else {
                 if let prev = renderedUserAnnotation {
-                    ewMapLog("applyUserMarker removing marker (host passed nil)")
+                    SpotLogger.log(MapMarkerLogs.userMarkerRemoved)
                     map.removeAnnotation(prev)
                     renderedUserAnnotation = nil
                 }
@@ -328,7 +328,6 @@ struct SharedSpotMap: UIViewRepresentable {
                     view.configure(with: existing)
                 }
             } else {
-                ewMapLog("applyUserMarker adding marker lat=\(marker.coordinate.latitude) lon=\(marker.coordinate.longitude)")
                 map.addAnnotation(marker)
                 renderedUserAnnotation = marker
             }
@@ -344,7 +343,10 @@ struct SharedSpotMap: UIViewRepresentable {
         func applyCameraIntent(map: MKMapView, intent: SharedSpotMapCameraIntent) {
             guard intent != lastAppliedCameraIntent else {
                 if case let .region(region, _) = intent {
-                    ewMapLog("applyCameraIntent SKIPPED duplicate region lat=\(region.center.latitude) lon=\(region.center.longitude)")
+                    SpotLogger.log(MapViewLogs.cameraIntentSkippedDuplicate, details: [
+                        "lat": region.center.latitude,
+                        "lon": region.center.longitude
+                    ])
                 }
                 return
             }
@@ -353,7 +355,14 @@ struct SharedSpotMap: UIViewRepresentable {
             case .none:
                 return
             case let .region(region, animated):
-                ewMapLog("applyCameraIntent .region lat=\(region.center.latitude) lon=\(region.center.longitude) span=\(region.span.latitudeDelta) animated=\(animated) mapBounds=\(map.bounds.size.width)x\(map.bounds.size.height)")
+                SpotLogger.log(MapViewLogs.cameraIntentApplied, details: [
+                    "kind": "region",
+                    "lat": region.center.latitude,
+                    "lon": region.center.longitude,
+                    "span": region.span.latitudeDelta,
+                    "animated": animated,
+                    "mapHeight": Int(map.bounds.height)
+                ])
                 didApplyExplicitCameraFromParent = true
                 ignoreNextRegionChange = true
                 map.setRegion(region, animated: animated)
