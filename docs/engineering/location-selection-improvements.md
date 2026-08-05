@@ -4,6 +4,20 @@
 
 This document describes comprehensive improvements to the location selection experience in the posting flow, specifically addressing accuracy and user experience issues when selecting a location on the map.
 
+## Nearby discovery refresh (August 2026)
+
+The initial place picker now uses `MKLocalPointsOfInterestRequest` instead of a narrow natural-language query for a few venue categories. It:
+
+- uses the shared `LocationManager` and refreshes when a real location fix arrives;
+- searches all MapKit point-of-interest categories within 3 km;
+- sorts results by distance and displays that distance on each place card;
+- offers an explicit 8 km wider-area search;
+- debounces typed search and searches within a 50 km local region before a global fallback;
+- avoids a nested vertical scroll view so every returned result can be reached; and
+- uses the continental-US fallback only as a search anchor when location is unavailable, rather than showing nearby results from an unrelated default city.
+
+Search limits and distance formatting live in `Spot/Utils/LocationSearchPolicy.swift` and have deterministic unit coverage.
+
 ## Problems Addressed
 
 ### 1. Location Accuracy Issues
