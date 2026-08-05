@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum MapViewLogs: SpotLog {
+enum MapViewLogs: SpotLog, CaseIterable {
     case mapAppeared
     case mapDisappeared
     case initialFitApplied

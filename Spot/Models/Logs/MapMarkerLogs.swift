@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum MapMarkerLogs: SpotLog {
+enum MapMarkerLogs: SpotLog, CaseIterable {
     case markersAdded
     case markersRemoved
     case markerReused

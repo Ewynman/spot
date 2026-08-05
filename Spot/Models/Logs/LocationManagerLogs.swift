@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum LocationManagerLogs: SpotLog {
+enum LocationManagerLogs: SpotLog, CaseIterable {
     case locationUpdateFailed
     case locationFixReceived
     case authorizationChanged
