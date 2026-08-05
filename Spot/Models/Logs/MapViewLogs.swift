@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum MapViewLogs: SpotLog {
+enum MapViewLogs: SpotLog, CaseIterable {
     case mapAppeared
     case mapDisappeared
     case initialFitApplied
@@ -28,6 +28,9 @@ enum MapViewLogs: SpotLog {
     case freshLocationReceived
     case locationUpdateApplied
     case locationUpdateSkipped
+    case cameraIntentApplied
+    case cameraIntentSkippedDuplicate
+    case staleCameraIntentCleared
     case memorySnapshot
 
     var tag: String { "MapView" }
@@ -51,6 +54,9 @@ enum MapViewLogs: SpotLog {
         case .freshLocationReceived: return .debug
         case .locationUpdateApplied: return .debug
         case .locationUpdateSkipped: return .debug
+        case .cameraIntentApplied: return .debug
+        case .cameraIntentSkippedDuplicate: return .debug
+        case .staleCameraIntentCleared: return .debug
         case .memorySnapshot: return .debug
         }
     }
@@ -74,6 +80,9 @@ enum MapViewLogs: SpotLog {
         case .freshLocationReceived: return "Map received fresh location update"
         case .locationUpdateApplied: return "Map applied fresh location update and re-centered"
         case .locationUpdateSkipped: return "Map skipped location update (minor change or user moved map)"
+        case .cameraIntentApplied: return "Map camera intent applied"
+        case .cameraIntentSkippedDuplicate: return "Map camera intent skipped (identical to last applied)"
+        case .staleCameraIntentCleared: return "Map cleared stale camera intent so the next recenter applies"
         case .memorySnapshot: return "Memory snapshot (DEBUG only)"
         }
     }

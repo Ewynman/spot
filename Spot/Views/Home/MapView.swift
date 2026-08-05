@@ -316,7 +316,11 @@ struct MapView: View {
     // MARK: - Lifecycle hooks
 
     private func onAppear(geo: GeometryProxy) {
-        SpotLogger.log(MapViewLogs.mapAppeared)
+        SpotLogger.log(MapViewLogs.mapAppeared, details: [
+            "auth": authStatusLabel(permissionManager.locationStatus),
+            "locationManagerAuth": authStatusLabel(locationManager.authorizationStatus),
+            "hasLocationFix": locationManager.userLocation != nil
+        ])
         MemoryDebugLogger.snapshot("map_appear")
         // Re-arm the one-shot auto-center every time the map tab appears.
         hasCenteredOnUser = false
@@ -434,8 +438,13 @@ struct MapView: View {
     /// from earlier in the app session.
     private func onUserLocationReceived(_ location: CLLocation?) {
         guard let location else { return }
-        guard selectedSpot == nil else { return }
-        
+        guard selectedSpot == nil else {
+            SpotLogger.log(MapViewLogs.locationUpdateSkipped, details: [
+                "reason": "drawerOpen"
+            ])
+            return
+        }
+
         SpotLogger.log(MapViewLogs.freshLocationReceived, details: [
             "lat": location.coordinate.latitude,
             "lon": location.coordinate.longitude,
@@ -499,14 +508,31 @@ struct MapView: View {
             center: coordinate,
             radiusMeters: Constants.MapDesign.initialNeighborhoodRadiusMeters
         )
-        cameraIntent = .region(region, animated: animated)
+        let intent = SharedSpotMapCameraIntent.region(region, animated: animated)
+        let intentUnchanged = cameraIntent == intent
+        cameraIntent = intent
+        clearCameraIntentAfterApply(intent)
         mapVM.loadForRegion(region)
         SpotLogger.log(MapViewLogs.initialFitApplied, details: [
             "source": source,
             "lat": coordinate.latitude,
             "lon": coordinate.longitude,
-            "animated": animated
+            "animated": animated,
+            "intentUnchanged": intentUnchanged
         ])
+    }
+
+    /// Camera intents are one-shot commands, but `SharedSpotMap` ignores an
+    /// intent equal to the last one it applied and MapKit swallows the settle
+    /// callback for programmatic moves — so an uncleared intent turns a repeat
+    /// recenter into a no-op. Reset it once the move has had time to land.
+    private func clearCameraIntentAfterApply(_ applied: SharedSpotMapCameraIntent) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard cameraIntent == applied else { return }
+            SpotLogger.log(MapViewLogs.staleCameraIntentCleared)
+            cameraIntent = .none
+        }
     }
 
     // MARK: - Filter binding (Pro gating)
@@ -733,26 +759,28 @@ struct MapView: View {
     }
 
     private func recenterOnUser() {
-        SpotLogger.log(MapViewLogs.recenterTapped)
         permissionManager.updatePermissionStatuses()
-        
+
         // Reset the "user moved map" flag since recenter is an explicit
         // action to re-enable location tracking
         userHasMovedMap = false
 
+        let outcome: String
         switch permissionManager.locationStatus {
         case .notDetermined:
             showLocationPrePrompt = true
-            return
+            outcome = "showedPrePrompt"
         case .denied, .restricted:
-            guard let loc = locationManager.userLocation else {
+            if let loc = locationManager.userLocation {
+                if selectedSpot != nil {
+                    dismissSelectedSpot(reason: .mapMoved, animated: false)
+                }
+                centerOnUser(coordinate: loc.coordinate, animated: true, source: "recenter_button")
+                outcome = "centeredOnCachedFix"
+            } else {
                 SpotLogger.log(MapViewLogs.userLocationUnavailable)
-                return
+                outcome = "deniedWithNoFix"
             }
-            if selectedSpot != nil {
-                dismissSelectedSpot(reason: .mapMoved, animated: false)
-            }
-            centerOnUser(coordinate: loc.coordinate, animated: true, source: "recenter_button")
         case .authorizedAlways, .authorizedWhenInUse:
             if let loc = locationManager.userLocation {
                 if selectedSpot != nil {
@@ -761,12 +789,27 @@ struct MapView: View {
                 centerOnUser(coordinate: loc.coordinate, animated: true, source: "recenter_button")
                 // Request fresh location in case the user has moved
                 locationManager.requestCurrentLocationForMapTab()
+                outcome = "centered"
             } else {
+                // No fix yet. Re-arm the one-shot auto-center so whichever
+                // fix CoreLocation delivers next moves the camera, instead
+                // of the tap silently doing nothing.
+                hasCenteredOnUser = false
+                lastCenteredCoordinate = nil
                 locationManager.requestCurrentLocationForMapTab()
+                outcome = "awaitingFirstFix"
             }
         @unknown default:
             SpotLogger.log(MapViewLogs.userLocationUnavailable)
+            outcome = "unknownAuth"
         }
+
+        SpotLogger.log(MapViewLogs.recenterTapped, details: [
+            "auth": authStatusLabel(permissionManager.locationStatus),
+            "locationManagerAuth": authStatusLabel(locationManager.authorizationStatus),
+            "hasLocationFix": locationManager.userLocation != nil,
+            "outcome": outcome
+        ])
     }
 
     private func performInitialFitIfNeeded() {

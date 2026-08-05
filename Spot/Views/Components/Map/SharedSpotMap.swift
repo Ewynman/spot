@@ -309,6 +309,7 @@ struct SharedSpotMap: UIViewRepresentable {
 
             guard let marker else {
                 if let prev = renderedUserAnnotation {
+                    SpotLogger.log(MapMarkerLogs.userMarkerRemoved)
                     map.removeAnnotation(prev)
                     renderedUserAnnotation = nil
                 }
@@ -340,12 +341,28 @@ struct SharedSpotMap: UIViewRepresentable {
         // MARK: - Camera
 
         func applyCameraIntent(map: MKMapView, intent: SharedSpotMapCameraIntent) {
-            guard intent != lastAppliedCameraIntent else { return }
+            guard intent != lastAppliedCameraIntent else {
+                if case let .region(region, _) = intent {
+                    SpotLogger.log(MapViewLogs.cameraIntentSkippedDuplicate, details: [
+                        "lat": region.center.latitude,
+                        "lon": region.center.longitude
+                    ])
+                }
+                return
+            }
             lastAppliedCameraIntent = intent
             switch intent {
             case .none:
                 return
             case let .region(region, animated):
+                SpotLogger.log(MapViewLogs.cameraIntentApplied, details: [
+                    "kind": "region",
+                    "lat": region.center.latitude,
+                    "lon": region.center.longitude,
+                    "span": region.span.latitudeDelta,
+                    "animated": animated,
+                    "mapHeight": Int(map.bounds.height)
+                ])
                 didApplyExplicitCameraFromParent = true
                 ignoreNextRegionChange = true
                 map.setRegion(region, animated: animated)

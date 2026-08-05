@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum MapMarkerLogs: SpotLog {
+enum MapMarkerLogs: SpotLog, CaseIterable {
     case markersAdded
     case markersRemoved
     case markerReused
@@ -19,6 +19,7 @@ enum MapMarkerLogs: SpotLog {
     case userMarkerAvatarLoaded
     case userMarkerAvatarFallback
     case userMarkerConfigured
+    case userMarkerRemoved
     case userMarkerCustomFailed
     case softClusterShown
     case overlapBucketResolved
@@ -36,6 +37,7 @@ enum MapMarkerLogs: SpotLog {
         case .userMarkerAvatarLoaded: return .debug
         case .userMarkerAvatarFallback: return .debug
         case .userMarkerConfigured: return .debug
+        case .userMarkerRemoved: return .debug
         case .userMarkerCustomFailed: return .error
         case .softClusterShown: return .debug
         case .overlapBucketResolved: return .debug
@@ -53,6 +55,7 @@ enum MapMarkerLogs: SpotLog {
         case .userMarkerAvatarLoaded: return "User-location avatar loaded"
         case .userMarkerAvatarFallback: return "User-location avatar fell back to initials/dot"
         case .userMarkerConfigured: return "User-location marker configured"
+        case .userMarkerRemoved: return "User-location marker removed (no location fix)"
         case .userMarkerCustomFailed: return "Custom user-location marker failed; using system fallback"
         case .softClusterShown: return "Soft cluster shown at far zoom"
         case .overlapBucketResolved: return "Overlap bucket resolved with radial offsets"
