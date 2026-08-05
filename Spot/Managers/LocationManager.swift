@@ -2,6 +2,15 @@ import Foundation
 import CoreLocation
 import MapKit
 
+/// `CLLocationManager` only delivers delegate callbacks on the thread that
+/// created it, and that thread must have an active run loop. `shared` is a
+/// lazy `static let`, so whichever call site touches it first decides where
+/// the underlying `CLLocationManager` is born — and the first touch in a
+/// normal session is the home-feed load, which runs on a Swift concurrency
+/// cooperative thread with no run loop. Pinning the whole type to the main
+/// actor guarantees construction (and every CoreLocation call) happens on a
+/// thread that can actually deliver `didUpdateLocations`.
+@MainActor
 class LocationManager: NSObject, ObservableObject {
     static let shared = LocationManager()
     private let manager = CLLocationManager()
@@ -15,7 +24,7 @@ class LocationManager: NSObject, ObservableObject {
     /// or simulator without a configured location). Apple App Review
     /// requires the map to remain functional with an obvious U.S. fallback
     /// when location is unavailable; see `MapDefaults.continentalUSRegion`.
-    static let defaultLocation = CLLocation(
+    nonisolated static let defaultLocation = CLLocation(
         latitude: MapDefaults.continentalUSCenter.latitude,
         longitude: MapDefaults.continentalUSCenter.longitude
     )
@@ -24,27 +33,34 @@ class LocationManager: NSObject, ObservableObject {
     /// map to pre-paint a useful region while CoreLocation acquires a
     /// fresh fix (or while running on a simulator without a configured
     /// location).
-    private static let cachedLocationKey = "spot.location.lastKnownGood"
+    nonisolated private static let cachedLocationKey = "spot.location.lastKnownGood"
 
     override init() {
         super.init()
+        ewMapLog("LocationManager.init isMainThread=\(Thread.isMainThread)")
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = 10 // Update location when user moves 10 meters
         // Seed the in-memory cache from disk if we have a previous fix.
         if let cached = Self.loadCachedLocation() {
             userLocation = cached
+            ewMapLog("LocationManager.init seeded from disk cache lat=\(cached.coordinate.latitude) lon=\(cached.coordinate.longitude)")
+        } else {
+            ewMapLog("LocationManager.init no disk cache")
         }
         // Pick up whatever the system already authorized us for.
         authorizationStatus = manager.authorizationStatus
+        ewMapLog("LocationManager.init auth=\(Self.label(for: authorizationStatus)) servicesEnabledCheckDeferred")
     }
 
     func requestLocationPermission() {
+        ewMapLog("requestLocationPermission auth=\(Self.label(for: manager.authorizationStatus))")
         SpotLogger.log(LocationManagerLogs.authorizationRequested)
         manager.requestWhenInUseAuthorization()
     }
 
     func startUpdatingLocation() {
+        ewMapLog("startUpdatingLocation auth=\(Self.label(for: manager.authorizationStatus)) hasCached=\(userLocation != nil) managerLocation=\(manager.location.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" } ?? "nil")")
         SpotLogger.log(LocationManagerLogs.startUpdatingLocation, details: [
             "auth": Self.label(for: manager.authorizationStatus),
             "hasCachedLocation": userLocation != nil
@@ -56,6 +72,7 @@ class LocationManager: NSObject, ObservableObject {
         if userLocation == nil, let immediate = manager.location {
             userLocation = immediate
             Self.cache(immediate)
+            ewMapLog("startUpdatingLocation seeded from manager.location lat=\(immediate.coordinate.latitude) lon=\(immediate.coordinate.longitude)")
             SpotLogger.log(LocationManagerLogs.locationFixReceived, details: [
                 "lat": immediate.coordinate.latitude,
                 "lon": immediate.coordinate.longitude,
@@ -68,6 +85,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     func stopUpdatingLocation() {
+        ewMapLog("stopUpdatingLocation")
         SpotLogger.log(LocationManagerLogs.stopUpdatingLocation)
         manager.stopUpdatingLocation()
     }
@@ -95,6 +113,7 @@ class LocationManager: NSObject, ObservableObject {
     /// when verifying "tap Map in the bottom nav -> ask CoreLocation for
     /// the user's current coordinate".
     func requestCurrentLocationForMapTab() {
+        ewMapLog("requestCurrentLocationForMapTab auth=\(Self.label(for: manager.authorizationStatus)) hasExisting=\(userLocation != nil)")
         SpotLogger.log(LocationManagerLogs.oneShotLocationRequested, details: [
             "auth": Self.label(for: manager.authorizationStatus),
             "hasExistingLocation": userLocation != nil
@@ -106,6 +125,7 @@ class LocationManager: NSObject, ObservableObject {
             requestLocationPermission()
         case .authorizedWhenInUse, .authorizedAlways:
             startUpdatingLocation()
+            ewMapLog("requestCurrentLocationForMapTab -> manager.requestLocation()")
             manager.requestLocation()
         case .denied, .restricted:
             startUpdatingLocation()
@@ -133,7 +153,7 @@ class LocationManager: NSObject, ObservableObject {
     /// neighborhood region when the user is authorized AND has a location
     /// fix; otherwise returns the continental-US fallback so the map opens
     /// without blocking on permission state.
-    static func initialRegion(
+    nonisolated static func initialRegion(
         locationStatus: CLAuthorizationStatus,
         lastKnownLocation: CLLocation?,
         neighborhoodRadiusMeters: Double = Constants.MapDesign.initialNeighborhoodRadiusMeters
@@ -196,7 +216,7 @@ class LocationManager: NSObject, ObservableObject {
 
     /// Persist the most recent fix so a fresh launch (or a simulator
     /// without a configured location) can still paint a sensible region.
-    private static func cache(_ location: CLLocation) {
+    nonisolated private static func cache(_ location: CLLocation) {
         let dict: [String: Double] = [
             "lat": location.coordinate.latitude,
             "lon": location.coordinate.longitude
@@ -204,7 +224,7 @@ class LocationManager: NSObject, ObservableObject {
         UserDefaults.standard.set(dict, forKey: cachedLocationKey)
     }
 
-    private static func loadCachedLocation() -> CLLocation? {
+    nonisolated private static func loadCachedLocation() -> CLLocation? {
         guard let dict = UserDefaults.standard.dictionary(forKey: cachedLocationKey),
               let lat = dict["lat"] as? Double,
               let lon = dict["lon"] as? Double else { return nil }
@@ -247,6 +267,7 @@ class LocationManager: NSObject, ObservableObject {
         // override never leaks to a physical device through any shared
         // UserDefaults pathway.
         userLocation = synthetic
+        ewMapLog("applySimulatorOverride source=\(source) lat=\(coord.latitude) lon=\(coord.longitude)")
         SpotLogger.log(LocationManagerLogs.simulatorOverrideApplied, details: [
             "lat": coord.latitude,
             "lon": coord.longitude,
@@ -258,14 +279,14 @@ class LocationManager: NSObject, ObservableObject {
     /// Hardcoded coordinates used as the very last-resort fallback in
     /// DEBUG simulator builds. Edit here to change the default dev
     /// location (NJ near NYC by default).
-    private static let debugSimulatorFallback = CLLocationCoordinate2D(
+    nonisolated private static let debugSimulatorFallback = CLLocationCoordinate2D(
         latitude: 40.867449,
         longitude: -74.025070
     )
 
     /// Parse `"lat,lon"` strings like `"40.867449,-74.025070"`. Returns
     /// nil on any malformed input.
-    private static func parseEnvCoordinate(_ raw: String) -> CLLocationCoordinate2D? {
+    nonisolated private static func parseEnvCoordinate(_ raw: String) -> CLLocationCoordinate2D? {
         let parts = raw.split(separator: ",")
             .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
         guard parts.count == 2 else { return nil }
@@ -276,7 +297,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     /// Human-readable auth status for logs.
-    fileprivate static func label(for status: CLAuthorizationStatus) -> String {
+    nonisolated fileprivate static func label(for status: CLAuthorizationStatus) -> String {
         switch status {
         case .notDetermined: return "notDetermined"
         case .restricted: return "restricted"
@@ -289,34 +310,46 @@ class LocationManager: NSObject, ObservableObject {
 }
 
 extension LocationManager: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        userLocation = location
-        Self.cache(location)
-        SpotLogger.log(LocationManagerLogs.locationFixReceived, details: [
-            "lat": location.coordinate.latitude,
-            "lon": location.coordinate.longitude,
-            "accuracy": location.horizontalAccuracy
-        ])
-    }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        SpotLogger.log(LocationManagerLogs.locationUpdateFailed, details: ["error": error.localizedDescription])
-    }
-
-    /// iOS 14+ uses the parameter-less `locationManagerDidChangeAuthorization`.
-    /// We implement both because the deprecated form is still called on some
-    /// system paths and because it's free defensive coverage.
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        DispatchQueue.main.async {
-            self.handleAuthorization(status: status)
+    /// CoreLocation calls the delegate on the thread that created the
+    /// manager (main, by construction). Hop defensively rather than
+    /// asserting so a mis-scheduled callback degrades instead of trapping.
+    nonisolated private func onMain(_ work: @escaping @MainActor () -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { work() }
+        } else {
+            Task { @MainActor in work() }
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        DispatchQueue.main.async {
-            self.handleAuthorization(status: status)
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        ewMapLog("didUpdateLocations count=\(locations.count) lat=\(location.coordinate.latitude) lon=\(location.coordinate.longitude) acc=\(location.horizontalAccuracy)")
+        onMain { [weak self] in
+            guard let self else { return }
+            self.userLocation = location
+            Self.cache(location)
+            SpotLogger.log(LocationManagerLogs.locationFixReceived, details: [
+                "lat": location.coordinate.latitude,
+                "lon": location.coordinate.longitude,
+                "accuracy": location.horizontalAccuracy
+            ])
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        ewMapLog("didFailWithError \(error.localizedDescription) code=\((error as NSError).code)")
+        onMain {
+            SpotLogger.log(LocationManagerLogs.locationUpdateFailed, details: ["error": error.localizedDescription])
+        }
+    }
+
+    /// iOS 14+ uses the parameter-less `locationManagerDidChangeAuthorization`.
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        ewMapLog("locationManagerDidChangeAuthorization status=\(LocationManager.label(for: status))")
+        onMain { [weak self] in
+            self?.handleAuthorization(status: status)
         }
     }
 
@@ -333,6 +366,7 @@ extension LocationManager: CLLocationManagerDelegate {
             startUpdatingLocation()
             if pendingOneShotLocationRequest {
                 pendingOneShotLocationRequest = false
+                ewMapLog("handleAuthorization draining pending one-shot request")
                 manager.requestLocation()
             }
         default:

@@ -317,6 +317,7 @@ struct MapView: View {
 
     private func onAppear(geo: GeometryProxy) {
         SpotLogger.log(MapViewLogs.mapAppeared)
+        ewMapLog("MapView.onAppear permAuth=\(authStatusLabel(permissionManager.locationStatus)) lmAuth=\(authStatusLabel(locationManager.authorizationStatus)) hasFix=\(locationManager.userLocation != nil)")
         MemoryDebugLogger.snapshot("map_appear")
         // Re-arm the one-shot auto-center every time the map tab appears.
         hasCenteredOnUser = false
@@ -332,6 +333,7 @@ struct MapView: View {
         // a cached one. This ensures the map shows the user's current
         // location, not where they were during onboarding or last session.
         let isAuthorized = LocationPermissionPolicy.isAuthorized(permissionManager.locationStatus)
+        ewMapLog("MapView.onAppear isAuthorized=\(isAuthorized)")
         if isAuthorized {
             SpotLogger.log(MapViewLogs.freshLocationRequested, details: [
                 "hasCachedLocation": locationManager.userLocation != nil,
@@ -357,6 +359,7 @@ struct MapView: View {
         // later, `onUserLocationReceived` re-centers (one-shot guarded by
         // `hasCenteredOnUser`).
         let fallback = MapDefaults.continentalUSRegion
+        ewMapLog("MapView.onAppear no fix available, painting continental-US fallback")
         mapVM.loadForRegion(fallback)
         cameraIntent = .region(fallback, animated: false)
         SpotLogger.log(MapViewLogs.waitingForUserLocation, details: [
@@ -433,7 +436,11 @@ struct MapView: View {
     /// silently miss the case where `LocationManager` already had a fix
     /// from earlier in the app session.
     private func onUserLocationReceived(_ location: CLLocation?) {
-        guard let location else { return }
+        guard let location else {
+            ewMapLog("onUserLocationReceived nil")
+            return
+        }
+        ewMapLog("onUserLocationReceived lat=\(location.coordinate.latitude) lon=\(location.coordinate.longitude) hasCentered=\(hasCenteredOnUser) userMovedMap=\(userHasMovedMap) drawerOpen=\(selectedSpot != nil)")
         guard selectedSpot == nil else { return }
         
         SpotLogger.log(MapViewLogs.freshLocationReceived, details: [
@@ -499,7 +506,10 @@ struct MapView: View {
             center: coordinate,
             radiusMeters: Constants.MapDesign.initialNeighborhoodRadiusMeters
         )
-        cameraIntent = .region(region, animated: animated)
+        let intent = SharedSpotMapCameraIntent.region(region, animated: animated)
+        ewMapLog("centerOnUser source=\(source) lat=\(coordinate.latitude) lon=\(coordinate.longitude) animated=\(animated) intentUnchanged=\(cameraIntent == intent)")
+        cameraIntent = intent
+        clearCameraIntentAfterApply(intent)
         mapVM.loadForRegion(region)
         SpotLogger.log(MapViewLogs.initialFitApplied, details: [
             "source": source,
@@ -507,6 +517,19 @@ struct MapView: View {
             "lon": coordinate.longitude,
             "animated": animated
         ])
+    }
+
+    /// Camera intents are one-shot commands, but `SharedSpotMap` ignores an
+    /// intent equal to the last one it applied and MapKit swallows the settle
+    /// callback for programmatic moves — so an uncleared intent turns a repeat
+    /// recenter into a no-op. Reset it once the move has had time to land.
+    private func clearCameraIntentAfterApply(_ applied: SharedSpotMapCameraIntent) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard cameraIntent == applied else { return }
+            ewMapLog("clearCameraIntentAfterApply resetting stale intent to .none")
+            cameraIntent = .none
+        }
     }
 
     // MARK: - Filter binding (Pro gating)
@@ -528,7 +551,10 @@ struct MapView: View {
     // MARK: - User marker
 
     private var userMarker: SpotUserLocationAnnotation? {
-        guard let loc = locationManager.userLocation else { return nil }
+        guard let loc = locationManager.userLocation else {
+            ewMapLog("userMarker nil (no location fix)")
+            return nil
+        }
         return SpotUserLocationAnnotation(
             coordinate: loc.coordinate,
             profileImageURL: authVM.currentUserProfileImageURL,
@@ -733,6 +759,7 @@ struct MapView: View {
     }
 
     private func recenterOnUser() {
+        ewMapLog("recenterOnUser tapped permAuth=\(authStatusLabel(permissionManager.locationStatus)) lmAuth=\(authStatusLabel(locationManager.authorizationStatus)) hasFix=\(locationManager.userLocation != nil)")
         SpotLogger.log(MapViewLogs.recenterTapped)
         permissionManager.updatePermissionStatuses()
         
@@ -742,10 +769,12 @@ struct MapView: View {
 
         switch permissionManager.locationStatus {
         case .notDetermined:
+            ewMapLog("recenterOnUser -> showing pre-prompt (notDetermined)")
             showLocationPrePrompt = true
             return
         case .denied, .restricted:
             guard let loc = locationManager.userLocation else {
+                ewMapLog("recenterOnUser -> denied/restricted and no cached fix, nothing to center on")
                 SpotLogger.log(MapViewLogs.userLocationUnavailable)
                 return
             }
@@ -762,6 +791,12 @@ struct MapView: View {
                 // Request fresh location in case the user has moved
                 locationManager.requestCurrentLocationForMapTab()
             } else {
+                // No fix yet. Re-arm the one-shot auto-center so whichever
+                // fix CoreLocation delivers next moves the camera, instead
+                // of the tap silently doing nothing.
+                ewMapLog("recenterOnUser -> authorized but no fix yet, re-arming auto-center")
+                hasCenteredOnUser = false
+                lastCenteredCoordinate = nil
                 locationManager.requestCurrentLocationForMapTab()
             }
         @unknown default:

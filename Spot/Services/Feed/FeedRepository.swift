@@ -127,7 +127,7 @@ final class FeedRepository: ObservableObject {
             self.refreshErrorMessage = nil
         }
 
-        let location = currentUserLocation()
+        let location = await currentUserLocation()
         do {
             async let optionalFeedProfile = Self.loadOptionalFeedProfileSnapshot()
             let firstAttempt = try await FeedAPI.fetchHomeFeed(
@@ -254,7 +254,7 @@ final class FeedRepository: ObservableObject {
 
         await MainActor.run { self.loadState = .loadingMore }
 
-        let location = currentUserLocation()
+        let location = await currentUserLocation()
         let forceSeenFallback = consecutiveEmptyLoadMore >= 1
 
         do {
@@ -345,7 +345,11 @@ final class FeedRepository: ObservableObject {
         }
     }
 
-    private func currentUserLocation() -> CLLocation? { LocationManager.shared.userLocation }
+    /// `LocationManager` is main-actor bound because `CLLocationManager` must be
+    /// created on a run-loop thread; the feed loads off the main actor, so hop.
+    private func currentUserLocation() async -> CLLocation? {
+        await MainActor.run { LocationManager.shared.userLocation }
+    }
 
     /// Snapshot for diversity tuning; failures are non-fatal (treated as unknown / low-signal-safe).
     private static func loadOptionalFeedProfileSnapshot() async -> FeedProfileRow? {
