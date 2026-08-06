@@ -41,7 +41,7 @@ This is a security and App Review gap. New profile-image work must migrate the c
 ### Signed URLs
 
 - Repository, profile, map, Search, optimistic-publish, and lazy gallery paths read `spot_images.storage_bucket` and create seven-day signed URLs.
-- Home-feed batch signing currently calls `createSignedURLs` on `spots` for all rows. Moderated rows can live in `approved_spot_images`, so the feed requires a bucket-aware RPC/result contract or grouped signing.
+- Home-feed and map primary-image signing are bucket-aware: `get_home_feed_v1` / `get_map_spots_v1` return `primary_storage_bucket`, and `FeedAPI` groups `createSignedURLs` by that bucket (legacy default `spots`).
 
 ### Failed publishes
 
@@ -57,6 +57,6 @@ Account deletion performs best-effort client cleanup for `avatars` and `spots`; 
 ## Open questions / TODOs
 
 - Define and implement retention/garbage collection for unlinked media and all moderation statuses.
-- Make feed signing bucket-aware.
+- Align Search signing with `spot_images.storage_bucket` the same way feed/map do.
 - Route profile avatars through the moderation pipeline.
 - Extend account-deletion Storage cleanup to all owned buckets.

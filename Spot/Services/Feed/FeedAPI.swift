@@ -34,6 +34,9 @@ struct HomeFeedRow: Decodable, Identifiable, Hashable {
     let vibeName: String?
     let primaryStoragePath: String?
     let primaryPublicUrl: String?
+    /// Supabase Storage bucket for `primaryStoragePath` (e.g. `spots` or
+    /// `approved_spot_images`). Nil/empty → client falls back to legacy `spots`.
+    let primaryStorageBucket: String?
     let sourceBucket: String
     let rankPosition: Int
     let rankingScore: Double
@@ -62,6 +65,7 @@ struct HomeFeedRow: Decodable, Identifiable, Hashable {
         case vibeName = "vibe_name"
         case primaryStoragePath = "primary_storage_path"
         case primaryPublicUrl = "primary_public_url"
+        case primaryStorageBucket = "primary_storage_bucket"
         case sourceBucket = "source_bucket"
         case rankPosition = "rank_position"
         case rankingScore = "ranking_score"
@@ -89,6 +93,7 @@ struct HomeFeedRow: Decodable, Identifiable, Hashable {
         vibeName = try c.decodeIfPresent(String.self, forKey: .vibeName)
         primaryStoragePath = try c.decodeIfPresent(String.self, forKey: .primaryStoragePath)
         primaryPublicUrl = try c.decodeIfPresent(String.self, forKey: .primaryPublicUrl)
+        primaryStorageBucket = try c.decodeIfPresent(String.self, forKey: .primaryStorageBucket)
         sourceBucket = try c.decodeIfPresent(String.self, forKey: .sourceBucket) ?? "personalized_unseen"
         rankPosition = try c.decodeIfPresent(Int.self, forKey: .rankPosition) ?? 0
         rankingScore = try c.decodeIfPresent(Double.self, forKey: .rankingScore) ?? 0
@@ -453,6 +458,8 @@ struct MapSpotRow: Decodable, Identifiable, Hashable {
     let vibeName: String?
     let primaryStoragePath: String?
     let primaryPublicUrl: String?
+    /// Supabase Storage bucket for `primaryStoragePath`. Nil/empty → legacy `spots`.
+    let primaryStorageBucket: String?
     let distanceMeters: Double?
     let mediaDisplayAspectRatio: Double?
 
@@ -472,6 +479,7 @@ struct MapSpotRow: Decodable, Identifiable, Hashable {
         case vibeName = "vibe_name"
         case primaryStoragePath = "primary_storage_path"
         case primaryPublicUrl = "primary_public_url"
+        case primaryStorageBucket = "primary_storage_bucket"
         case distanceMeters = "distance_meters"
         case mediaDisplayAspectRatio = "media_display_aspect_ratio"
     }
@@ -491,6 +499,7 @@ struct MapSpotRow: Decodable, Identifiable, Hashable {
         vibeName = try c.decodeIfPresent(String.self, forKey: .vibeName)
         primaryStoragePath = try c.decodeIfPresent(String.self, forKey: .primaryStoragePath)
         primaryPublicUrl = try c.decodeIfPresent(String.self, forKey: .primaryPublicUrl)
+        primaryStorageBucket = try c.decodeIfPresent(String.self, forKey: .primaryStorageBucket)
         distanceMeters = try c.decodeIfPresent(Double.self, forKey: .distanceMeters)
         mediaDisplayAspectRatio = try c.decodeIfPresent(Double.self, forKey: .mediaDisplayAspectRatio)
     }
@@ -506,10 +515,16 @@ struct MapSpotRow: Decodable, Identifiable, Hashable {
 ///  2. Signs primary image URLs for the (small) returned page,
 ///  3. Maps `HomeFeedRow` → `Spot` for UI rendering.
 enum FeedAPI {
-    /// Storage bucket where spot images live. Mirrors `SpotSupabaseRepository`.
+    /// Legacy default when `spot_images.storage_bucket` / RPC column is absent.
     private static let spotsStorageBucketId = "spots"
     /// Signed-URL lifetime; matches existing feed image expiry (7 days).
     private static let spotImageSignedURLExpirySeconds = 604_800
+
+    /// Resolves the Storage bucket id for a primary image path.
+    static func resolvedPrimaryStorageBucket(_ raw: String?) -> String {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? spotsStorageBucketId : trimmed
+    }
 
     // MARK: get_home_feed_v1
 
@@ -809,7 +824,8 @@ enum FeedAPI {
     /// `mapRowsToSpotsPerAuthor` path which signed every candidate's images.
     static func resolvePrimaryImageURL(
         storagePath: String?,
-        publicUrl: String?
+        publicUrl: String?,
+        storageBucket: String? = nil
     ) async -> String? {
         let trimmedPublic = publicUrl?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if trimmedPublic.lowercased().hasPrefix("https://") || trimmedPublic.lowercased().hasPrefix("http://") {
@@ -825,15 +841,17 @@ enum FeedAPI {
         }()
 
         guard let path else { return nil }
+        let bucket = resolvedPrimaryStorageBucket(storageBucket)
 
         do {
             let url = try await supabase.storage
-                .from(spotsStorageBucketId)
+                .from(bucket)
                 .createSignedURL(path: path, expiresIn: spotImageSignedURLExpirySeconds)
             return url.absoluteString
         } catch {
             SpotLogger.log(FeedSupabaseLogs.primaryImageSignFailed, details: [
                 "path": path,
+                "bucket": bucket,
                 "error": error.localizedDescription
             ])
             return nil
@@ -847,7 +865,7 @@ enum FeedAPI {
         for rows: [HomeFeedRow]
     ) async -> [UUID: String] {
         return await batchResolvePrimaryURLs(rows.map {
-            ($0.spotId, $0.primaryStoragePath, $0.primaryPublicUrl)
+            ($0.spotId, $0.primaryStoragePath, $0.primaryPublicUrl, $0.primaryStorageBucket)
         }, phase: "feed")
     }
 
@@ -857,21 +875,26 @@ enum FeedAPI {
         for rows: [MapSpotRow]
     ) async -> [UUID: String] {
         return await batchResolvePrimaryURLs(rows.map {
-            ($0.spotId, $0.primaryStoragePath, $0.primaryPublicUrl)
+            ($0.spotId, $0.primaryStoragePath, $0.primaryPublicUrl, $0.primaryStorageBucket)
         }, phase: "map")
     }
 
     private static func batchResolvePrimaryURLs(
-        _ entries: [(UUID, String?, String?)],
+        _ entries: [(UUID, String?, String?, String?)],
         phase: String
     ) async -> [UUID: String] {
         guard !entries.isEmpty else { return [:] }
 
-        var result: [UUID: String] = [:]
-        var pathsToSign: [String] = []
-        var pathRowIndex: [String: [UUID]] = [:]
+        struct BucketPath: Hashable {
+            let bucket: String
+            let path: String
+        }
 
-        for (spotId, storagePath, publicUrl) in entries {
+        var result: [UUID: String] = [:]
+        var pathRowIndex: [BucketPath: [UUID]] = [:]
+        var pathsByBucket: [String: [String]] = [:]
+
+        for (spotId, storagePath, publicUrl, storageBucket) in entries {
             let trimmedPublic = publicUrl?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if trimmedPublic.lowercased().hasPrefix("https://") || trimmedPublic.lowercased().hasPrefix("http://") {
                 result[spotId] = trimmedPublic
@@ -880,39 +903,50 @@ enum FeedAPI {
             let trimmedPath = storagePath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let path = trimmedPath.isEmpty ? trimmedPublic : trimmedPath
             guard !path.isEmpty else { continue }
-            pathRowIndex[path, default: []].append(spotId)
-            if !pathsToSign.contains(path) { pathsToSign.append(path) }
+            let bucket = resolvedPrimaryStorageBucket(storageBucket)
+            let key = BucketPath(bucket: bucket, path: path)
+            pathRowIndex[key, default: []].append(spotId)
+            if pathsByBucket[bucket]?.contains(path) != true {
+                pathsByBucket[bucket, default: []].append(path)
+            }
         }
 
-        if pathsToSign.isEmpty {
+        if pathsByBucket.isEmpty {
             return result
         }
 
-        do {
-            let signedResults = try await supabase.storage
-                .from(spotsStorageBucketId)
-                .createSignedURLs(paths: pathsToSign, expiresIn: spotImageSignedURLExpirySeconds)
-            for item in signedResults {
-                if case let .success(path, url) = item {
-                    guard let spotIds = pathRowIndex[path] else { continue }
-                    for sid in spotIds {
-                        result[sid] = url.absoluteString
+        var signedCount = 0
+        for (bucket, pathsToSign) in pathsByBucket {
+            do {
+                let signedResults = try await supabase.storage
+                    .from(bucket)
+                    .createSignedURLs(paths: pathsToSign, expiresIn: spotImageSignedURLExpirySeconds)
+                for item in signedResults {
+                    if case let .success(path, url) = item {
+                        let key = BucketPath(bucket: bucket, path: path)
+                        guard let spotIds = pathRowIndex[key] else { continue }
+                        for sid in spotIds {
+                            result[sid] = url.absoluteString
+                        }
+                        signedCount += spotIds.count
                     }
                 }
+            } catch {
+                SpotLogger.log(FeedSupabaseLogs.primaryImageSignFailed, details: [
+                    "phase": "batch_\(phase)",
+                    "bucket": bucket,
+                    "count": pathsToSign.count,
+                    "error": error.localizedDescription
+                ])
             }
-        } catch {
-            SpotLogger.log(FeedSupabaseLogs.primaryImageSignFailed, details: [
-                "phase": "batch_\(phase)",
-                "count": pathsToSign.count,
-                "error": error.localizedDescription
-            ])
         }
 
         SpotLogger.log(FeedSupabaseLogs.primaryImageSigned, details: [
             "phase": phase,
             "rows": entries.count,
-            "signed": result.count,
-            "batchPaths": pathsToSign.count
+            "signed": signedCount,
+            "batchBuckets": pathsByBucket.count,
+            "batchPaths": pathsByBucket.values.reduce(0) { $0 + $1.count }
         ])
         return result
     }

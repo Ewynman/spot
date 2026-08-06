@@ -331,7 +331,8 @@ final class FeedRepository: ObservableObject {
             for row in rows {
                 let url = await FeedAPI.resolvePrimaryImageURL(
                     storagePath: row.primaryStoragePath,
-                    publicUrl: row.primaryPublicUrl
+                    publicUrl: row.primaryPublicUrl,
+                    storageBucket: row.primaryStorageBucket
                 )
                 hydrated.append(row.toSpot(primaryURL: url))
             }

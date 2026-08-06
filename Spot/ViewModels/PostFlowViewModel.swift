@@ -176,6 +176,8 @@ class PostFlowViewModel: ObservableObject {
                 longitude: lon,
                 placeName: placeName,
                 userId: userId,
+                username: self.authViewModel?.currentUserUsername,
+                userProfileImageURL: self.authViewModel?.currentUserProfileImageURL,
                 sourceDraftID: self.activeDraftID
             )
 

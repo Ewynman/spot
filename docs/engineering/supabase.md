@@ -40,8 +40,8 @@ The versioned Edge Function is **`moderate-image`** under `supabase/functions/mo
 
 | Function | Role |
 | --- | --- |
-| `get_home_feed_v1`, `get_home_feed_status_v1` | Ranked feed and empty/caught-up state |
-| `get_map_spots_v1` | Viewport discovery |
+| `get_home_feed_v1`, `get_home_feed_status_v1` | Ranked feed and empty/caught-up state; feed rows include `primary_storage_bucket` for signed URLs |
+| `get_map_spots_v1` | Viewport discovery; includes `primary_storage_bucket` |
 | `record_feed_event_v1`, `recompute_my_feed_profile_v1` | Feed telemetry and profile recomputation |
 | `publish_spot_with_approved_media_assets_v1` | Atomic publish from approved assets |
 | `submit_content_report` | Authenticated UGC report |

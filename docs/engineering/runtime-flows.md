@@ -107,7 +107,7 @@ Reporting uses `submit_content_report`. Blocking from current UI paths inserts i
 These are implementation gaps, not target behavior:
 
 - Profile avatars currently upload directly to the public `avatars` bucket and do not use the moderation pipeline.
-- Home-feed batch signing assumes the legacy `spots` bucket while newer media records can use `approved_spot_images`.
+- Home-feed and map primary-image signing are bucket-aware via `primary_storage_bucket` on the RPC rows.
 - Failed or timed-out multi-image publishes can leave unlinked approved assets; draft recovery copy can overstate recoverability.
 - Notification actions post navigation events, but no production view consumes those events.
 - The Pro map "Following" filter currently receives an empty followed-user ID set.
