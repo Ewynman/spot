@@ -20,7 +20,9 @@ User opens **Post** tab → multi-step composer (`Spot/Views/PostFlow`) → sele
 
 ### Media
 
-Photos are chosen from the library or camera per system permissions (`Constants.UserDefaultsKeys` track permission prompts).
+Photos are chosen from an image-only multi-select library picker or the still-image camera. The first ordered photo is the cover. The photo workspace supports previewing, adding, replacing, removing, accessible reordering, and making any photo the cover.
+
+Each photo has a stable ID and non-destructive edit instructions. Crop, quarter-turn rotation, straightening, horizontal/vertical flip, brightness, contrast, saturation, and warmth are rendered from an orientation-normalized original. The original is retained until publication so edits can be reset or changed without repeatedly recompressing an earlier render. Picker filtering, client decoding, JPEG upload encoding, storage MIME restrictions, and moderation provide layered video exclusion.
 
 Free accounts can publish one photo and one vibe tag. Pro accounts can publish up to five photos and five vibe tags. The publish RPC independently enforces entitlement limits.
 
@@ -34,7 +36,7 @@ User picks from known tags and adds caption/details as the UI allows.
 
 ### Draft behavior
 
-`PostDraftStore` persists drafts locally under Application Support, including a reserved `autosave` draft and user-saved drafts. Draft metadata is indexed locally; no server draft table is involved.
+`PostDraftStore` persists drafts locally under Application Support, including a reserved `autosave` draft and user-saved drafts. Draft schema version 2 stores each photo's stable ID, durable original and rendered preview, source, ordered position, non-destructive edit instructions, and processing state. Version 1 drafts are migrated lazily when loaded: their known file order is retained, stable IDs are generated, and neutral edits are supplied. A missing version-2 photo file restores as an unavailable item that can be replaced or removed instead of crashing. Draft metadata is indexed locally; no server draft table is involved.
 
 Submission persists a snapshot before JPEG encoding and queueing. The composer resets as soon as `SpotPublishCoordinator` accepts the job, allowing the user to leave the Post tab while the global publish banner reports progress.
 
