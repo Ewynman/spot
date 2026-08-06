@@ -43,6 +43,12 @@ The workflow uses three validation scripts in `scripts/`:
    - Fails PR if coverage threshold not met
    - Shows detailed per-file coverage breakdown
 
+The PR comment also includes an informational unit-test scope percentage from
+`scripts/summarize-xccov.py`. It includes non-view `Spot.app` production files
+only; package dependencies, test targets, and SwiftUI views are excluded. This
+avoids presenting the root `xccov` aggregate—which includes linked packages—as
+if it represented the app's test coverage.
+
 **Test output:**
 - Test results are formatted with `xcbeautify` for readable output
 - Test results (`.xcresult` bundles) are uploaded as artifacts for 7 days

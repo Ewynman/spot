@@ -93,18 +93,24 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             test | xcbeautify
       
-      - name: Extract overall coverage
+      - name: Extract unit-test scope coverage
         id: coverage
         if: always()
         run: |
           if [ -d "TestResults.xcresult" ]; then
-            PCT=$(xcrun xccov view --report --json TestResults.xcresult | jq -r '.lineCoverage')
-            PCT_HUMAN=$(awk -v p="$PCT" 'BEGIN { printf "%.1f", (p * 100) }')
-            echo "Overall project line coverage: ${PCT_HUMAN}%"
-            echo "percent=${PCT_HUMAN}" >> "$GITHUB_OUTPUT"
-          else
-            echo "percent=unknown" >> "$GITHUB_OUTPUT"
+            if xcrun xccov view --report --json TestResults.xcresult > coverage-report.json &&
+              SUMMARY=$(python3 scripts/summarize-xccov.py coverage-report.json); then
+              PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
+              COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
+              EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
+              echo "Spot unit-test scope coverage: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
+              echo "percent=${PERCENT}" >> "$GITHUB_OUTPUT"
+              echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
+              echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
+          echo "percent=unknown" >> "$GITHUB_OUTPUT"
       
       - name: Validate Code Coverage
         id: coverage_validation
@@ -130,6 +136,8 @@ jobs:
         with:
           name: coverage-reports
           path: |
+            coverage-report.json
+            coverage-report.txt
             ~/Library/Developer/Xcode/DerivedData/**/ProfileData
           retention-days: 7
       
@@ -140,8 +148,14 @@ jobs:
             echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
-            # Extract overall coverage
-            xcrun xccov view --report TestResults.xcresult | head -20 >> $GITHUB_STEP_SUMMARY || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            PERCENT="${{ steps.coverage.outputs.percent }}"
+            if [ -n "$PERCENT" ] && [ "$PERCENT" != "unknown" ]; then
+              echo "**Spot unit-test scope:** ${PERCENT}% (${{ steps.coverage.outputs.covered }}/${{ steps.coverage.outputs.executable }} executable lines)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "This informational metric includes non-view production Swift files in Spot.app. Package dependencies, tests, and SwiftUI views are excluded." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
       
       - name: Comment PR with results
@@ -153,7 +167,7 @@ jobs:
             
             const testsOutcome = '${{ steps.tests.outcome }}';
             const coverageOutcome = '${{ steps.coverage_validation.outcome }}';
-            const overallCoverage = '${{ steps.coverage.outputs.percent }}';
+            const unitScopeCoverage = '${{ steps.coverage.outputs.percent }}';
             
             const icon = (outcome) => outcome === 'success'
               ? '✅'
@@ -164,12 +178,13 @@ jobs:
             comment += `### Tests: ${icon(testsOutcome)}\n\n`;
             
             comment += '### Coverage\n';
-            if (overallCoverage && overallCoverage !== 'unknown' && overallCoverage !== '') {
-              comment += `**Overall project line coverage: ${overallCoverage}%**\n\n`;
+            if (unitScopeCoverage && unitScopeCoverage !== 'unknown' && unitScopeCoverage !== '') {
+              comment += `**Spot unit-test scope coverage (informational): ${unitScopeCoverage}%**\n\n`;
             } else {
-              comment += 'Overall coverage data was not available for this run.\n\n';
+              comment += 'Unit-test scope coverage data was not available for this run.\n\n';
             }
-            comment += `**Changed-files coverage check (80% minimum): ${icon(coverageOutcome)}**\n\n`;
+            comment += 'This metric excludes package dependencies, test targets, and `Spot/Views/`; those previously made the project aggregate misleading.\n\n';
+            comment += `**Changed-line coverage gate (80% minimum): ${icon(coverageOutcome)}**\n\n`;
             
             // Include the per-changed-file coverage breakdown when available.
             try {

@@ -7,7 +7,7 @@
 ## Checklist
 
 ### Code Quality & Testing (Required)
-- [ ] Added Unit Tests For New Code (80% minimum coverage on changed files)
+- [ ] Added unit tests for new logic (CI enforces 80% of changed executable lines in non-view production files once the 10-line floor is met)
 - [ ] All tests pass locally (`xcodebuild -scheme SpotTests test`)
 - [ ] No breaking API changes (or documented if intentional)
 - [ ] Confirmed no new warnings introduced
@@ -33,7 +33,7 @@ See [docs/engineering/data-plane.md](docs/engineering/data-plane.md).
 
 The following checks run automatically on every PR:
 
-✅ **Code Coverage**: Enforces 80% minimum coverage on all changed production files  
+✅ **Code Coverage**: Enforces 80% minimum coverage on changed executable lines in non-view production files
 ✅ **API Stability**: Detects potential breaking changes to public APIs  
 ✅ **Documentation**: Validates documentation updates for significant changes  
 ✅ **Unit Tests**: All tests must pass before merge

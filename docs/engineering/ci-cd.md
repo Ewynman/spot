@@ -248,6 +248,14 @@ CI collects code coverage data on every run and **enforces coverage requirements
 
 The gate measures **changed-line coverage**, not whole-file coverage. The question it asks is "are the lines this PR wrote tested?" rather than "is this entire file well tested?". Whole-file thresholds punish any edit to a legacy low-coverage file — a four-line threading fix in a 341-line Supabase repository would have required retro-covering the whole repository to land, which pushes people toward not touching those files at all.
 
+CI also reports an informational **Spot unit-test scope** metric. It is a
+line-weighted summary of non-view production Swift files in the `Spot.app`
+target. The summary intentionally excludes package dependencies, test targets,
+and `Spot/Views/`, so it describes the code the unit-test job can meaningfully
+exercise. Do not use the root `xccov` `lineCoverage` value: that aggregate mixes
+Spot code with linked Firebase, Supabase, and transitive package targets and
+therefore produces a misleadingly low percentage.
+
 **Coverage Requirements:**
 - **80% of the executable lines a PR adds or modifies** must be covered
 - Applies to files under `Spot/`, excluding tests and `Spot/Views/`
@@ -283,7 +291,8 @@ xcrun simctl delete "$SIM"
 
 **Coverage reports:**
 - Uploaded as artifacts (retained for 7 days)
-- Summary posted to PR as comment
+- Unit-test scope summary and changed-line gate result posted to the PR
+- Raw `xccov` JSON and changed-line details included in the coverage artifact
 - Full report available in GitHub Actions logs
 
 **Exemptions:**

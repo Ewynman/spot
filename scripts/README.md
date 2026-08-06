@@ -21,14 +21,26 @@ Enforces minimum code coverage requirements on changed files in pull requests.
 **What it does:**
 - Extracts coverage data using `xcrun xccov`
 - Identifies changed Swift files via `git diff`
-- Calculates line coverage for each changed file
-- Fails if any file is below the threshold
+- Calculates coverage for changed executable lines in non-view `Spot/` files
+- Fails if an enforced file is below the threshold (files enter enforcement at 10 changed executable lines)
 - Provides detailed per-file coverage breakdown
 
 **Requirements:**
 - `jq` for JSON parsing
 - `git` for diff comparison
 - `xcrun` with xccov
+
+### `summarize-xccov.py`
+
+Calculates the informational unit-test scope metric shown in CI. It selects the
+`Spot.app` target and computes weighted line coverage for non-view production
+Swift files. Package dependencies, test targets, and `Spot/Views/` are excluded
+because they are outside the unit-test coverage boundary.
+
+```bash
+xcrun xccov view --report --json TestResults.xcresult > coverage-report.json
+python3 scripts/summarize-xccov.py coverage-report.json
+```
 
 **Example:**
 ```bash
