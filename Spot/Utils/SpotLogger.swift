@@ -1,8 +1,5 @@
 import Foundation
 import os
-#if DEBUG
-import Darwin
-#endif
 
 // MARK: - Structured log definitions
 
@@ -265,20 +262,20 @@ final class SpotLogger {
 }
 
 #if DEBUG
-private enum DebuggerDetector {
-    static var isAttached: Bool {
-        var processInfo = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
-        var name = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
-        let nameCount = name.count
-        let result = name.withUnsafeMutableBufferPointer {
-            sysctl($0.baseAddress, u_int(nameCount), &processInfo, &size, nil, 0)
-        }
-        return result == 0 && (processInfo.kp_proc.p_flag & P_TRACED) != 0
+extension SpotLogger {
+    /// Ensures `Documents/spot-debug.txt` exists with a session marker so Files
+    /// shows the Spot folder even before the first structured log.
+    static func ensureDebugLogFile() {
+        DebugFileLogWriter.shared.ensureSessionHeader()
+    }
+
+    /// Documents path for the active DEBUG log file (nil if unavailable).
+    static var debugLogFileURL: URL? {
+        DebugFileLogWriter.shared.fileURL
     }
 }
 
-/// Writes DEBUG logs only when the process is not attached to Xcode.
+/// Appends DEBUG logs to Documents/spot-debug.txt for Files and Finder.
 private final class DebugFileLogWriter {
     static let shared = DebugFileLogWriter()
 
@@ -291,10 +288,21 @@ private final class DebugFileLogWriter {
 
     private init() {}
 
+    var fileURL: URL? {
+        currentFileURL()
+    }
+
     func write(_ message: String) {
-        guard !DebuggerDetector.isAttached else { return }
         queue.async {
             self.append(message)
+        }
+    }
+
+    func ensureSessionHeader() {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        // Sync so configure() leaves a visible file before the first emit.
+        queue.sync {
+            self.append("--- Spot DEBUG session \(timestamp) ---")
         }
     }
 

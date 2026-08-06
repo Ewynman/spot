@@ -45,7 +45,7 @@ struct LoggingSettingsDetailView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             sectionHeader("Device log file")
                             Text(
-                                "When a DEBUG build runs without Xcode attached, logs appear in Files → On My iPhone → Spot → spot-debug.txt. They are also available through Finder when the phone is connected to a Mac. Files rotate at 1 MB and retain three archives."
+                                "In a DEBUG build, logs appear in Files → On My iPhone → Spot → spot-debug.txt (including while Xcode is attached). They are also available through Finder when the phone is connected to a Mac. Files rotate at 1 MB and retain three archives."
                             )
                             .font(.system(size: 12))
                             .foregroundColor(.gray)

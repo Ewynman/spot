@@ -15,6 +15,7 @@ enum LoggingConfig {
 
         #if DEBUG
         applyFromUserDefaults()
+        SpotLogger.ensureDebugLogFile()
         #else
         SpotLogger.setProfile(.errorsOnly)
         #endif

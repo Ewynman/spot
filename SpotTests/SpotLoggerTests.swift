@@ -145,4 +145,17 @@ struct SpotLoggerTests {
         #expect(!SpotLogger.shouldEmit(level: .error, tag: "AuthService", file: serviceFile, profile: .uiOnly))
         #expect(SpotLogger.shouldEmit(level: .debug, tag: "LocationManager", file: serviceFile, profile: .all))
     }
+
+    #if DEBUG
+    @Test func debugLogFileIsSeededWithSessionHeader() throws {
+        SpotLogger.ensureDebugLogFile()
+
+        let url = try #require(SpotLogger.debugLogFileURL)
+        #expect(url.lastPathComponent == "spot-debug.txt")
+        #expect(FileManager.default.fileExists(atPath: url.path))
+
+        let contents = try String(contentsOf: url, encoding: .utf8)
+        #expect(contents.contains("--- Spot DEBUG session "))
+    }
+    #endif
 }
