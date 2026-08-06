@@ -16,7 +16,7 @@ class PostFlowViewModel: ObservableObject {
     /// Stable per-slot ids for `PhotoSelectionView` / `TabView` (reorder-safe).
     @Published var selectedPhotos: [PostComposerPhoto] = []
 
-    /// Drafts, validation, and publish still consume `[UIImage]`.
+    /// Publishing consumes the current non-destructive rendered previews.
     var selectedImages: [UIImage] {
         get { selectedPhotos.map(\.image) }
         set { selectedPhotos = newValue.map { PostComposerPhoto(image: $0) } }
@@ -55,7 +55,10 @@ class PostFlowViewModel: ObservableObject {
 
     var canProceedToNextStep: Bool {
         switch currentStep {
-        case 1: return !selectedImages.isEmpty
+        case 1:
+            return !selectedPhotos.isEmpty &&
+                selectedPhotos.count <= maximumPhotoCount &&
+                selectedPhotos.allSatisfy(\.isReadyForUpload)
         case 2: return selectedLocation != nil
         case 3: return !selectedVibes.isEmpty
         default: return false
@@ -67,7 +70,17 @@ class PostFlowViewModel: ObservableObject {
     }
 
     var canSubmitPost: Bool {
-        !selectedImages.isEmpty && selectedLocation != nil && !selectedVibes.isEmpty
+        !selectedPhotos.isEmpty &&
+            selectedPhotos.count <= maximumPhotoCount &&
+            selectedPhotos.allSatisfy(\.isReadyForUpload) &&
+            selectedLocation != nil &&
+            !selectedVibes.isEmpty
+    }
+
+    var maximumPhotoCount: Int {
+        authViewModel?.isPro == true
+            ? Constants.PostLimits.maxProPostImages
+            : Constants.PostLimits.maxFreePostImages
     }
 
     func goBack() {
@@ -195,20 +208,22 @@ class PostFlowViewModel: ObservableObject {
     }
 
     func persistDraftSnapshot() {
-        activeDraftID = PostDraftStore.save(
+        if let savedDraftID = PostDraftStore.save(
             step: currentStep,
-            images: selectedImages,
+            photos: selectedPhotos,
             selectedLocation: selectedLocation,
             selectedVibes: selectedVibes,
             draftID: activeDraftID,
             status: .autosaved
-        )
+        ) {
+            activeDraftID = savedDraftID
+        }
         refreshDrafts()
     }
 
     func loadPersistedDraftIfAvailable() -> Bool {
         guard let loaded = PostDraftStore.loadAutosavedDraft() else { return false }
-        selectedImages = loaded.images
+        selectedPhotos = loaded.photos
         selectedLocation = loaded.location
         selectedVibes = loaded.draft.vibeTags
         selectedVibe = loaded.draft.vibeTags.first ?? ""
@@ -261,14 +276,18 @@ class PostFlowViewModel: ObservableObject {
             showToastWith(message: "Add photos, location, or vibes before saving.", isError: true)
             return false
         }
-        activeDraftID = PostDraftStore.save(
+        guard let savedDraftID = PostDraftStore.save(
             step: currentStep,
-            images: selectedImages,
+            photos: selectedPhotos,
             selectedLocation: selectedLocation,
             selectedVibes: selectedVibes,
             draftID: activeDraftID == "autosave" ? nil : activeDraftID,
             status: .saved
-        )
+        ) else {
+            showToastWith(message: "Could not save this draft. Please try again.", isError: true)
+            return false
+        }
+        activeDraftID = savedDraftID
         VibeTagUsageStore.recordUsage(tags: selectedVibes)
         PostDraftStore.clearAutosave()
         resetComposerForDraftExit()
@@ -282,7 +301,7 @@ class PostFlowViewModel: ObservableObject {
             showToastWith(message: "Could not open that draft.", isError: true)
             return
         }
-        selectedImages = loaded.images
+        selectedPhotos = loaded.photos
         selectedLocation = loaded.location
         selectedVibes = loaded.draft.vibeTags
         selectedVibe = loaded.draft.vibeTags.first ?? ""

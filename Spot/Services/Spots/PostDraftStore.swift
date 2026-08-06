@@ -24,6 +24,7 @@ struct PostComposerDraftSummary: Codable, Identifiable, Equatable {
 }
 
 struct PostComposerDraft: Codable, Identifiable {
+    let schemaVersion: Int?
     let id: String
     let step: Int
     let status: PostComposerDraftStatus
@@ -34,10 +35,31 @@ struct PostComposerDraft: Codable, Identifiable {
     let address: String?
     let isCustomName: Bool
     let imageFileNames: [String]
+    let photoRecords: [PostComposerDraftPhoto]?
     let updatedAt: Date
 }
 
+struct PostComposerDraftPhoto: Codable, Equatable {
+    let id: UUID
+    let originalFileName: String
+    let previewFileName: String
+    let source: PostComposerPhotoSource
+    let edits: PostComposerPhotoEdits
+    let processingState: PostComposerPhotoProcessingState
+    let processingError: String?
+    let createdAt: Date
+}
+
+struct PostComposerDraftLoadResult {
+    let draft: PostComposerDraft
+    let photos: [PostComposerPhoto]
+    let location: LocationData?
+
+    var images: [UIImage] { photos.map(\.image) }
+}
+
 enum PostDraftStore {
+    private static let currentSchemaVersion = 2
     private static let draftIndexFileName = "post-composer-drafts-index.json"
     private static let autosavedDraftID = "autosave"
 
@@ -62,8 +84,12 @@ enum PostDraftStore {
         draftsDirectory.appendingPathComponent("post-composer-draft-\(draftID).json")
     }
 
-    private static func imageFileName(draftID: String, index: Int) -> String {
-        "draft_\(draftID)_image_\(index).jpg"
+    private static func originalImageFileName(draftID: String, photoID: UUID, revision: String) -> String {
+        "draft_\(draftID)_photo_\(photoID.uuidString)_\(revision)_original.jpg"
+    }
+
+    private static func previewImageFileName(draftID: String, photoID: UUID, revision: String) -> String {
+        "draft_\(draftID)_photo_\(photoID.uuidString)_\(revision)_preview.jpg"
     }
 
     private static func loadIndex() -> [PostComposerDraftSummary] {
@@ -95,34 +121,46 @@ enum PostDraftStore {
 
     static func save(
         step: Int,
-        images: [UIImage],
+        photos: [PostComposerPhoto],
         selectedLocation: LocationData?,
         selectedVibes: [String],
         draftID: String? = nil,
         status: PostComposerDraftStatus = .autosaved
-    ) -> String {
+    ) -> String? {
         let resolvedID = draftID ?? (status == .autosaved ? autosavedDraftID : UUID().uuidString)
-        deleteImageFiles(for: resolvedID)
+        let previousDraft = (try? Data(contentsOf: draftFileURL(for: resolvedID)))
+            .flatMap { try? JSONDecoder().decode(PostComposerDraft.self, from: $0) }
+        let revision = UUID().uuidString
 
         var imageNames: [String] = []
-        for (index, image) in images.enumerated() {
-            let fileName = imageFileName(draftID: resolvedID, index: index)
-            let url = draftsDirectory.appendingPathComponent(fileName)
-            guard let data = image.spot_jpegDataOpaque(compressionQuality: 0.78) else { continue }
-            do {
-                try data.write(to: url, options: .atomic)
-            } catch {
-                SpotLogger.log(PostDraftStoreLogs.draftImageWriteFailed, details: [
-                    "draftId": resolvedID,
-                    "fileName": fileName,
-                    "error": error.localizedDescription
-                ])
-                continue
+        var stagedFileNames: [String] = []
+        var photoRecords: [PostComposerDraftPhoto] = []
+        for photo in photos {
+            let originalName = originalImageFileName(draftID: resolvedID, photoID: photo.id, revision: revision)
+            let previewName = previewImageFileName(draftID: resolvedID, photoID: photo.id, revision: revision)
+            stagedFileNames.append(contentsOf: [originalName, previewName])
+            guard
+                write(photo.originalImage, fileName: originalName, draftID: resolvedID),
+                write(photo.image, fileName: previewName, draftID: resolvedID)
+            else {
+                removeFiles(stagedFileNames)
+                return nil
             }
-            imageNames.append(fileName)
+            imageNames.append(previewName)
+            photoRecords.append(PostComposerDraftPhoto(
+                id: photo.id,
+                originalFileName: originalName,
+                previewFileName: previewName,
+                source: photo.source,
+                edits: photo.edits,
+                processingState: photo.processingState,
+                processingError: photo.processingError,
+                createdAt: photo.createdAt
+            ))
         }
 
         let draft = PostComposerDraft(
+            schemaVersion: currentSchemaVersion,
             id: resolvedID,
             step: step,
             status: status,
@@ -133,24 +171,31 @@ enum PostDraftStore {
             address: selectedLocation?.address,
             isCustomName: selectedLocation?.isCustomName ?? false,
             imageFileNames: imageNames,
+            photoRecords: photoRecords,
             updatedAt: Date()
         )
 
-        if let encoded = try? JSONEncoder().encode(draft) {
-            do {
-                try encoded.write(to: draftFileURL(for: resolvedID), options: .atomic)
-            } catch {
-                SpotLogger.log(PostDraftStoreLogs.draftWriteFailed, details: ["draftId": resolvedID, "error": error.localizedDescription])
-            }
-        } else {
+        guard let encoded = try? JSONEncoder().encode(draft) else {
             SpotLogger.log(PostDraftStoreLogs.draftWriteFailed, details: ["draftId": resolvedID, "error": "encode_failed"])
+            removeFiles(allImageFileNames(in: draft))
+            return nil
+        }
+        do {
+            try encoded.write(to: draftFileURL(for: resolvedID), options: .atomic)
+        } catch {
+            SpotLogger.log(PostDraftStoreLogs.draftWriteFailed, details: ["draftId": resolvedID, "error": error.localizedDescription])
+            removeFiles(allImageFileNames(in: draft))
+            return nil
         }
 
         upsertSummary(for: draft)
+        if let previousDraft {
+            removeFiles(allImageFileNames(in: previousDraft))
+        }
         return resolvedID
     }
 
-    static func loadDraft(id: String) -> (draft: PostComposerDraft, images: [UIImage], location: LocationData?)? {
+    static func loadDraft(id: String) -> PostComposerDraftLoadResult? {
         guard let raw = try? Data(contentsOf: draftFileURL(for: id)) else {
             SpotLogger.log(PostDraftStoreLogs.draftReadFailed, details: ["draftId": id])
             return nil
@@ -160,18 +205,7 @@ enum PostDraftStore {
             return nil
         }
 
-        let images: [UIImage] = draft.imageFileNames.compactMap { fileName in
-            let url = draftsDirectory.appendingPathComponent(fileName)
-            guard let data = try? Data(contentsOf: url) else {
-                SpotLogger.log(PostDraftStoreLogs.draftImageReadFailed, details: ["draftId": id, "fileName": fileName, "reason": "data_read_failed"])
-                return nil
-            }
-            guard let image = UIImage(data: data) else {
-                SpotLogger.log(PostDraftStoreLogs.draftImageReadFailed, details: ["draftId": id, "fileName": fileName, "reason": "image_decode_failed"])
-                return nil
-            }
-            return image
-        }
+        let photos = restorePhotos(from: draft)
 
         var location: LocationData?
         if
@@ -187,10 +221,10 @@ enum PostDraftStore {
             )
         }
 
-        return (draft, images, location)
+        return PostComposerDraftLoadResult(draft: draft, photos: photos, location: location)
     }
 
-    static func loadAutosavedDraft() -> (draft: PostComposerDraft, images: [UIImage], location: LocationData?)? {
+    static func loadAutosavedDraft() -> PostComposerDraftLoadResult? {
         loadDraft(id: autosavedDraftID)
     }
 
@@ -203,7 +237,7 @@ enum PostDraftStore {
 
     static func deleteDraft(id: String) {
         if let draft = (try? Data(contentsOf: draftFileURL(for: id))).flatMap({ try? JSONDecoder().decode(PostComposerDraft.self, from: $0) }) {
-            for fileName in draft.imageFileNames {
+            for fileName in allImageFileNames(in: draft) {
                 let url = draftsDirectory.appendingPathComponent(fileName)
                 try? FileManager.default.removeItem(at: url)
             }
@@ -228,13 +262,103 @@ enum PostDraftStore {
 }
 
 private extension PostDraftStore {
-    static func deleteImageFiles(for draftID: String) {
-        guard
-            let raw = try? Data(contentsOf: draftFileURL(for: draftID)),
-            let existing = try? JSONDecoder().decode(PostComposerDraft.self, from: raw)
-        else { return }
+    static func write(_ image: UIImage, fileName: String, draftID: String) -> Bool {
+        guard let data = image.spot_jpegDataOpaque(compressionQuality: 0.88) else { return false }
+        do {
+            try data.write(to: draftsDirectory.appendingPathComponent(fileName), options: .atomic)
+            return true
+        } catch {
+            SpotLogger.log(PostDraftStoreLogs.draftImageWriteFailed, details: [
+                "draftId": draftID,
+                "fileName": fileName,
+                "error": error.localizedDescription
+            ])
+            return false
+        }
+    }
 
-        for fileName in existing.imageFileNames {
+    static func restorePhotos(from draft: PostComposerDraft) -> [PostComposerPhoto] {
+        if let records = draft.photoRecords {
+            return records.map { record in
+                let original = loadImage(fileName: record.originalFileName, draftID: draft.id)
+                let preview = loadImage(fileName: record.previewFileName, draftID: draft.id)
+                let fallback = preview ?? original ?? unavailablePlaceholder()
+                let renderedAfterInterruptedSave: UIImage? = {
+                    guard let original,
+                          preview == nil || record.processingState == .processing else { return nil }
+                    return try? PostPhotoProcessor.render(original: original, edits: record.edits)
+                }()
+                let restoredState: PostComposerPhotoProcessingState
+                let restoredError: String?
+                if original == nil {
+                    restoredState = .unavailable
+                    restoredError = "This photo is no longer available on this device."
+                } else if record.processingState == .processing || preview == nil {
+                    restoredState = renderedAfterInterruptedSave == nil ? .failed : .ready
+                    restoredError = renderedAfterInterruptedSave == nil
+                        ? "We couldn’t prepare this photo."
+                        : nil
+                } else {
+                    restoredState = record.processingState
+                    restoredError = record.processingError
+                }
+                return PostComposerPhoto(
+                    id: record.id,
+                    image: renderedAfterInterruptedSave ?? fallback,
+                    originalImage: original ?? fallback,
+                    source: record.source,
+                    edits: record.edits,
+                    processingState: restoredState,
+                    processingError: restoredError,
+                    createdAt: record.createdAt
+                )
+            }
+        }
+        return draft.imageFileNames.map { fileName in
+            guard let image = loadImage(fileName: fileName, draftID: draft.id) else {
+                return PostComposerPhoto(
+                    image: unavailablePlaceholder(),
+                    source: .legacyDraft,
+                    processingState: .unavailable,
+                    processingError: "This photo is no longer available on this device."
+                )
+            }
+            return PostComposerPhoto(image: image, source: .legacyDraft)
+        }
+    }
+
+    static func loadImage(fileName: String, draftID: String) -> UIImage? {
+        let url = draftsDirectory.appendingPathComponent(fileName)
+        guard let data = try? Data(contentsOf: url), let image = UIImage(data: data) else {
+            SpotLogger.log(PostDraftStoreLogs.draftImageReadFailed, details: [
+                "draftId": draftID,
+                "fileName": fileName,
+                "reason": "read_or_decode_failed"
+            ])
+            return nil
+        }
+        return image
+    }
+
+    static func unavailablePlaceholder() -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: CGSize(width: 320, height: 240), format: format).image { context in
+            UIColor.secondarySystemBackground.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 320, height: 240))
+        }
+    }
+
+    static func allImageFileNames(in draft: PostComposerDraft) -> [String] {
+        if let records = draft.photoRecords {
+            return records.flatMap { [$0.originalFileName, $0.previewFileName] }
+        }
+        return draft.imageFileNames
+    }
+
+    static func removeFiles(_ fileNames: [String]) {
+        for fileName in Set(fileNames) {
             try? FileManager.default.removeItem(at: draftsDirectory.appendingPathComponent(fileName))
         }
     }

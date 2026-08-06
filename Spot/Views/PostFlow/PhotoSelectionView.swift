@@ -1,352 +1,913 @@
-import SwiftUI
+import AVFoundation
+import Photos
 import PhotosUI
+import SwiftUI
+import UniformTypeIdentifiers
 import UIKit
-import ImageIO
-
-private let postImageMaxPixelSize: CGFloat = 1600
 
 private enum GalleryPickMode: Equatable {
     case add
-    case replace
+    case replace(UUID)
+}
+
+private struct RemovedPhoto {
+    let photo: PostComposerPhoto
+    let index: Int
 }
 
 struct PhotoSelectionView: View {
-    @EnvironmentObject var authVM: AuthViewModel
-    @EnvironmentObject var permissionManager: PermissionManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var authVM: AuthViewModel
+    @EnvironmentObject private var permissionManager: PermissionManager
     @Binding var selectedPhotos: [PostComposerPhoto]
     let draftCount: Int
     let onOpenDrafts: () -> Void
-    /// Called when a non‑Pro user selects multiple photos at once (only the first is kept).
     var onFreeTierGalleryOverflow: (() -> Void)?
-    /// Programmatic gallery picker — shown only after the user taps
-    /// Choose from Gallery / Replace and, when needed, completes the
-    /// contextual `PhotoPermissionView` pre-prompt (`notDetermined`).
+
+    @State private var activePhotoID: UUID?
+    @State private var editorPhoto: PostComposerPhoto?
     @State private var galleryPickerItems: [PhotosPickerItem] = []
-    @State private var showGalleryPicker = false
     @State private var galleryPickMode: GalleryPickMode = .add
+    @State private var showGalleryPicker = false
+    @State private var showAddSourceSheet = false
     @State private var showPhotoLibraryPrePrompt = false
+    @State private var showCameraPrePrompt = false
     @State private var showCamera = false
     @State private var showPhotoSettingsAlert = false
     @State private var showCameraSettingsAlert = false
-    @State private var selectedPhotoIndex: Int = 0
-    /// True while the contextual Camera pre-prompt sheet is presented.
-    /// Apple App Review requires the custom `CameraPermissionView` to
-    /// appear BEFORE the native iOS dialog the first time the user taps
-    /// Take a Photo. Tapping Continue on the pre-prompt fires the
-    /// native dialog; swiping the sheet down is treated as a soft skip
-    /// and the composer simply stays on the photo step (the user can
-    /// still pick from gallery).
-    @State private var showCameraPrePrompt = false
+    @State private var showDeleteConfirmation = false
+    @State private var showReplaceWarning = false
+    @State private var isOpeningPicker = false
+    @State private var isImporting = false
+    @State private var importCount = 0
+    @State private var errorMessage: String?
+    @State private var retryGalleryMode: GalleryPickMode?
+    @State private var removedPhoto: RemovedPhoto?
+    @State private var undoTask: Task<Void, Never>?
+    @State private var draggedPhotoID: UUID?
 
     var body: some View {
-        VStack(spacing: 20) {
-            // Header
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Create a Spot")
-                        .font(FontManager.sectionHeader())
-                        .foregroundColor(Constants.Colors.primary)
-                    Text(selectedPhotos.isEmpty ? "Start with photos, or continue a saved draft." : "Review, reorder, replace, and add photos.")
-                        .font(FontManager.primaryText())
-                        .foregroundColor(.gray)
-                }
-                Spacer()
-                Button(action: onOpenDrafts) {
-                    VStack(spacing: 2) {
-                        Text("Drafts")
-                            .font(.caption.weight(.semibold))
-                        Text("\(draftCount)")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(Constants.Colors.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Constants.Colors.primary, lineWidth: 1))
-                    .cornerRadius(10)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityIdentifier("posting.draftsButton")
-            }
-            .padding(.horizontal, 24)
-
+        VStack(spacing: 18) {
+            header
             if selectedPhotos.isEmpty {
-                VStack(spacing: 14) {
-                    Image(systemName: "photo.stack")
-                        .font(.system(size: 28))
-                        .foregroundColor(Constants.Colors.primary)
-                    Text("Add at least one photo to continue")
-                        .font(FontManager.primaryText())
-                        .foregroundColor(.gray)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
-                    .background(Color.white)
-                    .cornerRadius(16)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(style: StrokeStyle(lineWidth: 1, dash: [6])).foregroundColor(Constants.Colors.primary))
-                    .padding(.horizontal, 24)
+                emptyState
             } else {
-                VStack(spacing: 12) {
-                    let previewWidth = max(SpotMediaLayoutMetrics.screenWidth - 48, 1)
-                    let previewHeight = postingPreviewCarouselHeight(width: previewWidth)
-
-                    TabView(selection: $selectedPhotoIndex) {
-                        ForEach(Array(selectedPhotos.enumerated()), id: \.element.id) { idx, photo in
-                            Image(uiImage: photo.image)
-                                .resizable()
-                                .scaledToFill()
-                                .tag(idx)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: previewHeight)
-                                .clipped()
-                                .cornerRadius(16)
-                                .padding(.horizontal, 24)
-                        }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .frame(height: previewHeight)
-
-                    Text("The first photo sets how your Spot appears in the feed. Drag thumbnails to reorder.")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-
-                    HStack {
-                        Text("\(selectedPhotoIndex + 1) of \(selectedPhotos.count)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Spacer()
-                        Button(action: openGalleryReplaceIfPermitted) {
-                            Label("Replace", systemImage: "arrow.triangle.2.circlepath")
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(Constants.Colors.primary)
-
-                        Button {
-                            deleteSelectedImage()
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.red)
-                    }
-                    .padding(.horizontal, 24)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(Array(selectedPhotos.enumerated()), id: \.element.id) { idx, photo in
-                                VStack(spacing: 6) {
-                                    Button {
-                                        selectedPhotoIndex = idx
-                                    } label: {
-                                        Image(uiImage: photo.image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 62, height: 62)
-                                            .clipped()
-                                            .cornerRadius(10)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .stroke(idx == selectedPhotoIndex ? Constants.Colors.primary : Color.clear, lineWidth: 2)
-                                            )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-
-                                    HStack(spacing: 4) {
-                                        Button { moveImage(from: idx, to: idx - 1) } label: {
-                                            Image(systemName: "arrow.left.circle")
-                                        }
-                                        .disabled(idx == 0)
-                                        Button { moveImage(from: idx, to: idx + 1) } label: {
-                                            Image(systemName: "arrow.right.circle")
-                                        }
-                                        .disabled(idx == selectedPhotos.count - 1)
-                                    }
-                                    .foregroundColor(Constants.Colors.primary)
-                                    .font(.caption)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                    }
-                }
+                managementWorkspace
             }
-
-            // Additional actions
-            VStack(spacing: 20) {
-                // Gallery — contextual pre-prompt before the system Photos UI
-                // when status is `.notDetermined` (same pattern as Take Photo).
-                Button(action: openGalleryAddIfPermitted) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 24))
-                            .foregroundColor(Constants.Colors.primary)
-
-                        Text("Choose from Gallery")
-                            .font(FontManager.primaryText())
-                            .foregroundColor(Constants.Colors.primary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Constants.Colors.primary, lineWidth: 1)
-                    )
+            if isImporting {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Adding \(importCount) photo\(importCount == 1 ? "" : "s")…")
                 }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(photoSelectionDisabled || selectedPhotos.count >= maxPhotoCount)
-
-                if photoSelectionDisabled {
-                    Button("Open iOS Settings") {
-                        showPhotoSettingsAlert = true
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .font(FontManager.primaryText())
-                    .foregroundColor(Constants.Colors.primary)
-                }
-
-                // Divider
-                HStack {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 1)
-                    Text("or")
-                        .font(FontManager.primaryText())
-                        .foregroundColor(.gray)
-                        .padding(.horizontal, 16)
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 1)
-                }
-                .padding(.horizontal, 32)
-
-                // Camera Button
-                Button(action: { openCameraIfPermitted() }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "camera")
-                            .font(.system(size: 24))
-                            .foregroundColor(Constants.Colors.primary)
-
-                        Text("Take a Photo")
-                            .font(FontManager.primaryText())
-                            .foregroundColor(Constants.Colors.primary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Constants.Colors.primary, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .buttonStyle(PlainButtonStyle())
+                .font(.caption)
+                .foregroundStyle(Constants.Colors.primary)
+                .accessibilityElement(children: .combine)
             }
-            .padding(.horizontal, 24)
-
-            Spacer()
+            if permissionManager.photoStatus == .limited {
+                Button("Manage Photo Access") {
+                    permissionManager.openPhotoSettings()
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Constants.Colors.primary)
+                .frame(minHeight: 44)
+                .accessibilityHint("Opens Settings to change which photos Spot can access")
+            }
+            if selectedPhotos.isEmpty {
+                Text("Add at least one photo to continue.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.bottom, 12)
         .accessibilityIdentifier("posting.photoStepRoot")
         .onAppear {
             permissionManager.updatePermissionStatuses()
+            repairActiveSelection()
         }
+        .onChange(of: selectedPhotos) { _, _ in repairActiveSelection() }
         .photosPicker(
             isPresented: $showGalleryPicker,
             selection: $galleryPickerItems,
             maxSelectionCount: galleryPickerMaxSelectionCount,
-            matching: .images
+            matching: .images,
+            preferredItemEncoding: .compatible
         )
-        .task(id: galleryPickerItems) {
-            guard !galleryPickerItems.isEmpty else { return }
-            let mode = galleryPickMode
-            let items = galleryPickerItems
-            galleryPickerItems = []
-            showGalleryPicker = false
-
-            switch mode {
-            case .add:
-                var newImages: [UIImage] = []
-                let maxCount = maxPhotoCount
-                let pickerCount = items.count
-                for item in items.prefix(maxCount) {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let uiImage = downsampledPostImage(from: data, maxPixelSize: postImageMaxPixelSize) {
-                        newImages.append(uiImage)
-                    }
-                }
-                if !newImages.isEmpty {
-                    SpotLogger.log(PhotoSelectionViewLogs.photosSelectedFromGallery, details: ["count": newImages.count])
-                    let available = max(0, maxPhotoCount - selectedPhotos.count)
-                    if available > 0 {
-                        selectedPhotos.append(contentsOf: newImages.prefix(available).map { PostComposerPhoto(image: $0) })
-                        selectedPhotoIndex = max(0, selectedPhotos.count - 1)
-                        if !authVM.isPro, maxPhotoCount == 1, pickerCount > 1 {
-                            onFreeTierGalleryOverflow?()
-                            AnalyticsService.shared.logEvent("post_multiple_images_upsell_shown", parameters: [:])
-                        }
-                    }
-                } else {
-                    SpotLogger.log(PhotoSelectionViewLogs.loadPhotosFailed)
-                }
-            case .replace:
-                guard let item = items.first else { return }
-                guard selectedPhotoIndex >= 0, selectedPhotoIndex < selectedPhotos.count else { return }
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let uiImage = downsampledPostImage(from: data, maxPixelSize: postImageMaxPixelSize) {
-                    let id = selectedPhotos[selectedPhotoIndex].id
-                    selectedPhotos[selectedPhotoIndex] = PostComposerPhoto(id: id, image: uiImage)
-                }
+        .onChange(of: showGalleryPicker) { _, presented in
+            guard !presented else { return }
+            isOpeningPicker = false
+            if galleryPickerItems.isEmpty {
+                AnalyticsService.shared.logEvent("spot_photo_picker_cancelled", parameters: [:])
             }
         }
-        .sheet(isPresented: $showCamera) {
-            CameraView(selectedPhotos: $selectedPhotos, maxCount: maxPhotoCount)
+        .onChange(of: galleryPickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            let mode = galleryPickMode
+            Task { await importPickerItems(items, mode: mode) }
         }
-        .sheet(isPresented: $showCameraPrePrompt) {
-            CameraPermissionView(
-                authDestination: .signup,
-                showsBackButton: false,
-                onComplete: {
-                    showCameraPrePrompt = false
-                    permissionManager.updatePermissionStatuses()
-                    switch permissionManager.cameraStatus {
-                    case .authorized:
-                        showCamera = true
-                    case .denied, .restricted:
-                        showCameraSettingsAlert = true
-                    default:
-                        break
+        .confirmationDialog("Add Photos", isPresented: $showAddSourceSheet, titleVisibility: .visible) {
+            Button("Choose from Photos") { openGalleryAddIfPermitted() }
+            Button("Take a Photo") { openCameraIfPermitted() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(remainingCapacityText)
+        }
+        .alert("Photo Library Access Is Off", isPresented: $showPhotoSettingsAlert) {
+            Button("Open Settings") { permissionManager.openPhotoSettings() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Photo access is needed to choose images for your Spot.")
+        }
+        .alert("Camera Access Is Off", isPresented: $showCameraSettingsAlert) {
+            Button("Open Settings") { permissionManager.openCameraSettings() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Camera access is needed to take a new photo.")
+        }
+        .alert("Remove this photo from your Spot?", isPresented: $showDeleteConfirmation) {
+            Button("Keep Photo", role: .cancel) {}
+            Button("Remove", role: .destructive) { removeActivePhoto() }
+        }
+        .alert("Replace Photo", isPresented: $showReplaceWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Replace", role: .destructive) { openGalleryReplaceIfPermitted() }
+        } message: {
+            Text("Replacing this photo will remove its current edits.")
+        }
+        .alert("Photo Error", isPresented: errorBinding) {
+            if let retryGalleryMode {
+                Button("Try Again") {
+                    switch retryGalleryMode {
+                    case .add: openGalleryAddIfPermitted()
+                    case .replace: openGalleryReplaceIfPermitted()
                     }
                 }
-            )
-            .environmentObject(permissionManager)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "We couldn’t open your photo library. Please try again.")
         }
         .sheet(isPresented: $showPhotoLibraryPrePrompt) {
             PhotoPermissionView(
                 authDestination: .signup,
                 showsBackButton: false,
-                onComplete: {
-                    finishPhotoLibraryPrePromptAndOpenPickerIfAllowed()
-                }
+                onComplete: finishPhotoPermissionPrompt
             )
             .environmentObject(permissionManager)
         }
-        .alert("Photo Library Access Is Off", isPresented: $showPhotoSettingsAlert) {
-            Button("Open iOS Settings") { permissionManager.openPhotoSettings() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Photo library access is off. You can update access in iOS Settings or continue without adding photos.")
+        .sheet(isPresented: $showCameraPrePrompt) {
+            CameraPermissionView(
+                authDestination: .signup,
+                showsBackButton: false,
+                onComplete: finishCameraPermissionPrompt
+            )
+            .environmentObject(permissionManager)
         }
-        .alert("Camera Access Is Off", isPresented: $showCameraSettingsAlert) {
-            Button("Open iOS Settings") { permissionManager.openCameraSettings() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Camera access is off. You can update access in iOS Settings or choose a photo from your library.")
+        .sheet(isPresented: $showCamera) {
+            SpotPhotoCameraView { result in
+                showCamera = false
+                handleCameraResult(result)
+            }
+            .ignoresSafeArea()
+        }
+        .fullScreenCover(item: $editorPhoto) { photo in
+            SpotPhotoEditorView(photo: photo) { edits in
+                saveEdits(edits, for: photo.id)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let removedPhoto {
+                HStack {
+                    Text("Photo removed")
+                    Spacer()
+                    Button("Undo") { undoRemoval(removedPhoto) }
+                        .fontWeight(.semibold)
+                }
+                .font(.subheadline)
+                .foregroundStyle(Constants.Colors.buttonText)
+                .padding()
+                .background(Constants.Colors.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .onDisappear {
+            undoTask?.cancel()
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Create a Spot")
+                    .font(FontManager.sectionHeader())
+                    .foregroundStyle(Constants.Colors.primary)
+                Text("Start by adding photos of this place.")
+                    .font(FontManager.primaryText())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(action: onOpenDrafts) {
+                VStack(spacing: 2) {
+                    Text("Drafts").font(.caption.weight(.semibold))
+                    Text("\(draftCount)").font(.caption2)
+                }
+                .foregroundStyle(Constants.Colors.primary)
+                .frame(minWidth: 48, minHeight: 44)
+                .padding(.horizontal, 6)
+                .background(.white)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Constants.Colors.primary))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("posting.draftsButton")
+            .accessibilityLabel("Drafts, \(draftCount)")
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 34))
+                    .foregroundStyle(Constants.Colors.primary)
+                Text("Add photos")
+                    .font(FontManager.sectionHeader())
+                    .foregroundStyle(Constants.Colors.primary)
+                Text("Choose up to \(maxPhotoCount) photo\(maxPhotoCount == 1 ? "" : "s"). You can crop, rotate, and reorder them before posting.")
+                    .font(FontManager.primaryText())
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                primaryGalleryButton
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Constants.Colors.primary.opacity(0.15)))
+
+            Text("or")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            secondaryCameraButton(title: "Take a Photo")
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var primaryGalleryButton: some View {
+        Button(action: openGalleryAddIfPermitted) {
+            Label(isOpeningPicker ? "Opening Photos…" : "Choose Photos", systemImage: "photo.stack")
+                .font(FontManager.buttonText())
+                .foregroundStyle(Constants.Colors.buttonText)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(Constants.Colors.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SpotPressedButtonStyle())
+        .disabled(isOpeningPicker || isImporting)
+        .accessibilityIdentifier("posting.choosePhotosButton")
+        .accessibilityHint(remainingCapacityText)
+    }
+
+    private var managementWorkspace: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("\(activePhotoIndex + 1) of \(selectedPhotos.count)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Constants.Colors.primary)
+                Spacer()
+                Button("Edit") { openEditor() }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Constants.Colors.primary)
+                    .frame(minHeight: 44)
+                    .accessibilityLabel("Edit photo \(activePhotoIndex + 1) of \(selectedPhotos.count)")
+                Menu {
+                    photoActionMenu
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Photo actions")
+            }
+            .padding(.horizontal, 24)
+
+            if let activePhoto {
+                ZStack(alignment: .topLeading) {
+                    Color.black.opacity(0.9)
+                    Image(uiImage: activePhoto.image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture { openEditor() }
+                        .accessibilityLabel("Edit photo \(activePhotoIndex + 1) of \(selectedPhotos.count)")
+                        .accessibilityAddTraits(.isButton)
+                    if activePhotoIndex == 0 {
+                        coverBadge.padding(12)
+                    }
+                    if activePhoto.processingState == .processing {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    if activePhoto.processingState == .failed || activePhoto.processingState == .unavailable {
+                        VStack(spacing: 10) {
+                            Text(activePhoto.processingState == .unavailable
+                                ? "This photo is no longer available on this device."
+                                : "We couldn’t prepare this photo.")
+                                .font(.subheadline.weight(.semibold))
+                                .multilineTextAlignment(.center)
+                            HStack {
+                                Button("Replace") { prepareReplacement() }
+                                Button("Remove", role: .destructive) { requestDelete() }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .foregroundStyle(.white)
+                        .padding()
+                        .background(.black.opacity(0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .frame(height: activePreviewHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 24)
+            }
+
+            Text("Hold and drag photos to reorder. The first photo is the cover.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            thumbnailTray
+
+            if selectedPhotos.count < maxPhotoCount {
+                secondaryCameraButton(title: "Take another photo")
+                    .padding(.horizontal, 24)
+            } else if selectedPhotos.count == maxPhotoCount {
+                Text("Maximum of \(maxPhotoCount) photos reached.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Constants.Colors.primary)
+            } else {
+                Text("Remove \(selectedPhotos.count - maxPhotoCount) photo\(selectedPhotos.count - maxPhotoCount == 1 ? "" : "s") to continue.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var thumbnailTray: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 10) {
+                ForEach(Array(selectedPhotos.enumerated()), id: \.element.id) { index, photo in
+                    thumbnail(photo, index: index)
+                }
+                if selectedPhotos.count < maxPhotoCount {
+                    Button {
+                        showAddSourceSheet = true
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: "plus").font(.title3)
+                            Text("Add").font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(Constants.Colors.primary)
+                        .frame(width: 80, height: 80)
+                        .background(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Constants.Colors.primary.opacity(0.4)))
+                    }
+                    .buttonStyle(SpotPressedButtonStyle())
+                    .accessibilityLabel("Add more photos")
+                    .accessibilityHint(remainingCapacityText)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func thumbnail(_ photo: PostComposerPhoto, index: Int) -> some View {
+        Menu {
+            Button("Edit Photo") {
+                activePhotoID = photo.id
+                openEditor()
+            }
+            if index > 0 {
+                Button("Make Cover") { makeCover(photo.id) }
+            }
+            Button("Move Left") { move(photo.id, by: -1) }
+                .disabled(index == 0)
+            Button("Move Right") { move(photo.id, by: 1) }
+                .disabled(index == selectedPhotos.count - 1)
+            Button("Move to Start") { move(photo.id, to: 0) }
+                .disabled(index == 0)
+            Button("Move to End") { move(photo.id, to: selectedPhotos.count - 1) }
+                .disabled(index == selectedPhotos.count - 1)
+            Button("Remove Photo", role: .destructive) {
+                activePhotoID = photo.id
+                requestDelete()
+            }
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                Image(uiImage: photo.image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 80, height: 80)
+                    .clipped()
+                if index == 0 {
+                    Text("Cover")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Constants.Colors.buttonText)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(Constants.Colors.primary)
+                        .clipShape(Capsule())
+                        .padding(4)
+                }
+                if photo.processingState == .processing {
+                    ProgressView().tint(.white).frame(width: 80, height: 80)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(photo.id == activePhotoID ? Constants.Colors.primary : .clear, lineWidth: 3)
+            )
+            .contentShape(Rectangle())
+        } primaryAction: {
+            activePhotoID = photo.id
+        }
+        .accessibilityLabel("Photo \(index + 1) of \(selectedPhotos.count)\(index == 0 ? ", cover photo" : "")")
+        .accessibilityHint("Double tap to select. Actions include editing and reordering.")
+        .draggable(photo.id.uuidString) {
+            Image(uiImage: photo.image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .onAppear {
+                    draggedPhotoID = photo.id
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard let raw = items.first,
+                  let sourceID = UUID(uuidString: raw),
+                  let source = selectedPhotos.firstIndex(where: { $0.id == sourceID }) else { return false }
+            move(sourceID, to: index)
+            draggedPhotoID = nil
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return source != index
+        } isTargeted: { _ in }
+    }
+
+    @ViewBuilder
+    private var photoActionMenu: some View {
+        Button("Edit Photo") { openEditor() }
+        if activePhotoIndex != 0 {
+            Button("Make Cover") { makeActivePhotoCover() }
+        }
+        Button("Replace Photo") { prepareReplacement() }
+        Button("Delete Photo", role: .destructive) { requestDelete() }
+    }
+
+    private var coverBadge: some View {
+        Label("Cover", systemImage: "star.fill")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(Constants.Colors.buttonText)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(Constants.Colors.primary)
+            .clipShape(Capsule())
+    }
+
+    private func secondaryCameraButton(title: String) -> some View {
+        Button(action: openCameraIfPermitted) {
+            Label(title, systemImage: "camera")
+                .font(FontManager.primaryText())
+                .foregroundStyle(Constants.Colors.primary)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(.white)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Constants.Colors.primary))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SpotPressedButtonStyle())
+        .disabled(selectedPhotos.count >= maxPhotoCount || showCamera)
+        .accessibilityLabel(title)
+    }
+}
+
+private extension PhotoSelectionView {
+    var maxPhotoCount: Int {
+        authVM.isPro ? Constants.PostLimits.maxProPostImages : Constants.PostLimits.maxFreePostImages
+    }
+
+    var remainingCapacityText: String {
+        let remaining = max(0, maxPhotoCount - selectedPhotos.count)
+        return remaining == 1 ? "You can add 1 more photo." : "You can add \(remaining) more photos."
+    }
+
+    var galleryPickerMaxSelectionCount: Int {
+        switch galleryPickMode {
+        case .add: max(1, maxPhotoCount - selectedPhotos.count)
+        case .replace: 1
+        }
+    }
+
+    var activePhotoIndex: Int {
+        guard let activePhotoID,
+              let index = selectedPhotos.firstIndex(where: { $0.id == activePhotoID }) else { return 0 }
+        return index
+    }
+
+    var activePhoto: PostComposerPhoto? {
+        guard selectedPhotos.indices.contains(activePhotoIndex) else { return nil }
+        return selectedPhotos[activePhotoIndex]
+    }
+
+    var activePreviewHeight: CGFloat {
+        guard let activePhoto else { return 300 }
+        let ratio = activePhoto.image.size.width / max(activePhoto.image.size.height, 1)
+        return min(390, max(230, (UIScreen.main.bounds.width - 48) / ratio))
+    }
+
+    var errorBinding: Binding<Bool> {
+        Binding(
+            get: { errorMessage != nil },
+            set: {
+                if !$0 {
+                    errorMessage = nil
+                    retryGalleryMode = nil
+                }
+            }
+        )
+    }
+
+    func repairActiveSelection() {
+        guard !selectedPhotos.isEmpty else {
+            activePhotoID = nil
+            return
+        }
+        if activePhotoID == nil || !selectedPhotos.contains(where: { $0.id == activePhotoID }) {
+            activePhotoID = selectedPhotos.first?.id
+        }
+    }
+
+    func beginPickerPresentation(mode: GalleryPickMode) {
+        guard !isOpeningPicker else { return }
+        isOpeningPicker = true
+        galleryPickMode = mode
+        galleryPickerItems = []
+        AnalyticsService.shared.logEvent("spot_photo_picker_opened", parameters: [
+            "mode": mode == .add ? "add" : "replace",
+            "remaining": max(0, maxPhotoCount - selectedPhotos.count)
+        ])
+        showGalleryPicker = true
+    }
+
+    func openGalleryAddIfPermitted() {
+        guard selectedPhotos.count < maxPhotoCount else {
+            errorMessage = "You can add up to \(maxPhotoCount) photos."
+            return
+        }
+        guard !isOpeningPicker, !isImporting else { return }
+        permissionManager.updatePermissionStatuses()
+        switch permissionManager.photoStatus {
+        case .authorized, .limited:
+            beginPickerPresentation(mode: .add)
+        case .notDetermined:
+            galleryPickMode = .add
+            showPhotoLibraryPrePrompt = true
+        case .denied, .restricted:
+            showPhotoSettingsAlert = true
+            AnalyticsService.shared.logEvent("spot_photo_permission_denied", parameters: [:])
+        @unknown default:
+            showPhotoSettingsAlert = true
+        }
+    }
+
+    func openGalleryReplaceIfPermitted() {
+        guard let activePhotoID, !isOpeningPicker, !isImporting else { return }
+        permissionManager.updatePermissionStatuses()
+        switch permissionManager.photoStatus {
+        case .authorized, .limited:
+            beginPickerPresentation(mode: .replace(activePhotoID))
+        case .notDetermined:
+            galleryPickMode = .replace(activePhotoID)
+            showPhotoLibraryPrePrompt = true
+        case .denied, .restricted:
+            showPhotoSettingsAlert = true
+        @unknown default:
+            showPhotoSettingsAlert = true
+        }
+    }
+
+    func finishPhotoPermissionPrompt() {
+        permissionManager.updatePermissionStatuses()
+        showPhotoLibraryPrePrompt = false
+        let status = permissionManager.photoStatus
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            switch status {
+            case .authorized, .limited:
+                beginPickerPresentation(mode: galleryPickMode)
+            case .denied, .restricted:
+                showPhotoSettingsAlert = true
+            default:
+                isOpeningPicker = false
+            }
+        }
+    }
+
+    func importPickerItems(_ items: [PhotosPickerItem], mode: GalleryPickMode) async {
+        isImporting = true
+        importCount = items.count
+        defer {
+            isImporting = false
+            importCount = 0
+            isOpeningPicker = false
+            galleryPickerItems = []
+        }
+
+        var imported: [PostComposerPhoto] = []
+        for item in items {
+            do {
+                if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) &&
+                    !item.supportedContentTypes.contains(where: { $0.conforms(to: .image) }) {
+                    throw PostPhotoImportError.video
+                }
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw PostPhotoImportError.unreadable
+                }
+                imported.append(try PostPhotoProcessor.importImage(data: data, source: .gallery))
+            } catch {
+                SpotLogger.log(PhotoSelectionViewLogs.loadPhotosFailed, details: [
+                    "action": mode == .add ? "add" : "replace",
+                    "permission": String(describing: permissionManager.photoStatus),
+                    "platform": UIDevice.current.systemVersion,
+                    "error": error.localizedDescription
+                ])
+                errorMessage = (error as? LocalizedError)?.errorDescription ??
+                    "We couldn’t open your photo library. Please try again."
+                retryGalleryMode = mode
+            }
+        }
+
+        guard !imported.isEmpty else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            AnalyticsService.shared.logEvent("spot_photo_picker_failed", parameters: ["category": "import"])
+            return
+        }
+        switch mode {
+        case .add:
+            let available = max(0, maxPhotoCount - selectedPhotos.count)
+            let accepted = Array(imported.prefix(available))
+            selectedPhotos.append(contentsOf: accepted)
+            activePhotoID = accepted.first?.id
+            if imported.count > available {
+                errorMessage = "You can add up to \(maxPhotoCount) photos."
+                AnalyticsService.shared.logEvent("spot_photo_max_reached", parameters: [:])
+            }
+            if !authVM.isPro, items.count > 1 {
+                onFreeTierGalleryOverflow?()
+            }
+            AnalyticsService.shared.logEvent("spot_photos_added", parameters: [
+                "count": accepted.count,
+                "source": "gallery"
+            ])
+        case let .replace(photoID):
+            guard let replacement = imported.first,
+                  let index = selectedPhotos.firstIndex(where: { $0.id == photoID }) else { return }
+            selectedPhotos[index] = PostComposerPhoto(
+                id: photoID,
+                image: replacement.image,
+                originalImage: replacement.originalImage,
+                source: .gallery
+            )
+            activePhotoID = photoID
+            AnalyticsService.shared.logEvent("spot_photo_replaced", parameters: [:])
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        SpotLogger.log(PhotoSelectionViewLogs.photosSelectedFromGallery, details: ["count": imported.count])
+    }
+
+    func openCameraIfPermitted() {
+        guard selectedPhotos.count < maxPhotoCount else {
+            errorMessage = "You can add up to \(maxPhotoCount) photos."
+            return
+        }
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            errorMessage = "The camera isn’t available on this device."
+            retryGalleryMode = nil
+            return
+        }
+        permissionManager.updatePermissionStatuses()
+        switch permissionManager.cameraStatus {
+        case .authorized:
+            showCamera = true
+            AnalyticsService.shared.logEvent("spot_camera_opened", parameters: [:])
+        case .notDetermined:
+            showCameraPrePrompt = true
+        case .denied, .restricted:
+            showCameraSettingsAlert = true
+            AnalyticsService.shared.logEvent("spot_photo_permission_denied", parameters: ["type": "camera"])
+        @unknown default:
+            showCameraSettingsAlert = true
+        }
+    }
+
+    func finishCameraPermissionPrompt() {
+        permissionManager.updatePermissionStatuses()
+        showCameraPrePrompt = false
+        let status = permissionManager.cameraStatus
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            if status == .authorized {
+                showCamera = true
+            } else if status == .denied || status == .restricted {
+                showCameraSettingsAlert = true
+            }
+        }
+    }
+
+    func handleCameraResult(_ result: Result<UIImage, Error>?) {
+        guard let result else {
+            AnalyticsService.shared.logEvent("spot_camera_cancelled", parameters: [:])
+            return
+        }
+        do {
+            let photo = try PostPhotoProcessor.importCameraImage(result.get())
+            guard selectedPhotos.count < maxPhotoCount else { return }
+            selectedPhotos.append(photo)
+            activePhotoID = photo.id
+            SpotLogger.log(PhotoSelectionViewLogs.photoCapturedWithCamera)
+            AnalyticsService.shared.logEvent("spot_photo_captured", parameters: [:])
+        } catch {
+            SpotLogger.log(PhotoSelectionViewLogs.capturePhotoFailed, details: ["error": error.localizedDescription])
+            errorMessage = "We couldn’t prepare this photo."
+        }
+    }
+
+    func openEditor() {
+        guard let activePhoto else { return }
+        guard activePhoto.processingState != .unavailable else {
+            errorMessage = "This photo is no longer available on this device."
+            retryGalleryMode = nil
+            return
+        }
+        editorPhoto = activePhoto
+        AnalyticsService.shared.logEvent("spot_photo_edit_opened", parameters: [:])
+    }
+
+    func saveEdits(_ edits: PostComposerPhotoEdits, for photoID: UUID) {
+        guard let index = selectedPhotos.firstIndex(where: { $0.id == photoID }) else { return }
+        let original = selectedPhotos[index].originalImage
+        let revision = UUID()
+        selectedPhotos[index].edits = edits
+        selectedPhotos[index].processingState = .processing
+        selectedPhotos[index].processingError = nil
+        selectedPhotos[index].renderRevision = revision
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try PostPhotoProcessor.render(original: original, edits: edits) }
+            }.value
+            guard let currentIndex = selectedPhotos.firstIndex(where: { $0.id == photoID }),
+                  selectedPhotos[currentIndex].renderRevision == revision else { return }
+            switch result {
+            case let .success(image):
+                selectedPhotos[currentIndex].image = image
+                selectedPhotos[currentIndex].processingState = .ready
+            case let .failure(error):
+                selectedPhotos[currentIndex].processingState = .failed
+                selectedPhotos[currentIndex].processingError = error.localizedDescription
+                errorMessage = "We couldn’t prepare this photo."
+                AnalyticsService.shared.logEvent("spot_photo_processing_failed", parameters: [:])
+            }
+        }
+    }
+
+    func prepareReplacement() {
+        guard let activePhoto else { return }
+        if activePhoto.edits.isNeutral {
+            openGalleryReplaceIfPermitted()
+        } else {
+            showReplaceWarning = true
+        }
+    }
+
+    func requestDelete() {
+        if selectedPhotos.count == 1 {
+            showDeleteConfirmation = true
+        } else {
+            removeActivePhoto()
+        }
+    }
+
+    func removeActivePhoto() {
+        guard selectedPhotos.indices.contains(activePhotoIndex) else { return }
+        let index = activePhotoIndex
+        let photo = selectedPhotos.remove(at: index)
+        activePhotoID = selectedPhotos.isEmpty ? nil : selectedPhotos[min(index, selectedPhotos.count - 1)].id
+        removedPhoto = RemovedPhoto(photo: photo, index: index)
+        AnalyticsService.shared.logEvent("spot_photo_removed", parameters: ["wasCover": index == 0])
+        undoTask?.cancel()
+        undoTask = Task {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : .easeOut) { removedPhoto = nil }
+        }
+    }
+
+    func undoRemoval(_ removal: RemovedPhoto) {
+        undoTask?.cancel()
+        let index = min(removal.index, selectedPhotos.count)
+        selectedPhotos.insert(removal.photo, at: index)
+        activePhotoID = removal.photo.id
+        removedPhoto = nil
+    }
+
+    func makeActivePhotoCover() {
+        guard let activePhotoID else { return }
+        makeCover(activePhotoID)
+    }
+
+    func makeCover(_ id: UUID) {
+        selectedPhotos = PostComposerPhotoOperations.makingCover(selectedPhotos, id: id)
+        activePhotoID = id
+        AnalyticsService.shared.logEvent("spot_photo_made_cover", parameters: [:])
+    }
+
+    func move(_ id: UUID, by offset: Int) {
+        guard let source = selectedPhotos.firstIndex(where: { $0.id == id }) else { return }
+        move(id, to: min(max(0, source + offset), selectedPhotos.count - 1))
+    }
+
+    func move(_ id: UUID, to destination: Int) {
+        guard let source = selectedPhotos.firstIndex(where: { $0.id == id }) else { return }
+        selectedPhotos = PostComposerPhotoOperations.reordered(selectedPhotos, from: source, to: destination)
+        activePhotoID = id
+        AnalyticsService.shared.logEvent("spot_photo_reordered", parameters: [
+            "from": source,
+            "to": destination
+        ])
+    }
+}
+
+private struct SpotPressedButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+struct SpotPhotoCameraView: UIViewControllerRepresentable {
+    let onComplete: (Result<UIImage, Error>?) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onComplete: onComplete) }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .camera
+        picker.mediaTypes = [UTType.image.identifier]
+        picker.cameraCaptureMode = .photo
+        picker.allowsEditing = false
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onComplete: (Result<UIImage, Error>?) -> Void
+
+        init(onComplete: @escaping (Result<UIImage, Error>?) -> Void) {
+            self.onComplete = onComplete
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            guard (info[.mediaType] as? String).map({ UTType($0)?.conforms(to: .image) == true }) ?? true,
+                  let image = info[.originalImage] as? UIImage else {
+                onComplete(.failure(PostPhotoImportError.video))
+                return
+            }
+            onComplete(.success(image))
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            SpotLogger.log(PhotoSelectionViewLogs.cameraCancelled)
+            onComplete(nil)
         }
     }
 }
@@ -366,225 +927,15 @@ private struct PhotoSelectionPreviewHost: View {
     }
 
     var body: some View {
-        PhotoSelectionView(selectedPhotos: $photos, draftCount: 2, onOpenDrafts: {}, onFreeTierGalleryOverflow: nil)
-            .environmentObject(authVM)
-            .environmentObject(PermissionManager.shared)
-    }
-}
-
-private extension PhotoSelectionView {
-    var galleryPickerMaxSelectionCount: Int {
-        switch galleryPickMode {
-        case .add:
-            return max(1, maxPhotoCount - selectedPhotos.count)
-        case .replace:
-            return 1
-        }
-    }
-
-    /// **Choose from Gallery** — show `PhotoPermissionView` when status is
-    /// still `.notDetermined`, then the system picker.
-    func openGalleryAddIfPermitted() {
-        guard selectedPhotos.count < maxPhotoCount else { return }
-        permissionManager.updatePermissionStatuses()
-        if photoSelectionDisabled {
-            showPhotoSettingsAlert = true
-            return
-        }
-        switch permissionManager.photoStatus {
-        case .authorized, .limited:
-            galleryPickMode = .add
-            showGalleryPicker = true
-        case .notDetermined:
-            galleryPickMode = .add
-            showPhotoLibraryPrePrompt = true
-        case .denied, .restricted:
-            showPhotoSettingsAlert = true
-        @unknown default:
-            showPhotoSettingsAlert = true
-        }
-    }
-
-    /// **Replace** — same contextual gate as add.
-    func openGalleryReplaceIfPermitted() {
-        guard !selectedPhotos.isEmpty else { return }
-        permissionManager.updatePermissionStatuses()
-        if photoSelectionDisabled {
-            showPhotoSettingsAlert = true
-            return
-        }
-        switch permissionManager.photoStatus {
-        case .authorized, .limited:
-            galleryPickMode = .replace
-            showGalleryPicker = true
-        case .notDetermined:
-            galleryPickMode = .replace
-            showPhotoLibraryPrePrompt = true
-        case .denied, .restricted:
-            showPhotoSettingsAlert = true
-        @unknown default:
-            showPhotoSettingsAlert = true
-        }
-    }
-
-    func finishPhotoLibraryPrePromptAndOpenPickerIfAllowed() {
-        showPhotoLibraryPrePrompt = false
-        permissionManager.updatePermissionStatuses()
-        switch permissionManager.photoStatus {
-        case .authorized, .limited:
-            showGalleryPicker = true
-        case .denied, .restricted:
-            showPhotoSettingsAlert = true
-        default:
-            break
-        }
-    }
-
-    /// Stable-height carousel matching feed clamps; cover = first photo.
-    func postingPreviewCarouselHeight(width: CGFloat) -> CGFloat {
-        guard let cover = selectedPhotos.first else {
-            return SpotMediaAspectRatio.mediaHeight(
-                containerWidth: width,
-                displayRatio: SpotMediaAspectRatio.fallbackRatio,
-                minHeight: SpotMediaPresentationContext.postingPreview.minMediaHeight,
-                maxHeight: SpotMediaPresentationContext.postingPreview.maxMediaHeight
+        ScrollView {
+            PhotoSelectionView(
+                selectedPhotos: $photos,
+                draftCount: 2,
+                onOpenDrafts: {}
             )
         }
-        let pxW = Int(cover.image.size.width * cover.image.scale)
-        let pxH = Int(cover.image.size.height * cover.image.scale)
-        let ratio = SpotMediaAspectRatio.display(width: pxW, height: pxH)
-        return SpotMediaAspectRatio.mediaHeight(
-            containerWidth: width,
-            displayRatio: ratio,
-            minHeight: SpotMediaPresentationContext.postingPreview.minMediaHeight,
-            maxHeight: SpotMediaPresentationContext.postingPreview.maxMediaHeight
-        )
-    }
-
-    var maxPhotoCount: Int { authVM.isPro ? 5 : 1 }
-
-    var photoSelectionDisabled: Bool {
-        permissionManager.photoStatus == .denied || permissionManager.photoStatus == .restricted
-    }
-
-    func moveImage(from: Int, to: Int) {
-        guard from != to, from >= 0, to >= 0, from < selectedPhotos.count, to < selectedPhotos.count else { return }
-        let slot = selectedPhotos.remove(at: from)
-        selectedPhotos.insert(slot, at: to)
-        if selectedPhotoIndex == from {
-            selectedPhotoIndex = to
-        } else if from < selectedPhotoIndex && to >= selectedPhotoIndex {
-            selectedPhotoIndex -= 1
-        } else if from > selectedPhotoIndex && to <= selectedPhotoIndex {
-            selectedPhotoIndex += 1
-        }
-    }
-
-    func deleteSelectedImage() {
-        guard selectedPhotoIndex >= 0, selectedPhotoIndex < selectedPhotos.count else { return }
-        selectedPhotos.remove(at: selectedPhotoIndex)
-        selectedPhotoIndex = max(0, min(selectedPhotoIndex, selectedPhotos.count - 1))
-    }
-
-    /// User tapped Take a Photo. On the first tap (when camera authorization
-    /// is `.notDetermined`) we present the contextual `CameraPermissionView`
-    /// pre-prompt — the native iOS dialog only fires after the user taps
-    /// Continue inside that screen. This matches Apple App Review's request
-    /// for a contextual, in-app explanation before the system prompt is
-    /// shown, and leaves the rest of the composer fully usable if the user
-    /// dismisses the pre-prompt without making a decision.
-    func openCameraIfPermitted() {
-        permissionManager.updatePermissionStatuses()
-        switch permissionManager.cameraStatus {
-        case .authorized:
-            showCamera = true
-        case .notDetermined:
-            showCameraPrePrompt = true
-        case .denied, .restricted:
-            showCameraSettingsAlert = true
-        @unknown default:
-            showCameraSettingsAlert = true
-        }
-    }
-}
-
-private func downsampledPostImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
-    let sourceOptions: CFDictionary = [kCGImageSourceShouldCache: false] as CFDictionary
-    guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
-    let options: CFDictionary = [
-        kCGImageSourceCreateThumbnailFromImageAlways: true,
-        kCGImageSourceCreateThumbnailWithTransform: true,
-        kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-    ] as CFDictionary
-    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else { return nil }
-    return UIImage(cgImage: cgImage)
-}
-
-private func resizedPostImage(_ image: UIImage, maxPixelSize: CGFloat) -> UIImage? {
-    let width = image.size.width
-    let height = image.size.height
-    let longestEdge = max(width, height)
-    guard longestEdge > maxPixelSize else { return image }
-    let ratio = maxPixelSize / longestEdge
-    let target = CGSize(width: floor(width * ratio), height: floor(height * ratio))
-    let format = UIGraphicsImageRendererFormat.default()
-    format.scale = 1
-    format.opaque = true
-    let renderer = UIGraphicsImageRenderer(size: target, format: format)
-    return renderer.image { _ in
-        image.draw(in: CGRect(origin: .zero, size: target))
-    }
-}
-
-// MARK: - Camera View
-struct CameraView: UIViewControllerRepresentable {
-    @Binding var selectedPhotos: [PostComposerPhoto]
-    let maxCount: Int
-    @Environment(\.dismiss) var dismiss
-
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .camera
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: CameraView
-
-        init(_ parent: CameraView) {
-            self.parent = parent
-        }
-
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                SpotLogger.log(PhotoSelectionViewLogs.photoCapturedWithCamera)
-                let normalized = resizedPostImage(image, maxPixelSize: postImageMaxPixelSize) ?? image
-                let photo = PostComposerPhoto(image: normalized)
-                var imgs = parent.selectedPhotos
-                if parent.maxCount <= 1 {
-                    imgs = [photo]
-                } else if imgs.count < parent.maxCount {
-                    imgs.append(photo)
-                } else {
-                    imgs[parent.maxCount - 1] = photo
-                }
-                parent.selectedPhotos = imgs
-            } else {
-                SpotLogger.log(PhotoSelectionViewLogs.capturePhotoFailed)
-            }
-            parent.dismiss()
-        }
-
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            SpotLogger.log(PhotoSelectionViewLogs.cameraCancelled)
-            parent.dismiss()
-        }
+        .background(Constants.Colors.background)
+        .environmentObject(authVM)
+        .environmentObject(PermissionManager.shared)
     }
 }
