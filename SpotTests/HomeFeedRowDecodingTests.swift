@@ -41,6 +41,7 @@ struct HomeFeedRowDecodingTests {
           "vibe_name": "Chill",
           "primary_storage_path": "users/abc/spot.jpg",
           "primary_public_url": null,
+          "primary_storage_bucket": "approved_spot_images",
           "source_bucket": "personalized_unseen",
           "rank_position": 5,
           "ranking_score": 0.42,
@@ -64,6 +65,7 @@ struct HomeFeedRowDecodingTests {
         #expect(row.vibeName == "Chill")
         #expect(row.primaryStoragePath == "users/abc/spot.jpg")
         #expect(row.primaryPublicUrl == nil)
+        #expect(row.primaryStorageBucket == "approved_spot_images")
         #expect(row.sourceBucket == "personalized_unseen")
         #expect(row.rankPosition == 5)
         #expect(row.rankingScore == 0.42)
@@ -87,6 +89,7 @@ struct HomeFeedRowDecodingTests {
         #expect(row.likesCount == nil)
         #expect(row.savesCount == nil)
         #expect(row.lastSeenAt == nil)
+        #expect(row.primaryStorageBucket == nil)
         #expect(row.sourceBucket == "following_new")
     }
 
@@ -165,6 +168,7 @@ struct HomeFeedRowDecodingTests {
           "vibe_name": null,
           "primary_storage_path": "spots/x.jpg",
           "primary_public_url": null,
+          "primary_storage_bucket": "spots",
           "distance_meters": 1234.5
         }
         """#
@@ -172,7 +176,15 @@ struct HomeFeedRowDecodingTests {
         #expect(row.locationName == "NYC")
         #expect(row.distanceMeters == 1234.5)
         #expect(row.primaryStoragePath == "spots/x.jpg")
+        #expect(row.primaryStorageBucket == "spots")
         #expect(row.vibeTagId == nil)
         #expect(row.vibeName == nil)
+    }
+
+    @Test func resolvedPrimaryStorageBucketFallsBackToLegacySpots() {
+        #expect(FeedAPI.resolvedPrimaryStorageBucket(nil) == "spots")
+        #expect(FeedAPI.resolvedPrimaryStorageBucket("") == "spots")
+        #expect(FeedAPI.resolvedPrimaryStorageBucket("  ") == "spots")
+        #expect(FeedAPI.resolvedPrimaryStorageBucket("approved_spot_images") == "approved_spot_images")
     }
 }

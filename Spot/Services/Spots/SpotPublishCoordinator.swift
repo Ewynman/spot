@@ -19,6 +19,8 @@ struct SpotPublishDraft: Equatable {
     let longitude: Double
     let placeName: String
     let userId: String
+    let username: String?
+    let userProfileImageURL: String?
     let sourceDraftID: String?
 }
 
@@ -84,8 +86,8 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
             let postedSpot = Spot(
                 id: spotIdString,
                 userId: draft.userId,
-                username: nil,
-                userProfileImageURL: nil,
+                username: draft.username,
+                userProfileImageURL: draft.userProfileImageURL,
                 imageURL: signedFirstImage,
                 thumbnailURL: signedFirstImage,
                 vibeTag: draft.vibeTags.first,
