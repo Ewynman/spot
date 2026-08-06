@@ -72,12 +72,31 @@ struct SpotPhotoEditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 VStack(spacing: 14) {
-                    Picker("Editing tool", selection: $selectedTool) {
+                    HStack(spacing: 8) {
                         ForEach(Tool.allCases) { tool in
-                            Label(tool.rawValue, systemImage: icon(for: tool)).tag(tool)
+                            Button {
+                                selectedTool = tool
+                            } label: {
+                                Label(tool.rawValue, systemImage: icon(for: tool))
+                                    .font(FontManager.primaryText())
+                                    .foregroundColor(
+                                        selectedTool == tool
+                                            ? Constants.Colors.buttonText
+                                            : Constants.Colors.primary
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        selectedTool == tool
+                                            ? Constants.Colors.primary
+                                            : Constants.Colors.accent
+                                    )
+                                    .cornerRadius(12)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .accessibilityElement(children: .contain)
 
                     toolControls
                         .frame(minHeight: 132, alignment: .top)
@@ -91,6 +110,7 @@ struct SpotPhotoEditorView: View {
                         AnalyticsService.shared.logEvent("spot_photo_edit_cancelled", parameters: [:])
                         dismiss()
                     }
+                    .buttonStyle(.plain)
                 }
                 ToolbarItem(placement: .principal) {
                     Text("Edit Photo")
@@ -113,6 +133,7 @@ struct SpotPhotoEditorView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .buttonStyle(.plain)
                 }
             }
             .tint(Constants.Colors.primary)
@@ -130,6 +151,7 @@ struct SpotPhotoEditorView: View {
                 .frame(minHeight: 44)
                 .accessibilityLabel("Reset photo edits")
                 .padding(.bottom, 4)
+                .buttonStyle(.plain)
             }
             .alert("Reset all edits to this photo?", isPresented: $showResetConfirmation) {
                 Button("Keep Editing", role: .cancel) {}
@@ -149,12 +171,26 @@ struct SpotPhotoEditorView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(cropOptions) { option in
-                        Button(option.title) {
+                        Button {
                             applyCrop(option)
+                        } label: {
+                            Text(option.title)
+                                .font(FontManager.primaryText())
+                                .foregroundColor(
+                                    edits.crop.aspectRatio == option.title
+                                        ? Constants.Colors.buttonText
+                                        : Constants.Colors.primary
+                                )
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 44)
+                                .background(
+                                    edits.crop.aspectRatio == option.title
+                                        ? Constants.Colors.primary
+                                        : Constants.Colors.accent
+                                )
+                                .cornerRadius(12)
                         }
-                        .buttonStyle(.bordered)
-                        .tint(edits.crop.aspectRatio == option.title ? Constants.Colors.primary : .gray)
-                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
                     }
                 }
             }

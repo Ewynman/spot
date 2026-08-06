@@ -142,11 +142,20 @@ enum ProfileService {
         var hasRequested = false
         var canView = true
         if let currentUserId, currentUserId != id, let viewerUUID = UUID(uuidString: currentUserId) {
-            do {
-                isFollowing = try await ProfileSupabaseSchema.hasFollowEdge(
+            let followTask = Task {
+                try await ProfileSupabaseSchema.hasFollowEdge(
                     followerId: viewerUUID,
                     followeeId: targetUUID
                 )
+            }
+            let requestTask = Task {
+                try await ProfileSupabaseSchema.hasPendingFollowRequest(
+                    requesterId: viewerUUID,
+                    targetUserId: targetUUID
+                )
+            }
+            do {
+                isFollowing = try await followTask.value
             } catch {
                 SpotLogger.log(ProfileServiceLogs.followStateQueryFailed, details: [
                     "error": error.localizedDescription
@@ -154,10 +163,7 @@ enum ProfileService {
                 isFollowing = false
             }
             do {
-                hasRequested = try await ProfileSupabaseSchema.hasPendingFollowRequest(
-                    requesterId: viewerUUID,
-                    targetUserId: targetUUID
-                )
+                hasRequested = try await requestTask.value
             } catch {
                 SpotLogger.log(ProfileServiceLogs.pendingFollowRequestQueryFailed, details: [
                     "error": error.localizedDescription

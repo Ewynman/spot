@@ -172,10 +172,6 @@ struct SpotCard: View {
                 SpotLogger.log(SpotCardLogs.ownerGateMissingInputs, details: ["source": source, "spotId": currentSpot.safeId])
             }
         }
-        .alert("Delete this spot? This can't be undone.", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) { onDelete?() }
-            Button("Cancel", role: .cancel) {}
-        }
         .overlay(
             // Custom dropdown menu overlay
             Group {
@@ -184,6 +180,13 @@ struct SpotCard: View {
                 }
             }
         )
+        .overlay {
+            if showDeleteConfirm {
+                deleteConfirmationOverlay
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: showDeleteConfirm)
         .onPreferenceChange(MenuButtonFrameKey.self) { frame in
             menuButtonFrame = frame
         }
@@ -633,6 +636,69 @@ struct SpotCard: View {
         )
     }
 
+    private var deleteConfirmationOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.28)
+                .contentShape(Rectangle())
+                .onTapGesture { showDeleteConfirm = false }
+
+            VStack(spacing: 16) {
+                Text("Delete this Spot?")
+                    .font(FontManager.sectionHeader())
+                    .foregroundColor(Constants.Colors.primary)
+
+                Text("This can’t be undone.")
+                    .font(FontManager.primaryText())
+                    .foregroundColor(.gray)
+
+                HStack(spacing: 12) {
+                    Button {
+                        showDeleteConfirm = false
+                    } label: {
+                        Text("Cancel")
+                            .font(FontManager.buttonText())
+                            .foregroundColor(Constants.Colors.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Constants.Colors.background)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Constants.Colors.primary, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("spot.deleteCancel")
+
+                    Button {
+                        showDeleteConfirm = false
+                        onDelete?()
+                    } label: {
+                        Text("Delete")
+                            .font(FontManager.buttonText())
+                            .foregroundColor(Constants.Colors.buttonText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Constants.Colors.primary)
+                            .cornerRadius(14)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("spot.deleteConfirm")
+                }
+            }
+            .padding(20)
+            .background(Constants.Colors.background)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Constants.Colors.primary.opacity(0.18), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+            .padding(.horizontal, 20)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("spot.deleteConfirmation")
+    }
+
     // MARK: - Custom Menu
     private var customMenuOverlay: some View {
         GeometryReader { _ in
@@ -883,6 +949,7 @@ struct SpotCard: View {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Done") { onDone() }
                             .foregroundColor(Constants.Colors.primary)
+                            .buttonStyle(.plain)
                     }
                 }
                 .onAppear { Task { await load() } }

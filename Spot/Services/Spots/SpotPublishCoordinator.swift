@@ -79,7 +79,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
             let spotId = try await publishSpotWithTimeout(draft: draft)
             let spotIdString = spotId.uuidString
             let postedAt = Date()
-            let signedFirstImage = try? await SpotSupabaseRepository.signFirstImageURLForSpot(spotId: spotId)
+            let signedFirstImage = await signedFirstImageURLWithRetry(for: spotId)
 
             let postedSpot = Spot(
                 id: spotIdString,
@@ -144,6 +144,22 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
         }
 
         bannerPhase = .hidden
+    }
+
+    /// Media rows can become readable a moment after the publish RPC returns.
+    /// Keep the optimistic feed insertion useful instead of emitting a Spot with
+    /// no image and replacing the card with an empty placeholder.
+    private func signedFirstImageURLWithRetry(for spotId: UUID) async -> String? {
+        for attempt in 0..<3 {
+            if let url = try? await SpotSupabaseRepository.signFirstImageURLForSpot(spotId: spotId),
+               !url.isEmpty {
+                return url
+            }
+            if attempt < 2 {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+            }
+        }
+        return nil
     }
 
     var bannerTitle: String {
