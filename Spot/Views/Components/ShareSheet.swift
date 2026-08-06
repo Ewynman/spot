@@ -31,6 +31,9 @@ struct ShareSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
+                        .font(FontManager.primaryText())
+                        .foregroundColor(Constants.Colors.primary)
+                        .buttonStyle(.plain)
                 }
             }
         }

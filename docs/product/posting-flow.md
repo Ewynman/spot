@@ -28,7 +28,7 @@ Free accounts can publish one photo and one vibe tag. Pro accounts can publish u
 
 ### Location
 
-User searches by place, venue, or address, or chooses from nearby MapKit points of interest in `LocationSelectionView`. Nearby results use the latest shared Core Location fix, are ordered by distance, and start within 3 km. The user can expand the nearby search to 8 km, then confirm or adjust the pin before continuing.
+User searches by place, venue, or address, or chooses from nearby MapKit points of interest in `LocationSelectionView`. Nearby results use the latest shared Core Location fix, are ordered by distance, and start within 3 km. The user can expand the nearby search to 8 km, then confirm or adjust the pin before continuing. The selected venue name remains authoritative while the confirmation map settles; reverse geocoding may rename the location only after the pin moves a meaningful distance.
 
 ### Vibe tags and caption
 

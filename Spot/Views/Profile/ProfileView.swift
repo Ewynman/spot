@@ -54,8 +54,6 @@ struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
     @State private var selectedTab = "Spots"
     @State private var selectedSpot: Spot?
-    @State private var pendingDeleteSpot: Spot?
-    @State private var showDeleteConfirm: Bool = false
     @State private var showMenu: Bool = false
     @State private var showSettingsNav: Bool = false
     @State private var showLikesNav: Bool = false
@@ -72,6 +70,27 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let tabs = ["Spots", "Map"]
+
+    @MainActor
+    init(
+        userId: String?,
+        fromNavigationPush: Bool = false
+    ) {
+        self.userId = userId
+        self.fromNavigationPush = fromNavigationPush
+        _viewModel = StateObject(wrappedValue: ProfileViewModel())
+    }
+
+    @MainActor
+    init(
+        userId: String?,
+        fromNavigationPush: Bool = false,
+        viewModel: ProfileViewModel
+    ) {
+        self.userId = userId
+        self.fromNavigationPush = fromNavigationPush
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     private var isOwnProfile: Bool {
         userId == nil || userId == authVM.userId
@@ -320,7 +339,9 @@ struct ProfileView: View {
                         }
 
                         // Follow / Request actions centered under header when viewing someone else
-                        if let viewedUserId = userId, viewedUserId != authVM.userId {
+                        if selectedSpot == nil,
+                           let viewedUserId = userId,
+                           viewedUserId != authVM.userId {
                             VStack {
                                 if viewModel.isFollowingUser {
                                     Button {
@@ -383,25 +404,24 @@ struct ProfileView: View {
                             .padding(.bottom, 8)
                         }
 
-                        // Tabs (simple text) - always visible
-                        HStack(spacing: 24) {
-                            ForEach(tabs, id: \.self) { tab in
-                                Text(tab)
-                                    .font(FontManager.primaryText())
-                                    .foregroundColor(selectedTab == tab ? Constants.Colors.primary : .gray)
-                                    .fontWeight(.semibold)
-                                    .onTapGesture { 
-                                        withAnimation(.easeInOut(duration: 0.2)) { 
+                        if selectedSpot == nil {
+                            HStack(spacing: 24) {
+                                ForEach(tabs, id: \.self) { tab in
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
                                             selectedTab = tab
-                                            // Clear selected spot when switching tabs
-                                            if selectedSpot != nil {
-                                                selectedSpot = nil
-                                            }
-                                        } 
+                                        }
+                                    } label: {
+                                        Text(tab)
+                                            .font(FontManager.primaryText())
+                                            .foregroundColor(selectedTab == tab ? Constants.Colors.primary : .gray)
+                                            .fontWeight(.semibold)
                                     }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("profile.\(tab.lowercased())Tab")
+                                }
                             }
                         }
-                        .padding(.top, selectedSpot != nil && selectedTab == "Map" ? 8 : 0)
 
                         if selectedTab == "Spots" {
                             if let selectedSpot {
@@ -409,7 +429,7 @@ struct ProfileView: View {
                                     spot: selectedSpot,
                                     showUserInfo: false,
                                     userId: userId,
-                                    onDelete: { pendingDeleteSpot = selectedSpot; showDeleteConfirm = true },
+                                    onDelete: { deleteSpot(selectedSpot) },
                                     source: "ProfileInline"
                                     // backAction removed - now handled by ProfileView top bar
                                 )
@@ -432,8 +452,7 @@ struct ProfileView: View {
                             ProfileMapView(spots: viewModel.spots, onSpotTap: { tapped in
                                 selectedSpot = tapped
                             }, onDeleteSpot: { spot in
-                                pendingDeleteSpot = spot
-                                showDeleteConfirm = true
+                                deleteSpot(spot)
                             }, onCollapseChange: { expanded in
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { isMapExpanded = expanded }
                             })
@@ -694,19 +713,6 @@ struct ProfileView: View {
             FeedProfileView()
                 .environmentObject(authVM)
         }
-        .alert("Delete this spot? This can't be undone.", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                if let spot = pendingDeleteSpot {
-                    Task {
-                        await viewModel.deleteSpot(spot)
-                        selectedSpot = nil
-                        isMapExpanded = false
-                    }
-                }
-                pendingDeleteSpot = nil
-            }
-            Button("Cancel", role: .cancel) { pendingDeleteSpot = nil }
-        }
         .onChange(of: viewModel.spots) { _, spots in
             guard let selectedSpot else { return }
             if !spots.contains(where: { $0.id == selectedSpot.id }) {
@@ -723,6 +729,14 @@ struct ProfileView: View {
             guard !fromNavigationPush else { return }
             guard (output.userInfo?[SpotMainTabNotification.userInfoTabIndexKey] as? Int) == 4 else { return }
             resetProfileTabToRoot()
+        }
+    }
+
+    private func deleteSpot(_ spot: Spot) {
+        Task {
+            await viewModel.deleteSpot(spot)
+            selectedSpot = nil
+            isMapExpanded = false
         }
     }
 

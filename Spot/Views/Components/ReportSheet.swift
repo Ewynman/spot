@@ -135,6 +135,7 @@ struct ReportSheet: View {
                         .font(FontManager.primaryText())
                         .foregroundColor(Constants.Colors.primary)
                         .disabled(isSubmitting)
+                        .buttonStyle(.plain)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

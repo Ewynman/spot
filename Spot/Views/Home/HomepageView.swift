@@ -7,7 +7,6 @@ struct HomepageView: View {
     @State private var showVerifyToast = false
     @State private var showPostSuccessToast = false
     @State private var postSuccessToastTask: Task<Void, Never>?
-    @State private var postSuccessRefreshTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack(path: $homeNavigationPath) {
@@ -22,6 +21,7 @@ struct HomepageView: View {
                 // Feed content only
                 FeedContentView(
                     isLoading: $feedVM.isLoading,
+                    isLoadingMore: feedVM.loadState == .loadingMore,
                     spots: feedVM.spots,
                     mapSpots: feedVM.mapSpots,
                     selectedTab: "Feed",
@@ -87,7 +87,6 @@ struct HomepageView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .spotDidPostSuccess)) { notification in
             postSuccessToastTask?.cancel()
-            postSuccessRefreshTask?.cancel()
             showPostSuccessToast = true
             if let postedSpot = notification.userInfo?["postedSpot"] as? Spot {
                 feedVM.insertNewSpot(postedSpot)
@@ -100,27 +99,9 @@ struct HomepageView: View {
                     }
                 }
             }
-            postSuccessRefreshTask = Task {
-                await refreshFeedForRecentPost()
-            }
         }
         .onDisappear {
             postSuccessToastTask?.cancel()
-            postSuccessRefreshTask?.cancel()
-        }
-    }
-
-    private func refreshFeedForRecentPost() async {
-        // Backend writes can be slightly delayed; do a short retry burst so the new post
-        // reliably appears near the top when returning from Post flow.
-        for attempt in 0..<3 {
-            await feedVM.refreshFeed()
-            if feedVM.spots.first?.userId == authVM.userId {
-                break
-            }
-            if attempt < 2 {
-                try? await Task.sleep(nanoseconds: 700_000_000)
-            }
         }
     }
 }

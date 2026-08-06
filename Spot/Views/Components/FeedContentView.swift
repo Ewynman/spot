@@ -10,6 +10,7 @@ import SwiftUI
 
 struct FeedContentView: View {
     @Binding var isLoading: Bool
+    let isLoadingMore: Bool
     let spots: [Spot]
     let mapSpots: [Spot]
     let selectedTab: String
@@ -143,8 +144,10 @@ struct FeedContentView: View {
                             onCellDisappear?(spot)
                         }
                     }
-                    if isLoading {
-                        ProgressView().padding()
+                    if isLoadingMore {
+                        ProgressView()
+                            .tint(Constants.Colors.primary)
+                            .padding()
                     }
                 }
             }

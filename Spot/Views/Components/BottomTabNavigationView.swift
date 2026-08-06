@@ -63,6 +63,7 @@ struct BottomTabNavigationView: View {
     @EnvironmentObject var permissionManager: PermissionManager
     @ObservedObject private var spotPublishCoordinator = SpotPublishCoordinator.shared
     @StateObject private var firstRunOnboarding = SpotFirstRunOnboardingManager()
+    @StateObject private var profileViewModel = ProfileViewModel()
     @State private var selectedTab: Int = 0
     @State private var coachFrames: [CoachTarget: CGRect] = [:]
     /// Pre-permission sheet for the first-run map tour step (`.userLocation`).
@@ -87,7 +88,11 @@ struct BottomTabNavigationView: View {
                         SearchView()
                             .environmentObject(authVM)
                     case 4:
-                        ProfileView(userId: nil, fromNavigationPush: false)
+                        ProfileView(
+                            userId: nil,
+                            fromNavigationPush: false,
+                            viewModel: profileViewModel
+                        )
                             .environmentObject(authVM)
                     default:
                         HomepageView()

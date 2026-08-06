@@ -18,6 +18,8 @@ Primary implementation: `Spot/Services/Feed/FeedRepository.swift` using Supabase
 
 The **home feed** is the default discovery surface after launch: a ranked, paginated list of Spots tailored to the viewer.
 
+After publishing, the completed Spot is inserted at the top of the current in-memory feed. The app does not immediately replace the entire feed with a new ranked page; a later user refresh remains authoritative.
+
 ### Ranking behavior
 
 - **Server-side candidate set and ranking** via `get_home_feed_v1` (authoritative for production feed).
@@ -50,7 +52,7 @@ The page size is 24. Pagination is not offset-based: each load-more request asks
 
 ### Empty / error / loading
 
-`FeedLoadState` distinguishes idle, loading initial/more, loaded, empty (with reason), and error while retaining prior items when possible.
+`FeedLoadState` distinguishes idle, loading initial/more, loaded, empty (with reason), and error while retaining prior items when possible. The pagination indicator is shown only during load-more so background or pull-to-refresh work does not shift the bottom of a visible list.
 
 ## Related docs
 

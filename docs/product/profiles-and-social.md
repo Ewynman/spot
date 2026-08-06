@@ -20,6 +20,8 @@ A **profile** shows a user’s identity, Spots, collections/bookmarks as impleme
 
 When a profile has no visible Spots, the Spots area explains the empty state. On the current user's own profile, it also offers a **Post a Spot** action that opens the Post tab. Other users' empty profiles do not show that action, and private profiles explain that following is required to view their Spots.
 
+Opening a Spot from the profile replaces the profile grid/map controls with the Spot detail card until the user returns. The main profile view model is retained across bottom-tab switches so revisiting the profile reuses loaded data, while explicit profile mutations can still force a refresh. Spot deletion uses one branded in-card confirmation.
+
 ### Public vs private
 
 Some profiles or content may be **private** to non-followers or pending requests. Visibility is enforced with **Supabase RLS**; the client reflects “unavailable” or limited UI when appropriate.

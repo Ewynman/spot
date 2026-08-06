@@ -67,3 +67,52 @@ struct LocationSearchPolicyTests {
         return item
     }
 }
+
+struct LocationSelectionPolicyTests {
+    @Test func initialCameraSettleDoesNotCountAsUserMovement() {
+        let initial = CLLocationCoordinate2D(latitude: 28.410, longitude: -80.608)
+        let nearby = CLLocationCoordinate2D(latitude: 28.41001, longitude: -80.60801)
+
+        #expect(LocationSelectionPolicy.hasMeaningfullyMoved(from: initial, to: nearby) == false)
+    }
+
+    @Test func meaningfulPinMovementIsDetected() {
+        let initial = CLLocationCoordinate2D(latitude: 28.410, longitude: -80.608)
+        let moved = CLLocationCoordinate2D(latitude: 28.411, longitude: -80.608)
+
+        #expect(LocationSelectionPolicy.hasMeaningfullyMoved(from: initial, to: moved))
+    }
+
+    @Test func selectedPointOfInterestNameSurvivesInitialReverseGeocode() {
+        let name = LocationSelectionPolicy.resolvedPlaceName(
+            originalName: "MSC Seashore",
+            reverseGeocodedName: "Port Canaveral",
+            isCustomName: false,
+            hasMeaningfullyMoved: false
+        )
+
+        #expect(name == "MSC Seashore")
+    }
+
+    @Test func reverseGeocodeNamesMeaningfullyMovedPin() {
+        let name = LocationSelectionPolicy.resolvedPlaceName(
+            originalName: "MSC Seashore",
+            reverseGeocodedName: "Port Canaveral",
+            isCustomName: false,
+            hasMeaningfullyMoved: true
+        )
+
+        #expect(name == "Port Canaveral")
+    }
+
+    @Test func customPlaceNameIsNeverOverwritten() {
+        let name = LocationSelectionPolicy.resolvedPlaceName(
+            originalName: "My Secret Spot",
+            reverseGeocodedName: "Port Canaveral",
+            isCustomName: true,
+            hasMeaningfullyMoved: true
+        )
+
+        #expect(name == "My Secret Spot")
+    }
+}

@@ -3,6 +3,30 @@ import MapKit
 import CoreLocation
 import UIKit
 
+enum LocationSelectionPolicy {
+    static let meaningfulMoveMeters: CLLocationDistance = 20
+
+    static func hasMeaningfullyMoved(
+        from initial: CLLocationCoordinate2D,
+        to candidate: CLLocationCoordinate2D
+    ) -> Bool {
+        let start = CLLocation(latitude: initial.latitude, longitude: initial.longitude)
+        let end = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
+        return start.distance(from: end) >= meaningfulMoveMeters
+    }
+
+    static func resolvedPlaceName(
+        originalName: String,
+        reverseGeocodedName: String,
+        isCustomName: Bool,
+        hasMeaningfullyMoved: Bool
+    ) -> String {
+        guard !isCustomName, hasMeaningfullyMoved else { return originalName }
+        let candidate = reverseGeocodedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return candidate.isEmpty ? originalName : candidate
+    }
+}
+
 struct LocationSelectionView: View {
     @Binding var selectedLocation: LocationData?
     @StateObject private var locationManager = LocationManager.shared
@@ -682,6 +706,7 @@ struct LocationMapView: View {
     @State private var geocodeWorkItem: DispatchWorkItem?
     private let geocoder = CLGeocoder()
     @State private var isGeocoding = false
+    @State private var geocodeRequestID = UUID()
     private let geocodeDebouncer = Debouncer(interval: 0.5)
     @State private var markerScale: CGFloat = 1.0
     @State private var initialLocation: LocationData
@@ -722,7 +747,20 @@ struct LocationMapView: View {
                 // Debounced center updates while the map moves continuously
                 .onMapCameraChange(frequency: .continuous) { context in
                     let center = context.region.center
-                    hasUserMoved = true
+                    let moved = LocationSelectionPolicy.hasMeaningfullyMoved(
+                        from: initialLocation.coordinate,
+                        to: center
+                    )
+                    hasUserMoved = moved
+                    guard moved else {
+                        geocodeDebouncer.cancel()
+                        geocoder.cancelGeocode()
+                        geocodeRequestID = UUID()
+                        isGeocoding = false
+                        draggedLocation = initialLocation
+                        currentLocationName = initialLocation.placeName
+                        return
+                    }
                     
                     // Animate marker on drag
                     withAnimation(.easeOut(duration: 0.1)) {
@@ -834,11 +872,28 @@ struct LocationMapView: View {
                 }
                 // Map controls
                 .overlay(alignment: .topTrailing) {
-                    VStack(spacing: 8) {
-                        MapUserLocationButton()
-                        MapCompass()
-                        MapScaleView()
+                    Button {
+                        position = .userLocation(
+                            followsHeading: false,
+                            fallback: .region(MKCoordinateRegion(
+                                center: initialLocation.coordinate,
+                                span: Self.calculateOptimalSpan(for: initialLocation)
+                            ))
+                        )
+                    } label: {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Constants.Colors.primary)
+                            .frame(width: 44, height: 44)
+                            .background(Constants.Colors.background)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(Constants.Colors.primary.opacity(0.2), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Center on my location")
                     .padding()
                 }
             }
@@ -862,10 +917,13 @@ struct LocationMapView: View {
         geocodeWorkItem?.cancel()
         geocoder.cancelGeocode()
         isGeocoding = true
+        let requestID = UUID()
+        geocodeRequestID = requestID
         
         let loc = CLLocation(latitude: newCenter.latitude, longitude: newCenter.longitude)
         geocoder.reverseGeocodeLocation(loc) { placemarks, error in
             DispatchQueue.main.async {
+                guard self.geocodeRequestID == requestID else { return }
                 defer { self.isGeocoding = false }
                 if let ns = error as NSError? {
                     if ns.code != CLError.Code.network.rawValue && 
@@ -883,14 +941,20 @@ struct LocationMapView: View {
                 let cityState = [city, state].compactMap { $0 }.joined(separator: ", ")
                 let address = [city, state, country].compactMap { $0 }.joined(separator: ", ")
                 let prettyName = (name?.isEmpty == false ? name! : (cityState.isEmpty ? self.draggedLocation.placeName : cityState))
-                
+                let resolvedName = LocationSelectionPolicy.resolvedPlaceName(
+                    originalName: self.initialLocation.placeName,
+                    reverseGeocodedName: prettyName,
+                    isCustomName: self.draggedLocation.isCustomName,
+                    hasMeaningfullyMoved: self.hasUserMoved
+                )
+
                 self.draggedLocation = LocationData(
                     coordinate: newCenter,
-                    placeName: self.draggedLocation.isCustomName ? self.draggedLocation.placeName : prettyName,
+                    placeName: resolvedName,
                     address: address.isEmpty ? nil : address,
                     isCustomName: self.draggedLocation.isCustomName
                 )
-                self.currentLocationName = self.draggedLocation.isCustomName ? self.draggedLocation.placeName : prettyName
+                self.currentLocationName = resolvedName
             }
         }
     }
@@ -912,6 +976,10 @@ struct LocationMapView: View {
     
     // MARK: - Reset to initial location
     private func resetToInitial() {
+        geocodeDebouncer.cancel()
+        geocoder.cancelGeocode()
+        geocodeRequestID = UUID()
+        isGeocoding = false
         withAnimation {
             let optimalSpan = Self.calculateOptimalSpan(for: initialLocation)
             let region = MKCoordinateRegion(

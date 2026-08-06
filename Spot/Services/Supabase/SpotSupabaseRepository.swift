@@ -335,7 +335,7 @@ enum SpotSupabaseRepository {
     ) async throws -> [Spot] {
         guard !rows.isEmpty else { return [] }
 
-        let authorIsPro = try await fetchAuthorProFlag(userId: rows[0].user_id)
+        async let authorIsProTask = fetchAuthorProFlag(userId: rows[0].user_id)
 
         let vibeIds = Set(rows.compactMap(\.vibe_tag_id))
         var vibeNames: [UUID: String] = [:]
@@ -350,13 +350,18 @@ enum SpotSupabaseRepository {
         }
 
         let spotIds = rows.map(\.id)
-        let labelsBySpot = try await fetchVibeLabelListsBySpotId(spotIds: spotIds)
-        let images: [SpotImageRow] = try await supabase
+        async let labelsBySpotTask = fetchVibeLabelListsBySpotId(spotIds: spotIds)
+        async let imagesTask: [SpotImageRow] = supabase
             .from("spot_images")
             .select("spot_id,storage_path,public_url,sort_index,storage_bucket")
             .in("spot_id", values: spotIds)
             .execute()
             .value
+        let (authorIsPro, labelsBySpot, images) = try await (
+            authorIsProTask,
+            labelsBySpotTask,
+            imagesTask
+        )
 
         var imagesBySpot: [UUID: [SpotImageRow]] = [:]
         for img in images {

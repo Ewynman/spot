@@ -322,10 +322,30 @@ struct PhotoSelectionView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .multilineTextAlignment(.center)
                             HStack {
-                                Button("Replace") { prepareReplacement() }
-                                Button("Remove", role: .destructive) { requestDelete() }
+                                Button {
+                                    prepareReplacement()
+                                } label: {
+                                    Text("Replace")
+                                        .font(FontManager.primaryText())
+                                        .foregroundColor(Constants.Colors.primary)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                        .background(Constants.Colors.accent)
+                                        .cornerRadius(12)
+                                }
+                                Button {
+                                    requestDelete()
+                                } label: {
+                                    Text("Remove")
+                                        .font(FontManager.primaryText())
+                                        .foregroundColor(Constants.Colors.buttonText)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                        .background(Constants.Colors.primary)
+                                        .cornerRadius(12)
+                                }
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.plain)
                         }
                         .foregroundStyle(.white)
                         .padding()
