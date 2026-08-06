@@ -180,13 +180,14 @@ struct SpotCard: View {
                 }
             }
         )
-        .overlay {
-            if showDeleteConfirm {
+        .fullScreenCover(isPresented: $showDeleteConfirm) {
+            ZStack {
+                Color.clear
+                    .ignoresSafeArea()
                 deleteConfirmationOverlay
-                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
             }
+            .presentationBackground(.clear)
         }
-        .animation(.easeInOut(duration: 0.18), value: showDeleteConfirm)
         .onPreferenceChange(MenuButtonFrameKey.self) { frame in
             menuButtonFrame = frame
         }

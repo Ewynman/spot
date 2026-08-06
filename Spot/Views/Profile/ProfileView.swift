@@ -71,10 +71,21 @@ struct ProfileView: View {
 
     private let tabs = ["Spots", "Map"]
 
+    @MainActor
+    init(
+        userId: String?,
+        fromNavigationPush: Bool = false
+    ) {
+        self.userId = userId
+        self.fromNavigationPush = fromNavigationPush
+        _viewModel = StateObject(wrappedValue: ProfileViewModel())
+    }
+
+    @MainActor
     init(
         userId: String?,
         fromNavigationPush: Bool = false,
-        viewModel: ProfileViewModel = ProfileViewModel()
+        viewModel: ProfileViewModel
     ) {
         self.userId = userId
         self.fromNavigationPush = fromNavigationPush

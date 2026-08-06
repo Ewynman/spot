@@ -706,6 +706,7 @@ struct LocationMapView: View {
     @State private var geocodeWorkItem: DispatchWorkItem?
     private let geocoder = CLGeocoder()
     @State private var isGeocoding = false
+    @State private var geocodeRequestID = UUID()
     private let geocodeDebouncer = Debouncer(interval: 0.5)
     @State private var markerScale: CGFloat = 1.0
     @State private var initialLocation: LocationData
@@ -752,6 +753,10 @@ struct LocationMapView: View {
                     )
                     hasUserMoved = moved
                     guard moved else {
+                        geocodeDebouncer.cancel()
+                        geocoder.cancelGeocode()
+                        geocodeRequestID = UUID()
+                        isGeocoding = false
                         draggedLocation = initialLocation
                         currentLocationName = initialLocation.placeName
                         return
@@ -912,10 +917,13 @@ struct LocationMapView: View {
         geocodeWorkItem?.cancel()
         geocoder.cancelGeocode()
         isGeocoding = true
+        let requestID = UUID()
+        geocodeRequestID = requestID
         
         let loc = CLLocation(latitude: newCenter.latitude, longitude: newCenter.longitude)
         geocoder.reverseGeocodeLocation(loc) { placemarks, error in
             DispatchQueue.main.async {
+                guard self.geocodeRequestID == requestID else { return }
                 defer { self.isGeocoding = false }
                 if let ns = error as NSError? {
                     if ns.code != CLError.Code.network.rawValue && 
@@ -968,6 +976,10 @@ struct LocationMapView: View {
     
     // MARK: - Reset to initial location
     private func resetToInitial() {
+        geocodeDebouncer.cancel()
+        geocoder.cancelGeocode()
+        geocodeRequestID = UUID()
+        isGeocoding = false
         withAnimation {
             let optimalSpan = Self.calculateOptimalSpan(for: initialLocation)
             let region = MKCoordinateRegion(
