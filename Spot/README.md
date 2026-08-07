@@ -39,5 +39,5 @@ Unit tests live under `SpotTests/` with the same folder mirror. See
 [`SpotTests/README.md`](../SpotTests/README.md). UI flows live under
 `SpotUITests/`.
 
-Coverage scope (CI): all production Swift under `Spot/` including Views;
+Coverage scope (CI): all production Swift under `Spot/` including Views for informational metrics; changed-line gate excludes Views;
 excludes `Models/Logs/`. See `scripts/coverage_scope.py`.

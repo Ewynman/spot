@@ -22,7 +22,7 @@ Enforces minimum code coverage requirements on changed files in pull requests.
 - Extracts coverage data using `xcrun xccov`
 - Identifies changed Swift files via `git diff`
 - Filters to the shared production coverage scope (`scripts/coverage_scope.py`)
-- Calculates coverage for changed executable lines in in-scope `Spot/` files (including Views; excluding `Models/Logs`)
+- Calculates coverage for changed executable lines in in-scope `Spot/` files (excluding Views and `Models/Logs`; skips pure renames)
 - Fails if an enforced file is below the threshold (files enter enforcement at 10 changed executable lines)
 - Provides detailed per-file coverage breakdown
 

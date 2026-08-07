@@ -16,7 +16,7 @@ This directory contains GitHub Actions workflows for the Spot iOS app.
   - **API Breaking Change Detection**: Scans for changes to public Swift APIs
   - **Documentation Validation**: Checks if documentation needs updates
   - **Unit Tests**: Runs the full `SpotTests` suite with one serial test worker
-  - **Code Coverage Enforcement**: Validates 80% minimum coverage of the lines changed in production-scope files (includes Views; excludes `Models/Logs`)
+  - **Code Coverage Enforcement**: Validates 80% minimum coverage of the lines changed in production-scope files (excludes Views — body via UITests — and `Models/Logs`; skips pure renames)
 - Uses macOS 15 runners and reports the selected Xcode version at runtime
 - Boots an iPhone simulator and executes tests
 - Enables code coverage collection

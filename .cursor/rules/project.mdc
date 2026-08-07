@@ -145,6 +145,6 @@ Optional: `-enableCodeCoverage YES` on `xcodebuild test` when collecting coverag
 
 ## Code coverage expectations
 
-For new production code, aim for **meaningful** tests: happy path, empty/error branches, and guard rules. CI enforces **80% changed-line coverage** on in-scope `Spot/` files (including Views; excluding `Models/Logs`). Prefer extracting pure logic from SwiftUI into `Utils` / ViewModels for unit tests. Keep test-only production changes minimal and DEBUG- or test-gated when they must exist.
+For new production code, aim for **meaningful** tests: happy path, empty/error branches, and guard rules. CI enforces **80% changed-line coverage** on in-scope `Spot/` files (excluding Views (body via UITests) and `Models/Logs`). Prefer extracting pure logic from SwiftUI into `Utils` / ViewModels for unit tests. Keep test-only production changes minimal and DEBUG- or test-gated when they must exist.
 
 Agents should run the **relevant scheme(s)** after substantive non-doc changes.

@@ -18,10 +18,13 @@ if [ -z "$XCRESULT_PATH" ] || [ ! -d "$XCRESULT_PATH" ]; then
     exit 1
 fi
 
-CHANGED_FILES=$(
-    git diff --name-only --diff-filter=d "${BASE_BRANCH}" -- '*.swift' \
-        | python3 -c '
-import sys
+NAME_STATUS=$(
+    git diff --find-renames --name-status --diff-filter=d "${BASE_BRANCH}" -- '*.swift' || true
+)
+
+CHANGED_ENTRIES=$(
+    NAME_STATUS="$NAME_STATUS" python3 -c '
+import os
 from pathlib import Path
 import importlib.util
 spec = importlib.util.spec_from_file_location(
@@ -31,15 +34,16 @@ spec = importlib.util.spec_from_file_location(
 mod = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(mod)
-for line in sys.stdin:
-    path = line.strip()
-    if path and mod.is_in_coverage_scope(path):
-        print(path)
+for new_path, old_path in mod.changed_files_from_name_status(
+    os.environ.get("NAME_STATUS", ""),
+    for_enforcement=True,
+):
+    print("%s\t%s" % (new_path, old_path or ""))
 '
 )
 
-if [ -z "$CHANGED_FILES" ]; then
-    echo "No in-scope production Swift files changed vs ${BASE_BRANCH}."
+if [ -z "$CHANGED_ENTRIES" ]; then
+    echo "No enforceable production Swift changes vs ${BASE_BRANCH}."
     exit 0
 fi
 
@@ -48,10 +52,10 @@ trap "rm -rf $TEMP_DIR" EXIT
 
 xcrun xccov view --report --json "$XCRESULT_PATH" > "$TEMP_DIR/coverage.json"
 
-echo "Uncovered changed executable lines vs ${BASE_BRANCH}:"
+echo "Uncovered changed executable lines vs ${BASE_BRANCH} (enforcement scope):"
 echo ""
 
-while IFS= read -r file; do
+while IFS=$'\t' read -r file old_path; do
     [ -z "$file" ] && continue
 
     RECORDED_PATH=$(jq -r --arg filepath "$file" '
@@ -65,7 +69,12 @@ while IFS= read -r file; do
         continue
     fi
 
-    git diff -U0 "${BASE_BRANCH}" -- "$file" | awk '
+    if [ -n "$old_path" ]; then
+        DIFF_ARGS=(--find-renames "${BASE_BRANCH}" -- "$old_path" "$file")
+    else
+        DIFF_ARGS=(--find-renames "${BASE_BRANCH}" -- "$file")
+    fi
+    git diff -U0 "${DIFF_ARGS[@]}" | awk '
         /^@@/ {
             match($0, /\+[0-9]+(,[0-9]+)?/)
             spec = substr($0, RSTART + 1, RLENGTH - 1)
@@ -95,4 +104,4 @@ while IFS= read -r file; do
         echo "✗ $file:"
         echo "$UNCOVERED" | sed 's/^/    line /'
     fi
-done <<< "$CHANGED_FILES"
+done <<< "$CHANGED_ENTRIES"

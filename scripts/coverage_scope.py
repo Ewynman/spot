@@ -1,6 +1,13 @@
 """Shared Spot production coverage scope rules for CI scripts.
 
-Includes all `Spot/**/*.swift` production sources (including Views).
+Includes all `Spot/**/*.swift` production sources (including Views) for
+whole-file / informational metrics.
+
+Changed-line enforcement (PR gate) excludes `Spot/Views/**`: SwiftUI `body`
+is not executed by SpotTests, so View call-site rewires cannot meet an 80%
+unit-test gate. Extract logic into Utils/ViewModels/Services for the gate;
+cover View bodies via SpotUITests / the informational combined-coverage job.
+
 Excludes log enum files under `Spot/Models/Logs/`, test targets, and
 non-Spot paths (package dependencies).
 """
@@ -39,6 +46,19 @@ def is_in_coverage_scope(path: str) -> bool:
     return True
 
 
+def is_in_changed_line_enforcement_scope(path: str) -> bool:
+    """True when changed lines in this file are subject to the 80% PR gate."""
+    if not is_in_coverage_scope(path):
+        return False
+    relative = spot_relative_parts(path)
+    if relative is None:
+        return False
+    # View bodies are not exercised by SpotTests; enforce via extractions logic.
+    if relative and relative[0] == "Views":
+        return False
+    return True
+
+
 def repo_relative_spot_path(path: str) -> str | None:
     """Return `Spot/...` repo-relative path when `path` is in coverage scope."""
     if not is_in_coverage_scope(path):
@@ -47,3 +67,70 @@ def repo_relative_spot_path(path: str) -> str | None:
     if relative is None:
         return None
     return str(PurePosixPath("Spot", *relative))
+
+
+def parse_name_status_line(line: str) -> tuple[str, str, str | None] | None:
+    """Parse one `git diff --name-status` line.
+
+    Returns `(status_code, new_path, old_path_or_none)`.
+    `status_code` is the leading status without rename similarity (A/M/R/…).
+    """
+    parts = line.rstrip("\n").split("\t")
+    if not parts or not parts[0]:
+        return None
+    raw_status = parts[0]
+    status = raw_status[0]
+    if status == "R":
+        if len(parts) < 3:
+            return None
+        return status, parts[2], parts[1]
+    if status in {"A", "M", "C", "T"}:
+        if len(parts) < 2:
+            return None
+        return status, parts[1], None
+    return None
+
+
+def rename_similarity(raw_status: str) -> int | None:
+    """Return rename similarity percent for `R100`-style statuses."""
+    if not raw_status.startswith("R"):
+        return None
+    digits = raw_status[1:]
+    if not digits.isdigit():
+        return None
+    return int(digits)
+
+
+def changed_files_from_name_status(
+    name_status_text: str,
+    *,
+    for_enforcement: bool = True,
+) -> list[tuple[str, str | None]]:
+    """Return `(new_path, old_path_or_none)` entries for coverage analysis.
+
+    Pure renames (`R100`) are omitted — no executable lines changed.
+    Partial renames keep `old_path` so callers can `git diff -- old new`.
+    """
+    scope = (
+        is_in_changed_line_enforcement_scope
+        if for_enforcement
+        else is_in_coverage_scope
+    )
+    results: list[tuple[str, str | None]] = []
+    for line in name_status_text.splitlines():
+        parts = line.rstrip("\n").split("\t")
+        if not parts or not parts[0]:
+            continue
+        raw_status = parts[0]
+        parsed = parse_name_status_line(line)
+        if parsed is None:
+            continue
+        status, new_path, old_path = parsed
+        if status == "R":
+            similarity = rename_similarity(raw_status)
+            if similarity == 100:
+                continue
+        if not scope(new_path):
+            continue
+        results.append((new_path, old_path))
+    return results

@@ -45,8 +45,10 @@ Folder mirrors: [`Spot/README.md`](../../Spot/README.md), [`SpotTests/README.md`
 
 Defined by [`scripts/coverage_scope.py`](../../scripts/coverage_scope.py):
 
-- **Include:** all `Spot/**` production Swift, including Views
-- **Exclude:** `Spot/Models/Logs/`, test targets, packages
+- **Informational / whole-file metric:** all `Spot/**` production Swift, including Views
+- **Changed-line PR gate:** same, but **excludes `Spot/Views/**`** (SwiftUI `body` is not run by SpotTests). Extract logic into Utils/ViewModels/Services for the gate; cover View bodies via SpotUITests / the informational combined-coverage job.
+- **Exclude always:** `Spot/Models/Logs/`, test targets, packages
+- **Renames:** pure `R100` moves are omitted from the gate (no executable lines changed)
 
 PR gate: **80% of changed executable lines** per enforced file (10-line floor). Xcode’s whole-target % includes packages and will look much lower than CI’s production-scope metric.
 

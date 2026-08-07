@@ -258,7 +258,7 @@ misleadingly low percentage.
 
 **Coverage Requirements:**
 - **80% of the executable lines a PR adds or modifies** must be covered
-- Applies to in-scope files under `Spot/` (including Views; excluding `Models/Logs` and tests)
+- Applies to in-scope files under `Spot/` (excluding Views and `Models/Logs`; skips pure renames). Informational whole-file metrics still include Views.
 - Scope rules live in `scripts/coverage_scope.py`
 - Extract pure view logic into `Spot/Utils/` (or ViewModels) so unit tests can hit it; use `SpotUITests` for body/navigation coverage
 - Measured using `xcrun xccov` against `.xcresult` bundles
