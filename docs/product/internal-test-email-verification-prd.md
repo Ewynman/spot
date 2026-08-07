@@ -6,13 +6,13 @@ Provide authorized internal testers with a memorable non-production verification
 
 ## Status
 
-- **Stage:** Discovery and proposal
+- **Stage:** Implemented (staging)
 - **Priority:** P2 internal quality tooling
-- **Owner:** TODO
-- **Last reviewed:** 2026-07-28
-- **Approval:** Product, Security, and Engineering approval required before implementation
-- **Implementation:** Not started
-- **Backend verification:** Supabase proof of concept still required
+- **Owner:** Engineering
+- **Last reviewed:** 2026-08-06
+- **Approval:** Implemented per this PRD for local DEBUG + Firebase `INTERNAL_TESTING` staging builds
+- **Implementation:** Client (`ConfirmEmailView` / `AuthViewModel` / `StagingTestEmailVerification`), Edge Function `staging-verify-email`, rate-limit table `staging_test_auth_attempts`
+- **Backend verification:** Deploy + secrets required on staging; exercise allowlisted signup with `UT####` before treating as ready
 
 ## Problem statement
 
@@ -60,7 +60,7 @@ The closest equivalent to an internal `UT####` code is a staging-only server exc
 
 - Firebase App Distribution builds a Release artifact but injects and validates **staging** Supabase configuration: `.github/workflows/deploy.yml`.
 - TestFlight builds inject **production** Supabase configuration: `.github/workflows/testflight.yml`.
-- There is no dedicated `INTERNAL_TESTING` Swift compilation condition.
+- Firebase App Distribution defines `INTERNAL_TESTING` via `SPOT_DISTRIBUTION_CONDITION` (see `.github/workflows/deploy.yml` and `docs/engineering/ci-cd.md`).
 
 Therefore, a `#if DEBUG` feature would work only for local DEBUG builds. Firebase App Distribution now targets staging, but an internal verification client still needs an explicit build/runtime gate because Firebase artifacts are Release builds.
 

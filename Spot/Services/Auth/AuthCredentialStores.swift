@@ -23,6 +23,14 @@ struct AuthAccountHint: Codable, Equatable {
 struct AuthVerificationRecovery: Codable, Equatable {
     let email: String
     let startedAt: Date
+    /// Pending Supabase Auth user id from signup. Optional for legacy recovery records.
+    let userId: UUID?
+
+    init(email: String, startedAt: Date, userId: UUID? = nil) {
+        self.email = email
+        self.startedAt = startedAt
+        self.userId = userId
+    }
 }
 
 protocol AuthDataStoring {
@@ -76,11 +84,11 @@ final class AuthVerificationRecoveryStore {
         self.now = now
     }
 
-    func save(email: String) {
+    func save(email: String, userId: UUID? = nil) {
         let normalized = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalized.isEmpty,
               let data = try? JSONEncoder().encode(
-                AuthVerificationRecovery(email: normalized, startedAt: now())
+                AuthVerificationRecovery(email: normalized, startedAt: now(), userId: userId)
               )
         else { return }
         keychain.save(data)

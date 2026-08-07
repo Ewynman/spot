@@ -29,6 +29,9 @@ DEBUG builds select staging defaults in **`Spot/Supabase/Supabase.swift`**. Rele
 | `AZURE_CONTENT_SAFETY_KEY` | `moderate-image` | Yes | **Yes** | Function secret in Supabase | Server-side only. |
 | `AZURE_CONTENT_SAFETY_API_VERSION` | `moderate-image` | Optional | No | Function config in Supabase | Provider API override. |
 | `MODERATION_THRESHOLDS_JSON` | `moderate-image` | Optional | Policy-sensitive | Function config in Supabase | Overrides default category thresholds. |
+| `STAGING_TEST_AUTH_ENABLED` | `staging-verify-email` | Staging only | No (kill switch) | Staging function secret | Must be `true`/`1`. **Never** set in production. |
+| `STAGING_TEST_AUTH_CODE` | `staging-verify-email` | Optional | **Yes** | Staging function secret | Defaults to `UT1234` when unset. Never ship in the app. |
+| `STAGING_TEST_AUTH_EMAILS` | `staging-verify-email` | Optional | Yes (account list) | Staging function secret | When unset/empty, any signup email is allowed on staging. Set to restrict Firebase internal builds. |
 | Share / Universal Link config | iOS app | Yes | No | `Info.plist` → `SpotURLs` | Domains must match entitlements. |
 
 ### Example placeholders only

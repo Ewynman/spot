@@ -37,7 +37,8 @@ User-initiated logout uses Supabase’s **local** sign-out scope. It removes the
 ### Credential and recovery storage
 
 - Passwords, OTP values, Apple identity tokens, and Supabase tokens are never stored by Spot application code.
-- `AuthVerificationRecoveryStore` keeps only the pending email and start time in device-only Keychain storage so signup OTP can resume after relaunch.
+- `AuthVerificationRecoveryStore` keeps the pending email, optional pending Supabase user ID, and start time in device-only Keychain storage so signup OTP can resume after relaunch. Passwords, OTPs, and token hashes are never stored.
+- **Staging internal verification** (`DEBUG` / `INTERNAL_TESTING` + staging only): Confirm Email can exchange an allowlisted `UT####` code through Edge Function `staging-verify-email`, then `verifyOTP(tokenHash:)` for a real session. See [../product/internal-test-email-verification-prd.md](../product/internal-test-email-verification-prd.md). Production/TestFlight builds omit the client path; the function must never be deployed to production.
 - `AuthAccountHintStore` keeps a removable device-local account suggestion for the returning-account screen.
 - Login fields use `.emailAddress`, `.username`, `.password`, and `.newPassword` content types as appropriate so Apple Password AutoFill can offer credentials managed by the operating system.
 - Sign in with Apple requests use a cryptographically random nonce. The request receives the SHA-256 nonce while Supabase receives the raw nonce with the Apple ID token.

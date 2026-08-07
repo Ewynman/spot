@@ -34,7 +34,12 @@ Private buckets for pending and approved images (`pending_images`, `approved_spo
 
 ### Edge Functions
 
-The versioned Edge Function is **`moderate-image`** under `supabase/functions/moderate-image/`. Deployment and secret presence must be verified independently in each project.
+| Function | Role | Deploy |
+| --- | --- | --- |
+| `moderate-image` | Azure content moderation for Spot media | Staging and production (separate secrets) |
+| `staging-verify-email` | Staging-only internal `UT####` signup verification exchange | **Staging only**; `scripts/deploy-staging-verify-email.sh` rejects production |
+
+Deployment and secret presence must be verified independently in each project. Never deploy `staging-verify-email` or its `STAGING_TEST_AUTH_*` secrets to production.
 
 ### Key RPCs and functions
 

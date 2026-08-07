@@ -55,10 +55,24 @@ struct AuthCredentialStoresTests {
 
         store.save(email: "  Maya@Example.COM ")
         #expect(store.load()?.email == "maya@example.com")
+        #expect(store.load()?.userId == nil)
 
         now = now.addingTimeInterval(61)
         #expect(store.load() == nil)
         #expect(storage.data == nil)
+    }
+
+    @Test func verificationRecoveryPersistsPendingUserId() {
+        let storage = InMemoryAuthDataStore()
+        let store = AuthVerificationRecoveryStore(
+            keychain: storage,
+            lifetime: 60,
+            now: { Date(timeIntervalSince1970: 1_000) }
+        )
+        let userId = UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")!
+
+        store.save(email: "maya@example.com", userId: userId)
+        #expect(store.load()?.userId == userId)
     }
 }
 
