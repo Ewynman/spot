@@ -475,5 +475,6 @@ If the team decides to re-enable Xcode Cloud in the future:
 - ~~Firebase build automation on merge to main~~ _(completed: deploy.yml)_
 - ~~Build number automation and release notes generation~~ _(completed: deploy.yml)_
 - Add SwiftLint or SwiftFormat for code style consistency (on roadmap)
-- Configure required status checks in GitHub branch protection (should be enabled for production)
 - Add the App Store Connect API secrets (`APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY_P8_BASE64`) so the TestFlight upload step in `testflight.yml` can complete
+
+Branch protection is configured via GitHub repository rulesets (see [.github/rulesets/README.md](../../.github/rulesets/README.md)).

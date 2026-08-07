@@ -7,8 +7,9 @@ This directory contains GitHub Actions workflows for the Spot iOS app.
 ### `ci.yml` - Continuous Integration
 
 **Triggers:**
-- Pull requests to `main`
+- Pull requests to `main` and `release/**`
 - Pushes to `main` (except `[skip ci]` commits)
+- Merge queue groups on `main` (`merge_group`, when merge queue is enabled)
 
 **What it does:**
 - Runs comprehensive PR validation including:
