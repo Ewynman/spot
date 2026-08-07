@@ -322,16 +322,7 @@ struct MapLocationPermissionStatusTests {
         status: CLAuthorizationStatus,
         hasLocation: Bool
     ) -> Bool {
-        switch status {
-        case .denied, .restricted:
-            return hasLocation
-        case .notDetermined:
-            return true
-        case .authorizedAlways, .authorizedWhenInUse:
-            return true
-        @unknown default:
-            return hasLocation
-        }
+        MapRecenterVisibility.shouldShow(status: status, hasLocation: hasLocation)
     }
 }
 

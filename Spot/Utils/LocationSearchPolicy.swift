@@ -5,8 +5,19 @@ enum LocationSearchPolicy {
     static let nearbyRadiusMeters: CLLocationDistance = 3_000
     static let expandedNearbyRadiusMeters: CLLocationDistance = 8_000
     static let localSearchRadiusMeters: CLLocationDistance = 50_000
+    static let nearbyRefreshThresholdMeters: CLLocationDistance = 250
     static let maximumNearbyResults = 30
     static let maximumSearchResults = 30
+
+    /// Whether the user moved far enough to warrant re-querying nearby places.
+    static func shouldRefreshNearby(
+        from previous: CLLocation?,
+        to candidate: CLLocation,
+        thresholdMeters: CLLocationDistance = nearbyRefreshThresholdMeters
+    ) -> Bool {
+        guard let previous else { return true }
+        return previous.distance(from: candidate) > thresholdMeters
+    }
 
     static func sortedByDistance(
         _ items: [MKMapItem],

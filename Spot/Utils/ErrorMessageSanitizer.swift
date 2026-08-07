@@ -86,30 +86,41 @@ enum ErrorMessageSanitizer {
     
     /// Categorizes the error and returns appropriate generic message.
     private static func categorizeAndSanitize(_ lower: String) -> String {
-        if lower.contains("database") || lower.contains("sql") || lower.contains("postgres") {
+        if lower.contains("database")
+            || lower.contains("sql")
+            || lower.contains("postgres")
+            || lower.contains("select ")
+            || lower.contains("insert ")
+            || lower.contains("update ")
+            || lower.contains("delete ") {
             return genericMessages["database"]!
         }
-        
+
         if lower.contains("network") || lower.contains("connection") || lower.contains("timeout") {
             return genericMessages["network"]!
         }
-        
-        if lower.contains("auth") || lower.contains("permission") || lower.contains("unauthorized") {
+
+        // Prefer auth over generic "invalid …" when credentials/tokens are present.
+        if lower.contains("auth")
+            || lower.contains("unauthorized")
+            || lower.contains("jwt")
+            || lower.contains("token")
+            || lower.contains("session") {
             return genericMessages["auth"]!
         }
-        
-        if lower.contains("validation") || lower.contains("invalid") || lower.contains("required") {
-            return genericMessages["validation"]!
-        }
-        
-        if lower.contains("not found") || lower.contains("404") {
-            return genericMessages["notfound"]!
-        }
-        
+
         if lower.contains("denied") || lower.contains("forbidden") || lower.contains("403") {
             return genericMessages["permission"]!
         }
-        
+
+        if lower.contains("validation") || lower.contains("invalid") || lower.contains("required") {
+            return genericMessages["validation"]!
+        }
+
+        if lower.contains("not found") || lower.contains("404") {
+            return genericMessages["notfound"]!
+        }
+
         // Default to generic server error
         return genericMessages["server"]!
     }

@@ -6,10 +6,7 @@ struct CollectionCardView: View {
     var count: Int?
 
     private var itemWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        let padding: CGFloat = 12 * 2
-        let spacing: CGFloat = 12 * 1 // 2 columns => one gap per row
-        return (screenWidth - padding - spacing) / 2
+        SpotGridLayout.itemWidth(columns: 2, containerWidth: UIScreen.main.bounds.width)
     }
 
     var body: some View {

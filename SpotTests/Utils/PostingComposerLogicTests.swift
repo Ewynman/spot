@@ -70,3 +70,46 @@ struct VibeSelectionPolicyTests {
         #expect(outcome.validationMessage == Constants.PostLimits.proTooManyVibesMessage)
     }
 }
+
+struct PostPhotoSelectionLimitsTests {
+    @Test func tierCapsAndCopy() {
+        #expect(PostPhotoSelectionLimits.maxPhotoCount(isPro: false) == Constants.PostLimits.maxFreePostImages)
+        #expect(PostPhotoSelectionLimits.maxPhotoCount(isPro: true) == Constants.PostLimits.maxProPostImages)
+        #expect(PostPhotoSelectionLimits.remainingCapacityText(maxCount: 5, selectedCount: 4) == "You can add 1 more photo.")
+        #expect(PostPhotoSelectionLimits.remainingCapacityText(maxCount: 5, selectedCount: 2) == "You can add 3 more photos.")
+        #expect(PostPhotoSelectionLimits.galleryPickerMaxSelectionCount(modeIsReplace: true, maxCount: 5, selectedCount: 2) == 1)
+        #expect(PostPhotoSelectionLimits.galleryPickerMaxSelectionCount(modeIsReplace: false, maxCount: 5, selectedCount: 3) == 2)
+        #expect(PostPhotoSelectionLimits.acceptedPrefixCount(importedCount: 4, maxCount: 5, selectedCount: 3) == 2)
+    }
+}
+
+struct PostPhotoSelectionStateTests {
+    @Test func repairsActiveID() {
+        let a = UUID()
+        let b = UUID()
+        #expect(PostPhotoSelectionState.repairedActiveID(photos: [], current: a) == nil)
+        #expect(PostPhotoSelectionState.repairedActiveID(photos: [a, b], current: nil) == a)
+        #expect(PostPhotoSelectionState.repairedActiveID(photos: [a, b], current: b) == b)
+        #expect(PostPhotoSelectionState.repairedActiveID(photos: [a, b], current: UUID()) == a)
+    }
+
+    @Test func removalAndMoveMath() {
+        let a = UUID()
+        let b = UUID()
+        let c = UUID()
+        #expect(PostPhotoSelectionState.nextActiveIDAfterRemoval(remaining: [b, c], removedIndex: 0) == b)
+        #expect(PostPhotoSelectionState.nextActiveIDAfterRemoval(remaining: [a, c], removedIndex: 2) == c)
+        #expect(PostPhotoSelectionState.undoInsertIndex(savedIndex: 5, currentCount: 2) == 2)
+        #expect(PostPhotoSelectionState.clampedMoveDestination(source: 1, offset: -5, count: 3) == 0)
+        #expect(PostPhotoSelectionState.clampedMoveDestination(source: 1, offset: 5, count: 3) == 2)
+    }
+}
+
+struct PostPhotoPreviewLayoutTests {
+    @Test func clampsPreviewHeight() {
+        let tall = PostPhotoPreviewLayout.height(imageWidth: 100, imageHeight: 400, containerWidth: 390)
+        #expect(tall == 390)
+        let wide = PostPhotoPreviewLayout.height(imageWidth: 400, imageHeight: 100, containerWidth: 390)
+        #expect(wide == 230)
+    }
+}

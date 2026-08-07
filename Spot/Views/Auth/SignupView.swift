@@ -115,20 +115,17 @@ struct SignupView: View {
 
                         // Username validation (client-fast)
                         let validator = UsernameValidator()
-                        switch validator.validate(username) {
-                        case .ok:
-                            break
-                        case .tooShort:
-                            showToast("Username is too short", isError: true); return
-                        case .tooLong:
-                            showToast("Username is too long", isError: true); return
-                        case .invalidChars:
-                            showToast("Username has invalid characters", isError: true); return
-                        case .reserved:
-                            showToast("That username is reserved", isError: true); return
-                        case .blocked:
-                            SpotLogger.log(SignupViewLogs.usernameBlocked, details: ["raw": username, "norm": validator.normalized(username), "reason": "blocked"])
-                            showToast("That username isn’t allowed", isError: true); return
+                        let usernameResult = validator.validate(username)
+                        if let feedback = UsernameFeedback.message(for: usernameResult) {
+                            if case .blocked = usernameResult {
+                                SpotLogger.log(SignupViewLogs.usernameBlocked, details: [
+                                    "raw": username,
+                                    "norm": validator.normalized(username),
+                                    "reason": "blocked"
+                                ])
+                            }
+                            showToast(feedback, isError: true)
+                            return
                         }
 
                         switch PasswordValidator.validate(password) {
@@ -257,15 +254,12 @@ struct SignupView: View {
             switch outcome {
             case .available:
                 await MainActor.run { self.signUpWithSupabase() }
-            case .taken:
+            case .taken, .unavailable:
                 await MainActor.run {
                     self.isLoading = false
-                    self.showToast("That username is taken. Try another.", isError: true)
-                }
-            case .unavailable:
-                await MainActor.run {
-                    self.isLoading = false
-                    self.showToast("We couldn’t check that username. Try again.", isError: true)
+                    if let feedback = UsernameAvailabilityFeedback.message(for: outcome) {
+                        self.showToast(feedback, isError: true)
+                    }
                 }
             }
         }

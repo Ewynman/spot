@@ -279,28 +279,35 @@ struct SettingsView: View {
         currentPasswordError = nil
         newPasswordError = nil
         confirmPasswordError = nil
-        guard !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Username cannot be empty"
+        guard SettingsAccountChangeValidation.usernameGate(username) == .ok else {
+            errorMessage = SettingsAccountChangeValidation.emptyUsernameMessage
             return
         }
-        if !newPassword.isEmpty || !confirmPassword.isEmpty {
-            guard newPassword == confirmPassword else {
-                confirmPasswordError = "Passwords do not match."
-                return
-            }
-            switch PasswordValidator.validate(newPassword) {
-            case .ok:
-                break
-            case .failure(let message):
-                newPasswordError = message
-                return
-            }
+        switch SettingsAccountChangeValidation.passwordChangeGate(
+            newPassword: newPassword,
+            confirmPassword: confirmPassword,
+            currentPassword: currentPassword,
+            requireCurrentPassword: false
+        ) {
+        case .ok:
+            break
+        case .mismatch:
+            confirmPasswordError = SettingsAccountChangeValidation.passwordMismatchMessage
+            return
+        case .invalidNewPassword(let message):
+            newPasswordError = message
+            return
+        case .currentPasswordRequired:
+            break
         }
         let isEmailChange = !email.isEmpty && email != SpotAuthBridge.currentUserEmail
         let isPasswordChange = !newPassword.isEmpty
-        if (isEmailChange || isPasswordChange) &&
-            currentPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            currentPasswordError = "Current password is required for email or password changes."
+        if SettingsAccountChangeValidation.requiresCurrentPassword(
+            isEmailChange: isEmailChange,
+            isPasswordChange: isPasswordChange,
+            currentPassword: currentPassword
+        ) {
+            currentPasswordError = SettingsAccountChangeValidation.currentPasswordRequiredForEmailOrPassword
             return
         }
 
@@ -326,15 +333,19 @@ struct SettingsView: View {
 
         // Username validation before updating
         let validator = UsernameValidator()
-        switch validator.validate(username) {
-        case .ok: break
-        case .tooShort: isSaving = false; errorMessage = "Username is too short"; return
-        case .tooLong: isSaving = false; errorMessage = "Username is too long"; return
-        case .invalidChars: isSaving = false; errorMessage = "Username has invalid characters"; return
-        case .reserved: isSaving = false; errorMessage = "That username is reserved"; return
+        let usernameResult = validator.validate(username)
+        switch usernameResult {
+        case .ok:
+            break
         case .blocked:
             SpotLogger.log(SettingsViewLogs.usernameBlocked, details: ["raw": username, "norm": validator.normalized(username)])
-            isSaving = false; errorMessage = "That username isn’t allowed"; return
+            isSaving = false
+            errorMessage = UsernameFeedback.message(for: usernameResult)
+            return
+        case .tooShort, .tooLong, .invalidChars, .reserved:
+            isSaving = false
+            errorMessage = UsernameFeedback.message(for: usernameResult)
+            return
         }
 
         group.enter()
@@ -426,16 +437,20 @@ struct SettingsView: View {
         successMessage = nil
         currentPasswordError = nil
 
-        guard !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Username cannot be empty"
+        guard SettingsAccountChangeValidation.usernameGate(username) == .ok else {
+            errorMessage = SettingsAccountChangeValidation.emptyUsernameMessage
             return
         }
 
         isSaving = true
         let isEmailChange = !email.isEmpty && email != SpotAuthBridge.currentUserEmail
-        if isEmailChange && currentPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if SettingsAccountChangeValidation.requiresCurrentPassword(
+            isEmailChange: isEmailChange,
+            isPasswordChange: false,
+            currentPassword: currentPassword
+        ) {
             isSaving = false
-            currentPasswordError = "Current password is required for email changes."
+            currentPasswordError = SettingsAccountChangeValidation.currentPasswordRequiredForEmail
             return
         }
 
@@ -452,22 +467,14 @@ struct SettingsView: View {
             }
 
             let validator = UsernameValidator()
-            switch validator.validate(username) {
-            case .ok: break
-            case .tooShort:
-                await MainActor.run { isSaving = false; errorMessage = "Username is too short" }
-                return
-            case .tooLong:
-                await MainActor.run { isSaving = false; errorMessage = "Username is too long" }
-                return
-            case .invalidChars:
-                await MainActor.run { isSaving = false; errorMessage = "Username has invalid characters" }
-                return
-            case .reserved:
-                await MainActor.run { isSaving = false; errorMessage = "That username is reserved" }
-                return
-            case .blocked:
-                await MainActor.run { isSaving = false; errorMessage = "That username isn’t allowed" }
+            let usernameResult = validator.validate(username)
+            if case .ok = usernameResult {
+                // continue
+            } else {
+                await MainActor.run {
+                    isSaving = false
+                    errorMessage = UsernameFeedback.message(for: usernameResult)
+                }
                 return
             }
 
@@ -526,18 +533,22 @@ struct SettingsView: View {
 
         let isPasswordChange = !newPassword.isEmpty || !confirmPassword.isEmpty
         if isPasswordChange {
-            guard newPassword == confirmPassword else {
-                confirmPasswordError = "Passwords do not match."
+            switch SettingsAccountChangeValidation.passwordChangeGate(
+                newPassword: newPassword,
+                confirmPassword: confirmPassword,
+                currentPassword: currentPassword,
+                requireCurrentPassword: true
+            ) {
+            case .ok:
+                break
+            case .mismatch:
+                confirmPasswordError = SettingsAccountChangeValidation.passwordMismatchMessage
                 return
-            }
-            switch PasswordValidator.validate(newPassword) {
-            case .ok: break
-            case .failure(let message):
+            case .invalidNewPassword(let message):
                 newPasswordError = message
                 return
-            }
-            if currentPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                currentPasswordError = "Current password is required for password changes."
+            case .currentPasswordRequired:
+                currentPasswordError = SettingsAccountChangeValidation.currentPasswordRequiredForPassword
                 return
             }
         }
@@ -585,10 +596,14 @@ struct SettingsView: View {
             "reauth": "password",
             "hasPassword": !deletePassword.isEmpty
         ])
-        guard confirmDelete, !deletePassword.isEmpty else {
+        guard SettingsAccountChangeValidation.deleteAccountGate(
+            confirmDelete: confirmDelete,
+            deletePassword: deletePassword,
+            reauth: .password
+        ) == .ok else {
             SpotLogger.log(SettingsViewLogs.deleteAccountBlockedMissingConfirmation)
             showToast(
-                message: "Turn on the confirmation switch and enter your password to delete your account.",
+                message: SettingsAccountChangeValidation.deleteNeedsPasswordConfirmation,
                 isError: true
             )
             return
@@ -605,9 +620,13 @@ struct SettingsView: View {
             "confirmDelete": confirmDelete,
             "reauth": "apple"
         ])
-        guard confirmDelete else {
+        guard SettingsAccountChangeValidation.deleteAccountGate(
+            confirmDelete: confirmDelete,
+            deletePassword: "",
+            reauth: .apple
+        ) == .ok else {
             SpotLogger.log(SettingsViewLogs.deleteAccountBlockedMissingConfirmation)
-            showToast(message: "Turn on the confirmation switch before deleting your account.", isError: true)
+            showToast(message: SettingsAccountChangeValidation.deleteNeedsAppleConfirmation, isError: true)
             return
         }
         isSaving = true

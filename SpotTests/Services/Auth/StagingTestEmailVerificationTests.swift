@@ -64,6 +64,8 @@ struct StagingTestEmailVerificationTests {
 
     @Test func verifyInternalDeniedKeepsPendingState() async throws {
         let auth = AuthViewModel()
+        // Cancel live Supabase auth stream so a simulator session cannot clear pending state mid-test.
+        auth.cancelAuthStateListeningForTests()
         let userId = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
         auth.beginEmailVerificationPending(email: "qa@example.com", avatar: nil, userId: userId)
         auth.stagingTestEmailVerifier = FailingStagingVerifier(error: .serverDenied)

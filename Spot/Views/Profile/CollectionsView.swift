@@ -43,7 +43,7 @@ struct CollectionsView: View {
                         .cornerRadius(10)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(!CollectionNamePolicy.canCreate(newName))
             }
             .padding(.horizontal, 16)
 
@@ -84,8 +84,8 @@ struct CollectionsView: View {
     }
 
     private func create() async {
-        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
+        let name = CollectionNamePolicy.normalized(newName)
+        guard CollectionNamePolicy.canCreate(name) else { return }
         do {
             _ = try await BookmarksCollectionsService.shared.createCollection(name: name)
             newName = ""

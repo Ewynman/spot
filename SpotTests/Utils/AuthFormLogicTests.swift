@@ -13,6 +13,26 @@ struct LoginErrorMapperTests {
             LoginErrorMapper.message(forDescription: "Email not confirmed")
                 == "Verify your email to finish creating your account."
         )
+        #expect(
+            LoginErrorMapper.message(forDescription: "email_not_confirmed")
+                == "Verify your email to finish creating your account."
+        )
+    }
+
+    @Test func mapsMissingEmailPrompt() {
+        #expect(
+            LoginErrorMapper.message(forDescription: "Please enter the email for your account")
+                == "Enter the email address for your account."
+        )
+    }
+
+    @Test func mapsErrorProtocolViaLocalizedDescription() {
+        let error = NSError(
+            domain: "test",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Network offline"]
+        )
+        #expect(LoginErrorMapper.message(for: error) == "Network error. Please check your connection.")
     }
 
     @Test func mapsUsernameMiss() {
@@ -70,5 +90,28 @@ struct OTPDigitFieldTests {
         let digits = Array(repeating: "", count: 6)
         let next = OTPDigitField.applyPaste("12ab34", into: digits, at: 0)
         #expect(next == ["1", "2", "3", "4", "", ""])
+    }
+}
+
+struct UsernameFeedbackTests {
+    @Test func mapsUsernameValidation() {
+        #expect(UsernameFeedback.message(for: .ok) == nil)
+        #expect(UsernameFeedback.message(for: .tooShort) == "Username is too short")
+        #expect(UsernameFeedback.message(for: .blocked("x")) == "That username isn’t allowed")
+    }
+
+    @Test func mapsAvailability() {
+        #expect(UsernameAvailabilityFeedback.message(for: .available) == nil)
+        #expect(UsernameAvailabilityFeedback.message(for: .taken) == "That username is taken. Try another.")
+        #expect(UsernameAvailabilityFeedback.message(for: .unavailable) == "We couldn’t check that username. Try again.")
+    }
+}
+
+struct PlaceNameFeedbackTests {
+    @Test func mapsValidationResults() {
+        #expect(PlaceNameFeedback.message(for: .ok("Cafe")) == nil)
+        #expect(PlaceNameFeedback.message(for: .tooShort) == "Please use at least 3 characters.")
+        #expect(PlaceNameFeedback.message(for: .tooLong) == "Please keep it shorter.")
+        #expect(PlaceNameFeedback.message(for: .blocked("x")) == "That name isn’t allowed.")
     }
 }

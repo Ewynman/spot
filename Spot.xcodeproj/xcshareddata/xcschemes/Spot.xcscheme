@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "2600"
+   LastUpgradeVersion = "2630"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -47,8 +47,7 @@
             </BuildableReference>
          </TestableReference>
          <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
+            skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "642844232E20429E00DC9E8A"
@@ -91,13 +90,13 @@
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
-      <StoreKitConfigurationFileReference
-         identifier = "../../Spot/StoreKit/SpotDev.storekit">
-      </StoreKitConfigurationFileReference>
       <LocationScenarioReference
          identifier = "../../Spot/SpotDevLocation.gpx"
          referenceType = "0">
       </LocationScenarioReference>
+      <StoreKitConfigurationFileReference
+         identifier = "../../Spot/StoreKit/SpotDev.storekit">
+      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

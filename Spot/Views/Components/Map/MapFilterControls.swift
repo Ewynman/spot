@@ -78,14 +78,14 @@ struct MapFilterPillRow: View {
     }
 
     private func toggle(_ dim: SpotMapFilter) {
+        let shouldOpenVibePicker = state.toggling(dim)
         if state.dimensions.contains(dim) {
-            state.dimensions.remove(dim)
-            if dim == .vibe { state.vibeTags.removeAll() }
-            SpotLogger.log(MapFilterLogs.filterCleared, details: ["dim": dim.rawValue])
-        } else {
-            state.dimensions.insert(dim)
             SpotLogger.log(MapFilterLogs.filterApplied, details: ["dim": dim.rawValue])
-            if dim == .vibe { onOpenVibePicker() }
+        } else {
+            SpotLogger.log(MapFilterLogs.filterCleared, details: ["dim": dim.rawValue])
+        }
+        if shouldOpenVibePicker {
+            onOpenVibePicker()
         }
     }
 
@@ -145,12 +145,7 @@ struct MapVibeFilterSheet: View {
     }
 
     private func toggle(_ tag: String) {
-        if state.vibeTags.contains(tag) {
-            state.vibeTags.remove(tag)
-        } else {
-            state.vibeTags.insert(tag)
-            state.dimensions.insert(.vibe)
-        }
+        state.togglingVibeTag(tag)
         SpotLogger.log(MapFilterLogs.filterApplied, details: [
             "dim": SpotMapFilter.vibe.rawValue,
             "tag": tag,

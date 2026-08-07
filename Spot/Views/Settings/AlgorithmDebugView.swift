@@ -228,45 +228,13 @@ struct AlgorithmDebugView: View {
     }
 
     private func applyRawData(_ data: Data) {
-        guard
-            let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-            let row = arr.first
-        else {
-            prettyJSON = String(data: data, encoding: .utf8) ?? ""
-            profileVersion = nil
-            lastComputedAt = nil
-            return
-        }
-
-        profileVersion = row["profile_version"] as? Int
-        if let lc = row["last_computed_at"] as? String {
-            lastComputedAt = Self.iso8601.date(from: lc) ?? Self.iso8601Frac.date(from: lc)
-        }
-
-        if let pretty = try? JSONSerialization.data(
-            withJSONObject: row,
-            options: [.prettyPrinted, .sortedKeys]
-        ),
-           let str = String(data: pretty, encoding: .utf8) {
-            prettyJSON = str
-        } else {
-            prettyJSON = String(data: data, encoding: .utf8) ?? ""
-        }
+        let snapshot = FeedProfileSnapshotParser.parse(data)
+        profileVersion = snapshot.profileVersion
+        lastComputedAt = snapshot.lastComputedAt
+        prettyJSON = snapshot.prettyJSON
     }
 
     // MARK: - Formatters
-
-    private static let iso8601: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
-
-    private static let iso8601Frac: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
 
     private static let timestampFormatter: DateFormatter = {
         let f = DateFormatter()

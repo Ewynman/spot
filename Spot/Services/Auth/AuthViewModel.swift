@@ -59,6 +59,21 @@ class AuthViewModel: ObservableObject {
         sessionRefreshTask?.cancel()
     }
 
+    #if DEBUG
+    /// Unit tests: stop listening to live Supabase auth so simulator sessions cannot clobber pending state.
+    func cancelAuthStateListeningForTests() {
+        supabaseAuthTask?.cancel()
+        supabaseAuthTask = nil
+        sessionRefreshTask?.cancel()
+        sessionRefreshTask = nil
+        uiTestSyntheticSessionActive = true
+        isAuthenticated = false
+        isEmailVerified = false
+        awaitingEmailVerification = false
+        userId = nil
+    }
+    #endif
+
     private var previousUserId: String?
     /// True while `delete_my_account` is in flight (password re-auth triggers `.signedIn`; skip profile sync / feed refreshes).
     private var accountDeletionInProgress = false

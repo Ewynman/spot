@@ -54,6 +54,16 @@ struct LocationSearchPolicyTests {
         #expect(region.span.latitudeDelta < 0.6)
     }
 
+    @Test func nearbyRefreshRequiresMeaningfulMove() {
+        let first = CLLocation(latitude: 40.0, longitude: -74.0)
+        let near = CLLocation(latitude: 40.0001, longitude: -74.0)
+        let far = CLLocation(latitude: 40.01, longitude: -74.0)
+
+        #expect(LocationSearchPolicy.shouldRefreshNearby(from: nil, to: first))
+        #expect(!LocationSearchPolicy.shouldRefreshNearby(from: first, to: near))
+        #expect(LocationSearchPolicy.shouldRefreshNearby(from: first, to: far))
+    }
+
     private func makeItem(
         name: String,
         latitude: CLLocationDegrees,
@@ -114,5 +124,111 @@ struct LocationSelectionPolicyTests {
         )
 
         #expect(name == "My Secret Spot")
+    }
+}
+
+struct LocationMapCameraPolicyTests {
+    @Test func customNameUsesWideSpan() {
+        let location = LocationData(
+            coordinate: .init(latitude: 40.7, longitude: -74),
+            placeName: "My Spot",
+            address: nil,
+            isCustomName: true
+        )
+        let span = LocationMapCameraPolicy.optimalSpan(for: location)
+        #expect(span.latitudeDelta == 0.02)
+    }
+
+    @Test func addressWithCommaUsesTightSpan() {
+        let location = LocationData(
+            coordinate: .init(latitude: 40.7, longitude: -74),
+            placeName: "Cafe",
+            address: "123 Main, Brooklyn, NY",
+            isCustomName: false
+        )
+        let span = LocationMapCameraPolicy.optimalSpan(for: location)
+        #expect(span.latitudeDelta == 0.005)
+    }
+
+    @Test func plainPOIUsesMediumSpan() {
+        let location = LocationData(
+            coordinate: .init(latitude: 40.7, longitude: -74),
+            placeName: "Park",
+            address: "Central Park",
+            isCustomName: false
+        )
+        let span = LocationMapCameraPolicy.optimalSpan(for: location)
+        #expect(span.latitudeDelta == 0.01)
+    }
+}
+
+struct LocationPlacemarkFormatterTests {
+    @Test func buildsSubtitleAndAddress() {
+        #expect(
+            LocationPlacemarkFormatter.subtitle(city: "Brooklyn", state: "NY", title: "Title")
+                == "Brooklyn, NY"
+        )
+        #expect(
+            LocationPlacemarkFormatter.subtitle(city: nil, state: nil, title: "Title") == "Title"
+        )
+        #expect(
+            LocationPlacemarkFormatter.address(city: "Brooklyn", state: "NY", country: "USA")
+                == "Brooklyn, NY, USA"
+        )
+        #expect(LocationPlacemarkFormatter.address(city: nil, state: nil, country: nil) == nil)
+    }
+
+    @Test func prefersItemNameThenLocality() {
+        #expect(
+            LocationPlacemarkFormatter.placeName(
+                itemName: "Cafe",
+                city: "Brooklyn",
+                state: "NY",
+                country: "USA"
+            ) == "Cafe"
+        )
+        #expect(
+            LocationPlacemarkFormatter.placeName(
+                itemName: nil,
+                city: nil,
+                state: "NY",
+                country: "USA"
+            ) == "NY"
+        )
+    }
+
+    @Test func reverseGeocodeFallsBackToPrevious() {
+        #expect(
+            LocationPlacemarkFormatter.reverseGeocodedPlaceName(
+                placemarkName: "  Pier  ",
+                city: "Cape Canaveral",
+                state: "FL",
+                previousPlaceName: "Old"
+            ) == "Pier"
+        )
+        #expect(
+            LocationPlacemarkFormatter.reverseGeocodedPlaceName(
+                placemarkName: "   ",
+                city: "Cape Canaveral",
+                state: "FL",
+                previousPlaceName: "Old"
+            ) == "Cape Canaveral, FL"
+        )
+        #expect(
+            LocationPlacemarkFormatter.reverseGeocodedPlaceName(
+                placemarkName: nil,
+                city: nil,
+                state: nil,
+                previousPlaceName: "Old"
+            ) == "Old"
+        )
+    }
+}
+
+struct CanonicalPlaceMatcherTests {
+    @Test func matchesNameAndAliases() {
+        #expect(CanonicalPlaceMatcher.matches(name: "Central Park", aliases: ["cp"], query: " central park "))
+        #expect(CanonicalPlaceMatcher.matches(name: "Central Park", aliases: ["cp"], query: "cp"))
+        #expect(!CanonicalPlaceMatcher.matches(name: "Central Park", aliases: ["cp"], query: "prospect"))
     }
 }

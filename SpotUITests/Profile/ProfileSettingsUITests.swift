@@ -34,5 +34,12 @@ final class ProfileSettingsUITests: XCTestCase {
 
         let settingsRoot = app.descendants(matching: .any)["settings.screenRoot"]
         XCTAssertTrue(settingsRoot.waitForExistence(timeout: 15), "Settings should present settings.screenRoot")
+
+        let account = app.buttons["settings.accountSettingsEntry"]
+        XCTAssertTrue(account.waitForExistence(timeout: 8))
+        account.tap()
+
+        let accountScreen = app.descendants(matching: .any)["settings.accountSettingsScreen"]
+        XCTAssertTrue(accountScreen.waitForExistence(timeout: 10), "Account settings should open from settings list")
     }
 }

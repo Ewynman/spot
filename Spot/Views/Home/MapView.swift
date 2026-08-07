@@ -229,29 +229,35 @@ struct MapView: View {
     private func mapDrawerResolvedHeight(in geo: GeometryProxy) -> CGFloat {
         let safe = geo.safeAreaInsets.bottom
         let ceiling = drawerMaxHeightBelowFilterPills(in: geo)
+        let requested: CGFloat
         switch mapDrawerDetent {
         case .peek:
-            let requested = openPanelHeight(in: geo.size, safe: safe).height
-            return max(Constants.MapDesign.panelMinHeight, min(requested, ceiling))
+            requested = openPanelHeight(in: geo.size, safe: safe).height
         case .expanded:
-            let requested = expandedMapDrawerHeight(in: geo.size, bottomSafeArea: safe)
-            return max(Constants.MapDesign.panelMinHeight, min(requested, ceiling))
+            requested = expandedMapDrawerHeight(in: geo.size, bottomSafeArea: safe)
         }
+        return MapDrawerLayoutPolicy.resolvedHeight(
+            requested: requested,
+            ceiling: ceiling,
+            minHeight: Constants.MapDesign.panelMinHeight
+        )
     }
 
     /// Max drawer height from bottom padding up to `gap` below the measured filter row (or a safe fallback when non‑Pro).
     private func drawerMaxHeightBelowFilterPills(in geo: GeometryProxy) -> CGFloat {
-        let bottomPad = max(geo.safeAreaInsets.bottom, 8)
-        let gap = Constants.MapDesign.mapDrawerGapBelowFilterPills
-        let pillsBottom = filterPillsBottomY(in: geo)
-        let topOfDrawer = pillsBottom + gap
-        return max(0, geo.size.height - topOfDrawer - bottomPad)
+        MapDrawerLayoutPolicy.maxHeightBelowFilterPills(
+            screenHeight: geo.size.height,
+            bottomPadding: max(geo.safeAreaInsets.bottom, 8),
+            pillsBottomY: filterPillsBottomY(in: geo),
+            gap: Constants.MapDesign.mapDrawerGapBelowFilterPills
+        )
     }
 
     private func filterPillsBottomY(in geo: GeometryProxy) -> CGFloat {
-        if let y = mapFilterPillsMaxY, y > 1 { return y }
-        // Non–Pro (no pill row): approximate top chrome so the drawer still doesn’t run under the status area.
-        return geo.safeAreaInsets.top + 52
+        MapDrawerLayoutPolicy.filterPillsBottomY(
+            measuredMaxY: mapFilterPillsMaxY,
+            safeAreaTop: geo.safeAreaInsets.top
+        )
     }
 
     /// Peek height used for pin camera lift — matches capped peek drawer.
@@ -259,14 +265,20 @@ struct MapView: View {
         let safe = geo.safeAreaInsets.bottom
         let requested = openPanelHeight(in: geo.size, safe: safe).height
         let ceiling = drawerMaxHeightBelowFilterPills(in: geo)
-        return max(Constants.MapDesign.panelMinHeight, min(requested, ceiling))
+        return MapDrawerLayoutPolicy.resolvedHeight(
+            requested: requested,
+            ceiling: ceiling,
+            minHeight: Constants.MapDesign.panelMinHeight
+        )
     }
 
     private func expandedMapDrawerHeight(in size: CGSize, bottomSafeArea: CGFloat) -> CGFloat {
-        let topReveal: CGFloat = 8
-        let usable = size.height - bottomSafeArea - topReveal
-        let maxDrawer = size.height * Constants.MapDesign.panelMaxScreenFraction
-        return max(Constants.MapDesign.panelMinHeight, min(usable, maxDrawer))
+        MapDrawerLayoutPolicy.expandedHeight(
+            screenHeight: size.height,
+            bottomSafeArea: bottomSafeArea,
+            maxScreenFraction: Constants.MapDesign.panelMaxScreenFraction,
+            minHeight: Constants.MapDesign.panelMinHeight
+        )
     }
 
     private var mapOnboardingTargets: some View {
@@ -374,16 +386,10 @@ struct MapView: View {
     /// authorized but still waiting on CoreLocation. Hidden when access is
     /// denied/restricted and we have no cached coordinate to recenter on.
     private var shouldShowRecenterControl: Bool {
-        switch permissionManager.locationStatus {
-        case .denied, .restricted:
-            return locationManager.userLocation != nil
-        case .notDetermined:
-            return true
-        case .authorizedAlways, .authorizedWhenInUse:
-            return true
-        @unknown default:
-            return locationManager.userLocation != nil
-        }
+        MapRecenterVisibility.shouldShow(
+            status: permissionManager.locationStatus,
+            hasLocation: locationManager.userLocation != nil
+        )
     }
 
 
