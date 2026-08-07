@@ -17,10 +17,11 @@ enum SpotLaunchConfiguration {
         NSClassFromString("XCTestCase") != nil
     }
 
-    /// True when UI tests set `SPOT_UI_TEST_MODE=1` (DEBUG only).
+    /// True when UI tests set `SPOT_UI_TEST_MODE=1` or `--ui-testing` (DEBUG only).
     static var isUITestMode: Bool {
         #if DEBUG
         ProcessInfo.processInfo.environment["SPOT_UI_TEST_MODE"] == "1"
+            || ProcessInfo.processInfo.arguments.contains("--ui-testing")
         #else
         false
         #endif
@@ -32,13 +33,15 @@ enum SpotLaunchConfiguration {
         case loggedOut
     }
 
+    /// Defaults to `.loggedOut` whenever UI-test mode is on but `SPOT_AUTH_STATE` is unset.
     static var uiTestAuthBootstrap: UITestAuthBootstrap? {
         #if DEBUG
-        guard isUITestMode,
-              let raw = ProcessInfo.processInfo.environment["SPOT_AUTH_STATE"],
-              let value = UITestAuthBootstrap(rawValue: raw)
-        else { return nil }
-        return value
+        guard isUITestMode else { return nil }
+        if let raw = ProcessInfo.processInfo.environment["SPOT_AUTH_STATE"],
+           let value = UITestAuthBootstrap(rawValue: raw) {
+            return value
+        }
+        return .loggedOut
         #else
         nil
         #endif

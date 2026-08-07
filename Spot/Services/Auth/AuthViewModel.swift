@@ -43,13 +43,20 @@ class AuthViewModel: ObservableObject {
     private var sessionRefreshTask: Task<Void, Never>?
 
     init() {
-        restoreVerificationRecovery()
         #if DEBUG
-        if SpotLaunchConfiguration.uiTestAuthBootstrap == .loggedIn {
-            Task { @MainActor in
-                self.configureUITestSyntheticAuthIfNeeded()
+        if SpotLaunchConfiguration.isUITestMode {
+            // Keep UI tests off the indefinite LaunchView path even if Supabase
+            // authStateChanges is slow/hanging on CI simulators.
+            uiTestSyntheticSessionActive = true
+            isLoading = false
+            Task { @MainActor [weak self] in
+                self?.configureUITestSyntheticAuthIfNeeded()
             }
+        } else {
+            restoreVerificationRecovery()
         }
+        #else
+        restoreVerificationRecovery()
         #endif
         listenToSupabaseAuthState()
     }
@@ -94,17 +101,27 @@ class AuthViewModel: ObservableObject {
     @MainActor
     private func configureUITestSyntheticAuthIfNeeded() {
         #if DEBUG
-        guard SpotLaunchConfiguration.uiTestAuthBootstrap == .loggedIn else { return }
+        guard SpotLaunchConfiguration.isUITestMode else { return }
         uiTestSyntheticSessionActive = true
-        userId = SpotLaunchConfiguration.uiTestSyntheticUserId
-        isAuthenticated = true
-        isEmailVerified = true
         isLoading = false
         awaitingEmailVerification = false
-        isPro = SpotLaunchConfiguration.uiTestUserIsPro
-        proUntil = nil
-        if let reauth = SpotLaunchConfiguration.uiTestAccountDeletionReauth {
-            accountDeletionReauthMethod = reauth
+
+        switch SpotLaunchConfiguration.uiTestAuthBootstrap {
+        case .loggedIn:
+            userId = SpotLaunchConfiguration.uiTestSyntheticUserId
+            isAuthenticated = true
+            isEmailVerified = true
+            isPro = SpotLaunchConfiguration.uiTestUserIsPro
+            proUntil = nil
+            if let reauth = SpotLaunchConfiguration.uiTestAccountDeletionReauth {
+                accountDeletionReauthMethod = reauth
+            }
+        case .loggedOut, nil:
+            userId = nil
+            isAuthenticated = false
+            isEmailVerified = false
+            isPro = false
+            proUntil = nil
         }
         #endif
     }

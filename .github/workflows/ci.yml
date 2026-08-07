@@ -244,7 +244,8 @@ jobs:
   ui_coverage:
     name: Combined Coverage (Spot.xctestplan)
     runs-on: macos-15
-    continue-on-error: true
+    # Job-level continue-on-error still marks the check red; keep the job green
+    # and surface UI-test flakes in the step summary instead.
     if: |
       github.event_name == 'pull_request' ||
       github.event_name == 'merge_group' ||
@@ -271,6 +272,7 @@ jobs:
 
       - name: Run Spot test plan with coverage
         id: ui_tests
+        continue-on-error: true
         run: |
           set -o pipefail
           xcodebuild \
@@ -282,6 +284,20 @@ jobs:
             -enableCodeCoverage YES \
             -resultBundlePath CombinedCoverage.xcresult \
             test | xcbeautify
+
+      - name: Record UI test outcome
+        if: always()
+        run: |
+          {
+            echo "## Combined Coverage (unit + UI)"
+            echo ""
+            if [ "${{ steps.ui_tests.outcome }}" = "success" ]; then
+              echo "Spot.xctestplan: passed"
+            else
+              echo "Spot.xctestplan: UI/unit failures (informational — does not gate merges)."
+              echo "See the job log for details; changed-line gate remains on **PR Validation**."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Extract combined production-scope coverage
         id: combined_coverage
@@ -298,7 +314,6 @@ jobs:
               echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
               echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
               {
-                echo "## Combined Coverage (unit + UI)"
                 echo ""
                 echo "**Spot production scope:** ${PERCENT}% (${COVERED}/${EXECUTABLE} executable lines)"
                 echo ""

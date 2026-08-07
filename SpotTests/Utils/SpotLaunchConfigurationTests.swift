@@ -16,4 +16,8 @@ struct SpotLaunchConfigurationTests {
     @Test func syntheticUserIdIsStableUuidString() {
         #expect(UUID(uuidString: SpotLaunchConfiguration.uiTestSyntheticUserId) != nil)
     }
+
+    @Test func uiTestAuthBootstrapNilOutsideUITestMode() {
+        #expect(SpotLaunchConfiguration.uiTestAuthBootstrap == nil)
+    }
 }
