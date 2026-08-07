@@ -57,7 +57,7 @@ Firebase must **not** be used for:
 
 ## Forbidden symbols in `Spot/`
 
-`SpotTests/DataPlaneGuardTests` fails CI/local `SpotTests` if production sources under `Spot/` contain legacy data-plane imports or types, including:
+`SpotTests/Guards/DataPlaneGuardTests` fails CI/local `SpotTests` if production sources under `Spot/` contain legacy data-plane imports or types, including:
 
 - `SpotUploader`, `SpotUploadFirebaseAdapters`, `SpotMultiImageUploadCoordinator` (Firebase-era upload stack)
 - `import FirebaseFirestore`, `import FirebaseStorage`, `import FirebaseAuth`, `import FirebaseDatabase`

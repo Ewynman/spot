@@ -31,7 +31,7 @@ Spot is a **social place-discovery** iOS app. A **Spot** is a saved place recomm
 - Handle **loading, empty, error, and unauthenticated** states in user-facing flows.
 - Prefer **typed services** and **mockable** boundaries for testability.
 - Avoid broad architecture refactors unless explicitly requested.
-- **Data plane:** Supabase only for users, spots, media, and social data. Do **not** add `SpotUploader`, Firestore, or Firebase Storage upload paths. See `docs/engineering/data-plane.md` and `SpotTests/DataPlaneGuardTests.swift`.
+- **Data plane:** Supabase only for users, spots, media, and social data. Do **not** add `SpotUploader`, Firestore, or Firebase Storage upload paths. See `docs/engineering/data-plane.md` and `SpotTests/Guards/DataPlaneGuardTests.swift`.
 - **Supabase DDL**: When you add or change schema under `supabase/migrations/`, **apply it to the Spot Supabase project using the Supabase MCP** `apply_migration` (server `plugin-supabase-supabase`). Use MCP `list_projects` to resolve `project_id` if it is not already known. Do not treat “SQL committed locally” as done until the MCP migration has succeeded (or the user explicitly opts out for a non-linked database).
 
 ## Git workflow

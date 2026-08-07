@@ -10,7 +10,7 @@ Product, engineering, QA.
 
 ## Current status
 
-Map UI lives under `Spot/Views/Home/MapView.swift`, `SharedSpotMap`, `MapControlsOverlay`, `MapSpotPreviewCard`. Drawer dismiss policy is covered by unit tests such as `SpotTests/MapDiscoveryDrawerPolicyTests.swift`.
+Map UI lives under `Spot/Views/Home/MapView.swift`, `SharedSpotMap`, `MapControlsOverlay`, `MapSpotPreviewCard`. Drawer dismiss policy is covered by unit tests such as `SpotTests/Models/MapDiscoveryDrawerPolicyTests.swift`.
 
 ## Details
 

@@ -6,9 +6,17 @@ import Supabase
 
 /// Client gate for staging-only internal email verification (`UT####` exchange).
 enum StagingTestEmailVerification {
+    #if DEBUG
+    /// When set, overrides `isAvailable` so unit tests can exercise unavailable paths.
+    static var isAvailableOverride: Bool?
+    #endif
+
     /// True only for DEBUG / INTERNAL_TESTING builds pointed at staging Supabase.
     static var isAvailable: Bool {
-        SupabaseEnvironment.current == .staging
+        #if DEBUG
+        if let isAvailableOverride { return isAvailableOverride }
+        #endif
+        return SupabaseEnvironment.current == .staging
     }
 
     /// `UT` followed by four digits (e.g. `UT1234`). Actual accepted value is a server secret.
@@ -57,6 +65,8 @@ protocol StagingTestEmailVerifying {
 }
 
 struct StagingTestEmailVerificationService: StagingTestEmailVerifying {
+    var urlSession: URLSession = .shared
+
     func exchange(
         userId: UUID,
         email: String,
@@ -86,7 +96,7 @@ struct StagingTestEmailVerificationService: StagingTestEmailVerifying {
             "code": code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         ])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw StagingTestEmailVerificationError.serverDenied
         }

@@ -52,7 +52,7 @@ xcodebuild -scheme SpotUITests -destination "id=$SIM_ID" test | $BEAUTIFY
 
 ### Adding tests
 
-- Place Swift Testing tests in **`SpotTests/`**.
+- Place Swift Testing tests in **`SpotTests/`**, in the subfolder that mirrors the production file under `Spot/` (see `SpotTests/README.md`).
 - Place XCTest UI tests in **`SpotUITests/`**.
 - Do not cross-contaminate targets (per project rules).
 

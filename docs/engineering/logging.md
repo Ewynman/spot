@@ -108,4 +108,4 @@ Call sites must still follow these rules:
 - `Spot/Utils/LoggingConfig.swift`
 - `Spot/Config/LoggingDefaults.plist`
 - `Spot/Models/Logs/`
-- `SpotTests/SpotLoggerTests.swift`
+- `SpotTests/Utils/SpotLoggerTests.swift`

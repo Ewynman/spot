@@ -28,7 +28,7 @@ This pass implemented the two functional fixes from the PRD (home feed variety a
 
 - **Root cause**: Candidates are correct from `get_home_feed_v1`, but the first hydrated window could still be tag-heavy for low-signal accounts.
 - **Implementation**: `FeedDiversity.diversifyHomeFeedPage` reorders the first items under caps (stricter when `user_feed_profiles`-derived signal count &lt; 10). Parallel fetch of profile snapshot in `FeedRepository` (non-blocking on failure).
-- **Tests**: `SpotTests/FeedDiversityTests.swift`, updated `FeedRankerTests`.
+- **Tests**: `SpotTests/Services/Feed/FeedDiversityTests.swift`, updated `FeedRankerTests`.
 
 ## Follow State Fix
 
@@ -43,9 +43,9 @@ This pass implemented the two functional fixes from the PRD (home feed variety a
 
 ## Tests Added
 
-- `SpotTests/FeedDiversityTests.swift`
-- `SpotTests/PostgresErrorDigestTests.swift`
-- `SpotTests/FeedRankerTests` — `singleLikedTagDoesNotMaxOutVibeComponent`
+- `SpotTests/Services/Feed/FeedDiversityTests.swift`
+- `SpotTests/Utils/PostgresErrorDigestTests.swift`
+- `SpotTests/Services/Feed/FeedRankerTests.swift` — `singleLikedTagDoesNotMaxOutVibeComponent`
 
 ## Remaining Risks
 
