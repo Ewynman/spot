@@ -29,6 +29,9 @@ enum AuthViewModelLogs: SpotLog {
     case usernameAvailabilityCheckFailed
     case userBlocked
     case userUnblocked
+    case internalTestEmailVerificationSucceeded
+    case internalTestEmailVerificationDenied
+    case internalTestEmailTokenExchangeFailed
 
     var tag: String { "AuthViewModel" }
     var level: LogLevel {
@@ -54,6 +57,9 @@ enum AuthViewModelLogs: SpotLog {
         case .usernameAvailabilityCheckFailed: return .error
         case .userBlocked: return .info
         case .userUnblocked: return .info
+        case .internalTestEmailVerificationSucceeded: return .info
+        case .internalTestEmailVerificationDenied: return .info
+        case .internalTestEmailTokenExchangeFailed: return .error
         }
     }
     var message: String {
@@ -79,6 +85,9 @@ enum AuthViewModelLogs: SpotLog {
         case .usernameAvailabilityCheckFailed: return "Username availability check failed"
         case .userBlocked: return "User blocked"
         case .userUnblocked: return "User unblocked"
+        case .internalTestEmailVerificationSucceeded: return "Internal test email verification succeeded"
+        case .internalTestEmailVerificationDenied: return "Internal test email verification denied"
+        case .internalTestEmailTokenExchangeFailed: return "Internal test email token exchange failed"
         }
     }
 }

@@ -184,6 +184,7 @@ class AuthViewModel: ObservableObject {
     private func restoreVerificationRecovery() {
         guard let recovery = AuthVerificationRecoveryStore.shared.load() else { return }
         pendingVerificationEmail = recovery.email
+        pendingVerificationUserId = recovery.userId
         verificationEmailMaskSource = recovery.email
         awaitingEmailVerification = true
     }
@@ -600,18 +601,20 @@ class AuthViewModel: ObservableObject {
     }
 
     // MARK: - Email verification (Supabase email OTP / signup)
-    func beginEmailVerificationPending(email: String, avatar: UIImage?) {
+    func beginEmailVerificationPending(email: String, avatar: UIImage?, userId: UUID? = nil) {
         awaitingEmailVerification = true
         pendingVerificationEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        pendingVerificationUserId = userId
         verificationEmailMaskSource = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         pendingAvatarAfterVerification = avatar
         emailResendAvailableAt = nil
-        AuthVerificationRecoveryStore.shared.save(email: email)
+        AuthVerificationRecoveryStore.shared.save(email: email, userId: userId)
     }
 
     func clearEmailVerificationPending() {
         awaitingEmailVerification = false
         pendingVerificationEmail = nil
+        pendingVerificationUserId = nil
         pendingAvatarAfterVerification = nil
         emailResendAvailableAt = nil
         AuthVerificationRecoveryStore.shared.clear()
@@ -627,6 +630,63 @@ class AuthViewModel: ObservableObject {
             throw NSError(domain: "AuthVM", code: -1, userInfo: [NSLocalizedDescriptionKey: "Missing signup email. Go back and sign up again."])
         }
         _ = try await supabase.auth.verifyOTP(email: email, token: trimmed, type: .signup)
+        try await finishEmailVerificationAfterSession()
+    }
+
+    #if DEBUG || INTERNAL_TESTING
+    /// Staging-only: exchange an internal `UT####` code for a real Supabase session.
+    var isInternalTestEmailVerificationAvailable: Bool {
+        StagingTestEmailVerification.isAvailable && pendingVerificationUserId != nil
+    }
+
+    /// Override in unit tests; production DEBUG path uses the live Edge Function client.
+    var stagingTestEmailVerifier: StagingTestEmailVerifying = StagingTestEmailVerificationService()
+
+    func verifyInternalTestEmailCode(_ code: String) async throws {
+        guard StagingTestEmailVerification.isAvailable else {
+            throw StagingTestEmailVerificationError.unavailable
+        }
+        guard StagingTestEmailVerification.isValidCodeFormat(code) else {
+            throw StagingTestEmailVerificationError.invalidFormat
+        }
+        guard let email = pendingVerificationEmail else {
+            throw StagingTestEmailVerificationError.missingPendingUser
+        }
+        guard let userId = pendingVerificationUserId else {
+            throw StagingTestEmailVerificationError.missingPendingUser
+        }
+
+        do {
+            let exchange = try await stagingTestEmailVerifier.exchange(
+                userId: userId,
+                email: email,
+                code: code
+            )
+            do {
+                _ = try await supabase.auth.verifyOTP(
+                    tokenHash: exchange.tokenHash,
+                    type: exchange.type
+                )
+            } catch {
+                SpotLogger.log(
+                    AuthViewModelLogs.internalTestEmailTokenExchangeFailed,
+                    details: ["error": error.localizedDescription]
+                )
+                throw StagingTestEmailVerificationError.tokenExchangeFailed
+            }
+            SpotLogger.log(AuthViewModelLogs.internalTestEmailVerificationSucceeded)
+            try await finishEmailVerificationAfterSession()
+        } catch let error as StagingTestEmailVerificationError {
+            SpotLogger.log(
+                AuthViewModelLogs.internalTestEmailVerificationDenied,
+                details: ["reason": String(describing: error)]
+            )
+            throw error
+        }
+    }
+    #endif
+
+    private func finishEmailVerificationAfterSession() async throws {
         try await completePendingAvatarUploadIfNeeded()
         clearEmailVerificationPending()
         await SupabaseUserService.shared.syncCurrentUser()
@@ -651,6 +711,7 @@ class AuthViewModel: ObservableObject {
     }
 
     private var pendingVerificationEmail: String?
+    private var pendingVerificationUserId: UUID?
     private var pendingAvatarAfterVerification: UIImage?
 
     func sendVerificationEmail() async throws {

@@ -328,7 +328,11 @@ struct SignupView: View {
 
                 await MainActor.run {
                     if response.session == nil {
-                        authVM.beginEmailVerificationPending(email: cleanEmail, avatar: nil)
+                        authVM.beginEmailVerificationPending(
+                            email: cleanEmail,
+                            avatar: nil,
+                            userId: response.user.id
+                        )
                     } else {
                         authVM.clearEmailVerificationPending()
                     }

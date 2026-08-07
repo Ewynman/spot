@@ -9,6 +9,11 @@ struct ConfirmEmailView: View {
     @State private var isResending = false
     @State private var errorMessage: String?
     @State private var showToast: String?
+    #if DEBUG || INTERNAL_TESTING
+    @State private var showInternalCodeEntry = false
+    @State private var internalTestCode = ""
+    @State private var isVerifyingInternal = false
+    #endif
 
     var body: some View {
         VStack(spacing: 20) {
@@ -133,6 +138,12 @@ struct ConfirmEmailView: View {
                 .accessibilityIdentifier("auth.confirmEmail.resendButton")
             }
 
+            #if DEBUG || INTERNAL_TESTING
+            if authVM.isInternalTestEmailVerificationAvailable {
+                internalTestCodeSection
+            }
+            #endif
+
             AuthDivider()
                 .padding(.horizontal, 32)
 
@@ -165,6 +176,71 @@ struct ConfirmEmailView: View {
     private var otpCode: String {
         otpDigits.joined()
     }
+
+    #if DEBUG || INTERNAL_TESTING
+    @ViewBuilder
+    private var internalTestCodeSection: some View {
+        VStack(spacing: 12) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showInternalCodeEntry.toggle()
+                }
+            } label: {
+                Text(showInternalCodeEntry ? "Hide internal test code" : "Use internal test code")
+                    .font(FontManager.primaryText())
+                    .foregroundColor(Constants.Colors.primary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("auth.confirmEmail.internalTestToggle")
+
+            if showInternalCodeEntry {
+                TextField("UT1234", text: $internalTestCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .font(FontManager.sectionHeader())
+                    .foregroundColor(Constants.Colors.primary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+                    .background(Constants.Colors.welcomeSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Constants.Colors.primary.opacity(0.25), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 32)
+                    .accessibilityIdentifier("auth.confirmEmail.internalTestCode")
+
+                Button {
+                    Task { await verifyInternalTapped() }
+                } label: {
+                    Text(isVerifyingInternal ? "Verifying..." : "Verify internal code")
+                        .font(FontManager.buttonText())
+                        .foregroundColor(Constants.Colors.buttonText)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Constants.Colors.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(isVerifyingInternal || isVerifying || !StagingTestEmailVerification.isValidCodeFormat(internalTestCode))
+                .padding(.horizontal, 32)
+                .accessibilityIdentifier("auth.confirmEmail.internalTestVerifyButton")
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func verifyInternalTapped() async {
+        errorMessage = nil
+        isVerifyingInternal = true
+        defer { isVerifyingInternal = false }
+        do {
+            try await authVM.verifyInternalTestEmailCode(internalTestCode)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    #endif
 
     private func verifyTapped() async {
         errorMessage = nil

@@ -70,6 +70,7 @@ Add previews for new or heavily changed UI when practical to speed design review
 
 1. Cold launch signed out and with a restored session.
 2. Email signup, OTP recovery, login, and logout.
+3. Staging DEBUG / internal builds: allowlisted email + internal `UT####` code on Confirm Email (real emailed OTP still works).
 3. First-run coach complete and skip paths.
 4. Home feed load, refresh, and load more.
 5. Map pin selection, replacement, and pan-away drawer dismissal.
