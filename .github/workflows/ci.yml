@@ -100,9 +100,12 @@ jobs:
         id: coverage
         if: always()
         run: |
+          TITLE="Spot production-scope coverage (SpotTests)"
           if [ -d "TestResults.xcresult" ]; then
             if xcrun xccov view --report --json TestResults.xcresult > coverage-report.json &&
-              SUMMARY=$(python3 scripts/summarize-xccov.py coverage-report.json); then
+              SUMMARY=$(python3 scripts/summarize-xccov.py coverage-report.json \
+                --write-markdown coverage-summary.md \
+                --title "$TITLE"); then
               PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
               COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
               EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
@@ -113,11 +116,27 @@ jobs:
               exit 0
             fi
           fi
+          python3 - <<'PY'
+from pathlib import Path
+import importlib.util
+spec = importlib.util.spec_from_file_location("summarize_xccov", "scripts/summarize-xccov.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+Path("coverage-summary.md").write_text(
+    mod.unavailable_markdown(
+        title="Spot production-scope coverage (SpotTests)",
+        reason="TestResults.xcresult missing or could not be summarized",
+    ),
+    encoding="utf-8",
+)
+PY
           echo "percent=unknown" >> "$GITHUB_OUTPUT"
       
       - name: Validate Code Coverage
         id: coverage_validation
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: |
+          always() &&
+          (github.event_name == 'pull_request' || github.event_name == 'merge_group')
         run: |
           set -o pipefail
           echo "Validating coverage of the lines changed by this PR..."
@@ -132,6 +151,7 @@ jobs:
           name: test-results
           path: TestResults.xcresult
           retention-days: 7
+          if-no-files-found: warn
       
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -141,24 +161,25 @@ jobs:
           path: |
             coverage-report.json
             coverage-report.txt
-            ~/Library/Developer/Xcode/DerivedData/**/ProfileData
+            coverage-summary.md
           retention-days: 7
+          if-no-files-found: warn
       
       - name: Generate coverage report summary
         if: always()
         run: |
-          if [ -d "TestResults.xcresult" ]; then
-            echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            PERCENT="${{ steps.coverage.outputs.percent }}"
-            if [ -n "$PERCENT" ] && [ "$PERCENT" != "unknown" ]; then
-              echo "**Spot production scope:** ${PERCENT}% (${{ steps.coverage.outputs.covered }}/${{ steps.coverage.outputs.executable }} executable lines)" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "This informational metric includes production Swift under Spot/ (including Views). Package dependencies, test targets, and Spot/Models/Logs are excluded." >> $GITHUB_STEP_SUMMARY
-            else
-              echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
-            fi
+          echo "## Code Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f coverage-summary.md ]; then
+            # Drop the H1 — the step summary already has a section heading.
+            tail -n +2 coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Coverage data not available" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          PERCENT="${{ steps.coverage.outputs.percent }}"
+          if [ -n "$PERCENT" ] && [ "$PERCENT" != "unknown" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Artifact: \`coverage-reports\` (JSON + Markdown)." >> "$GITHUB_STEP_SUMMARY"
           fi
       
       - name: Comment PR with results
@@ -303,9 +324,12 @@ jobs:
         id: combined_coverage
         if: always()
         run: |
+          TITLE="Spot production-scope coverage (Spot.xctestplan)"
           if [ -d "CombinedCoverage.xcresult" ]; then
             if xcrun xccov view --report --json CombinedCoverage.xcresult > combined-coverage-report.json &&
-              SUMMARY=$(python3 scripts/summarize-xccov.py combined-coverage-report.json); then
+              SUMMARY=$(python3 scripts/summarize-xccov.py combined-coverage-report.json \
+                --write-markdown combined-coverage-summary.md \
+                --title "$TITLE"); then
               PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
               COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
               EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
@@ -315,15 +339,32 @@ jobs:
               echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
               {
                 echo ""
-                echo "**Spot production scope:** ${PERCENT}% (${COVERED}/${EXECUTABLE} executable lines)"
+                tail -n +2 combined-coverage-summary.md
                 echo ""
-                echo "Includes Views; excludes Models/Logs, packages, and test targets. Informational — does not gate PRs."
+                echo "Artifact: \`combined-coverage\` (JSON + Markdown + xcresult)."
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
           fi
+          python3 - <<'PY'
+from pathlib import Path
+import importlib.util
+spec = importlib.util.spec_from_file_location("summarize_xccov", "scripts/summarize-xccov.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+Path("combined-coverage-summary.md").write_text(
+    mod.unavailable_markdown(
+        title="Spot production-scope coverage (Spot.xctestplan)",
+        reason="CombinedCoverage.xcresult missing or could not be summarized",
+    ),
+    encoding="utf-8",
+)
+PY
           echo "percent=unknown" >> "$GITHUB_OUTPUT"
-          echo "Combined coverage data not available" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ""
+            tail -n +2 combined-coverage-summary.md
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload combined coverage results
         uses: actions/upload-artifact@v4
@@ -333,4 +374,6 @@ jobs:
           path: |
             CombinedCoverage.xcresult
             combined-coverage-report.json
+            combined-coverage-summary.md
           retention-days: 7
+          if-no-files-found: warn

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Summarize xccov data for Spot's production coverage boundary."""
 
+from __future__ import annotations
+
+import argparse
 import importlib.util
 import json
 import sys
@@ -67,19 +70,72 @@ def summarize(report: dict) -> dict:
     }
 
 
+def format_markdown(summary: dict, *, title: str) -> str:
+    return "\n".join(
+        [
+            f"# {title}",
+            "",
+            "| Metric | Value |",
+            "| --- | --- |",
+            f"| Coverage | {summary['percent']}% |",
+            f"| Covered lines | {summary['coveredLines']} |",
+            f"| Executable lines | {summary['executableLines']} |",
+            f"| Files in scope | {summary['fileCount']} |",
+            "",
+            "Scope: `Spot/` production Swift including Views; excludes `Models/Logs`, packages, and test targets.",
+            "",
+        ]
+    )
+
+
+def unavailable_markdown(*, title: str, reason: str) -> str:
+    return "\n".join(
+        [
+            f"# {title}",
+            "",
+            "Coverage data was **not available** for this run.",
+            "",
+            f"Reason: {reason}",
+            "",
+        ]
+    )
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <xccov-report.json>", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(
+        description="Summarize Spot production-scope coverage from an xccov JSON report."
+    )
+    parser.add_argument("report_json", help="Path to xcrun xccov --report --json output")
+    parser.add_argument(
+        "--write-markdown",
+        metavar="PATH",
+        help="Also write a human-readable Markdown summary to PATH",
+    )
+    parser.add_argument(
+        "--title",
+        default="Spot production-scope coverage",
+        help="Markdown report title",
+    )
+    args = parser.parse_args()
 
     try:
-        with open(sys.argv[1], encoding="utf-8") as report_file:
+        with open(args.report_json, encoding="utf-8") as report_file:
             summary = summarize(json.load(report_file))
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
         print(f"Unable to summarize coverage: {error}", file=sys.stderr)
+        if args.write_markdown:
+            Path(args.write_markdown).write_text(
+                unavailable_markdown(title=args.title, reason=str(error)),
+                encoding="utf-8",
+            )
         return 1
 
     print(json.dumps(summary, separators=(",", ":")))
+    if args.write_markdown:
+        Path(args.write_markdown).write_text(
+            format_markdown(summary, title=args.title),
+            encoding="utf-8",
+        )
     return 0
 
 

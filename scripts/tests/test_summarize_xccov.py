@@ -114,6 +114,20 @@ class SummarizeXccovTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no executable lines"):
             summarize_xccov.summarize(report)
 
+    def test_format_markdown_includes_percent(self):
+        md = summarize_xccov.format_markdown(
+            {
+                "percent": 54.5,
+                "coveredLines": 120,
+                "executableLines": 220,
+                "fileCount": 3,
+            },
+            title="Unit coverage",
+        )
+        self.assertIn("# Unit coverage", md)
+        self.assertIn("54.5%", md)
+        self.assertIn("120", md)
+
 
 if __name__ == "__main__":
     unittest.main()
