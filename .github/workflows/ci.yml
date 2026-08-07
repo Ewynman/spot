@@ -96,7 +96,7 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             test | xcbeautify
       
-      - name: Extract unit-test scope coverage
+      - name: Extract production-scope coverage
         id: coverage
         if: always()
         run: |
@@ -106,7 +106,7 @@ jobs:
               PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
               COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
               EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
-              echo "Spot unit-test scope coverage: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
+              echo "Spot production scope coverage: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
               echo "percent=${PERCENT}" >> "$GITHUB_OUTPUT"
               echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
               echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
@@ -153,9 +153,9 @@ jobs:
             
             PERCENT="${{ steps.coverage.outputs.percent }}"
             if [ -n "$PERCENT" ] && [ "$PERCENT" != "unknown" ]; then
-              echo "**Spot unit-test scope:** ${PERCENT}% (${{ steps.coverage.outputs.covered }}/${{ steps.coverage.outputs.executable }} executable lines)" >> $GITHUB_STEP_SUMMARY
+              echo "**Spot production scope:** ${PERCENT}% (${{ steps.coverage.outputs.covered }}/${{ steps.coverage.outputs.executable }} executable lines)" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "This informational metric includes non-view production Swift files in Spot.app. Package dependencies, tests, and SwiftUI views are excluded." >> $GITHUB_STEP_SUMMARY
+              echo "This informational metric includes production Swift under Spot/ (including Views). Package dependencies, test targets, and Spot/Models/Logs are excluded." >> $GITHUB_STEP_SUMMARY
             else
               echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
             fi
@@ -182,11 +182,11 @@ jobs:
             
             comment += '### Coverage\n';
             if (unitScopeCoverage && unitScopeCoverage !== 'unknown' && unitScopeCoverage !== '') {
-              comment += `**Spot unit-test scope coverage (informational): ${unitScopeCoverage}%**\n\n`;
+              comment += `**Spot production scope coverage (informational): ${unitScopeCoverage}%**\n\n`;
             } else {
-              comment += 'Unit-test scope coverage data was not available for this run.\n\n';
+              comment += 'Production scope coverage data was not available for this run.\n\n';
             }
-            comment += 'This metric excludes package dependencies, test targets, and `Spot/Views/`; those previously made the project aggregate misleading.\n\n';
+            comment += 'This metric includes `Spot/` production Swift (including Views). It excludes package dependencies, test targets, and `Spot/Models/Logs/`.\n\n';
             comment += `**Changed-line coverage gate (80% minimum): ${icon(coverageOutcome)}**\n\n`;
             
             // Include the per-changed-file coverage breakdown when available.
@@ -238,3 +238,84 @@ jobs:
                 body: comment
               });
             }
+
+  # Combined unit+UI coverage trend. Informational only — does not gate PRs.
+  # Changed-line enforcement stays on the validation job (SpotTests).
+  ui_coverage:
+    name: Combined Coverage (Spot.xctestplan)
+    runs-on: macos-15
+    continue-on-error: true
+    if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Install dependencies
+        run: |
+          brew install xcbeautify
+          brew install jq
+
+      - name: Run Spot test plan with coverage
+        id: ui_tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -scheme Spot \
+            -testPlan Spot \
+            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -parallel-testing-enabled NO \
+            -maximum-parallel-testing-workers 1 \
+            -enableCodeCoverage YES \
+            -resultBundlePath CombinedCoverage.xcresult \
+            test | xcbeautify
+
+      - name: Extract combined production-scope coverage
+        id: combined_coverage
+        if: always()
+        run: |
+          if [ -d "CombinedCoverage.xcresult" ]; then
+            if xcrun xccov view --report --json CombinedCoverage.xcresult > combined-coverage-report.json &&
+              SUMMARY=$(python3 scripts/summarize-xccov.py combined-coverage-report.json); then
+              PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
+              COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
+              EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
+              echo "Combined Spot production scope: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
+              echo "percent=${PERCENT}" >> "$GITHUB_OUTPUT"
+              echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
+              echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
+              {
+                echo "## Combined Coverage (unit + UI)"
+                echo ""
+                echo "**Spot production scope:** ${PERCENT}% (${COVERED}/${EXECUTABLE} executable lines)"
+                echo ""
+                echo "Includes Views; excludes Models/Logs, packages, and test targets. Informational — does not gate PRs."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo "percent=unknown" >> "$GITHUB_OUTPUT"
+          echo "Combined coverage data not available" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload combined coverage results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combined-coverage
+          path: |
+            CombinedCoverage.xcresult
+            combined-coverage-report.json
+          retention-days: 7

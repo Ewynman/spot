@@ -323,15 +323,11 @@ class PostFlowViewModel: ObservableObject {
     /// Client-side guard aligned with server publish RPC (non‑Pro bypass prevention).
     private func entitlementViolationMessage() -> String? {
         guard let auth = authViewModel else { return nil }
-        let maxImg = auth.isPro ? Constants.PostLimits.maxProPostImages : Constants.PostLimits.maxFreePostImages
-        let maxVib = auth.isPro ? Constants.PostLimits.maxProPostVibes : Constants.PostLimits.maxFreePostVibes
-        if selectedImages.count > maxImg {
-            return auth.isPro ? Constants.PostLimits.proTooManyImagesMessage : Constants.PostLimits.freeMultipleImagesMessage
-        }
-        if selectedVibes.count > maxVib {
-            return auth.isPro ? Constants.PostLimits.proTooManyVibesMessage : Constants.PostLimits.freeMultipleVibesMessage
-        }
-        return nil
+        return PostEntitlementGuard.message(
+            isPro: auth.isPro,
+            imageCount: selectedImages.count,
+            vibeCount: selectedVibes.count
+        )
     }
 
     private func resetComposerForDraftExit() {

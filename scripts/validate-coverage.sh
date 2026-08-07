@@ -57,6 +57,7 @@ fi
 echo -e "${BLUE}=== Changed-Line Coverage Validation ===${NC}"
 echo "Coverage threshold: ${COVERAGE_THRESHOLD}% of changed executable lines"
 echo "Enforced once a file has at least ${MIN_CHANGED_LINES} changed executable lines"
+echo "Scope: Spot/ production Swift including Views; excludes Models/Logs and tests"
 echo "Base branch: ${BASE_BRANCH}"
 echo "xcresult: ${XCRESULT_PATH}"
 echo ""
@@ -65,13 +66,30 @@ echo ""
 echo -e "${BLUE}Getting changed files...${NC}"
 git fetch origin "${BASE_BRANCH##*/}" --depth=1 2>/dev/null || true
 
-# SwiftUI view execution is measured by the separate SpotUITests scheme, not by
-# this unit-test job. Enforce unit coverage on changed non-view production code.
+# Production scope includes Spot/Views and excludes Spot/Models/Logs (log enums).
 # `--diff-filter=d` drops deleted files, which have no lines left to cover.
-CHANGED_FILES=$(git diff --name-only --diff-filter=d "${BASE_BRANCH}" -- '*.swift' | grep -E '^Spot/' | grep -v '^Spot/Views/' | grep -v 'SpotTests/' | grep -v 'SpotUITests/' || true)
+CHANGED_FILES=$(
+    git diff --name-only --diff-filter=d "${BASE_BRANCH}" -- '*.swift' \
+        | python3 -c '
+import sys
+from pathlib import Path
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "coverage_scope",
+    Path("scripts/coverage_scope.py"),
+)
+mod = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(mod)
+for line in sys.stdin:
+    path = line.strip()
+    if path and mod.is_in_coverage_scope(path):
+        print(path)
+'
+)
 
 if [ -z "$CHANGED_FILES" ]; then
-    echo -e "${GREEN}✓ No production Swift files changed - skipping coverage check${NC}"
+    echo -e "${GREEN}✓ No in-scope production Swift files changed - skipping coverage check${NC}"
     exit 0
 fi
 

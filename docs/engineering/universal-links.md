@@ -10,7 +10,7 @@ Engineers, release owners, and anyone debugging share links.
 
 ## Current status
 
-Verified against `Spot/Services/DeepLinkRouter.swift`, `Spot/ViewModels/DeepLinkState.swift`, `Spot/Utils/URLConfiguration.swift`, `Spot/Spot.entitlements`, and `Spot/Info.plist` (`SpotURLs`). Spot fetch uses **`SpotService`** / Supabase-backed services (not Firestore).
+Verified against `Spot/Services/Core/DeepLinkRouter.swift`, `Spot/ViewModels/DeepLinkState.swift`, `Spot/Utils/URLConfiguration.swift`, `Spot/Spot.entitlements`, and `Spot/Info.plist` (`SpotURLs`). Spot fetch uses **`SpotService`** / Supabase-backed services (not Firestore).
 
 ## Details
 
@@ -44,7 +44,7 @@ Associated Domains in `Spot/Spot.entitlements`:
 
 ### Implementation components
 
-1. **`DeepLinkRouter`** (`Spot/Services/DeepLinkRouter.swift`) — Parses URLs into `DeepLinkRoute` (`.spotDetail`, `.subscriptionReturn`, `.unknown`). Validates spot IDs: non-empty, max length 50, alphanumeric + `_` `-`.
+1. **`DeepLinkRouter`** (`Spot/Services/Core/DeepLinkRouter.swift`) — Parses URLs into `DeepLinkRoute` (`.spotDetail`, `.subscriptionReturn`, `.unknown`). Validates spot IDs: non-empty, max length 50, alphanumeric + `_` `-`.
 2. **`DeepLinkState`** (`Spot/ViewModels/DeepLinkState.swift`) — `@MainActor` navigation state, pending deep link on cold start or when logged out, debounce for duplicate spot IDs, integrates **`SpotService.shared`** for `fetchSpotById`.
 3. **`URLConfiguration`** — Reads `SpotURLs` from Info.plist for share base URL and allowed universal hosts; **`ShareSheet`** uses `shareURL(for:)` for `https://…/s/{id}` style links.
 

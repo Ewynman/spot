@@ -746,12 +746,7 @@ struct MapView: View {
 
     /// After dismiss, zoom back to the pre-spot viewport unless the user already moved the map (e.g. pan dismiss).
     private func shouldRestoreViewportAfterDismiss(reason: MapDrawerDismissReason) -> Bool {
-        switch reason {
-        case .mapMoved:
-            return false
-        default:
-            return true
-        }
+        MapDrawerDismissRestore.shouldRestoreViewport(after: reason)
     }
 
     private func closePanel() {

@@ -685,10 +685,7 @@ struct SettingsView: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        SettingsDateFormatter.mediumDate(date)
     }
     
     private func uploadProfilePhoto(_ image: UIImage) {
@@ -1093,10 +1090,7 @@ private struct SubscriptionSettingsDetailView: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        SettingsDateFormatter.mediumDate(date)
     }
 }
 

@@ -10,14 +10,15 @@ New developers, reviewers, release owners, support, and Cursor agents.
 
 ## Current status
 
-Code and workflow behavior were re-audited on **2026-07-28**. Remaining unknowns are explicitly marked; verified implementation gaps are documented as limitations rather than target behavior.
+Code and workflow behavior were re-audited on **2026-08-06** (coverage scope, Services folder mirror, SpotTests layout). Remaining unknowns are explicitly marked; verified implementation gaps are documented as limitations rather than target behavior.
 
 ## Details
 
 ### Start here
 
 1. Read the [root README](../README.md) for a one-minute overview, quick start, and links.
-2. Pick a reading path below.
+2. Skim [`Spot/README.md`](../Spot/README.md) for the app source map.
+3. Pick a reading path below.
 
 ### Product
 

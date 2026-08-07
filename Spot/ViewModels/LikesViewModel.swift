@@ -32,18 +32,7 @@ class LikesViewModel: ObservableObject {
             let result = try await UserSpotService.shared.fetchLikedSpots(pageSize: pageSize)
             SpotLogger.log(LikesViewModelLogs.fetchedSpotsFromService, details: ["count": result.spots.count])
 
-            // Filter out duplicates within session
-            let newSpots = result.spots.filter { spot in
-                guard let spotId = spot.id else {
-                    SpotLogger.log(LikesViewModelLogs.spotWithoutIdFound)
-                    return false
-                }
-                let isNew = !loadedSpotIds.contains(spotId)
-                if isNew {
-                    loadedSpotIds.insert(spotId)
-                }
-                return isNew
-            }
+            let newSpots = SpotListDeduper.accepting(result.spots, into: &loadedSpotIds)
 
             spots = newSpots
             lastCursor = result.lastCursor

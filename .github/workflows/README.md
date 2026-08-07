@@ -16,7 +16,7 @@ This directory contains GitHub Actions workflows for the Spot iOS app.
   - **API Breaking Change Detection**: Scans for changes to public Swift APIs
   - **Documentation Validation**: Checks if documentation needs updates
   - **Unit Tests**: Runs the full `SpotTests` suite with one serial test worker
-  - **Code Coverage Enforcement**: Validates 80% minimum coverage of the lines changed in non-view files
+  - **Code Coverage Enforcement**: Validates 80% minimum coverage of the lines changed in production-scope files (includes Views; excludes `Models/Logs`)
 - Uses macOS 15 runners and reports the selected Xcode version at runtime
 - Boots an iPhone simulator and executes tests
 - Enables code coverage collection
@@ -38,23 +38,29 @@ The workflow uses three validation scripts in `scripts/`:
    - Provides suggestions for which docs may need updates
 
 3. **`validate-coverage.sh`**
-   - Enforces 80% minimum coverage of the lines changed in non-view production files
-   - Excludes `Spot/Views/`, which belongs to the separate UI-test coverage boundary
+   - Enforces 80% minimum coverage of the lines changed in production-scope files
+   - Scope is defined by `scripts/coverage_scope.py` (includes `Spot/Views/`; excludes `Spot/Models/Logs/`)
    - Uses `xcrun xccov` to extract coverage from `.xcresult` bundles
    - Fails PR if coverage threshold not met
    - Shows detailed per-file coverage breakdown
 
-The PR comment also includes an informational unit-test scope percentage from
-`scripts/summarize-xccov.py`. It includes non-view `Spot.app` production files
-only; package dependencies, test targets, and SwiftUI views are excluded. This
-avoids presenting the root `xccov` aggregate—which includes linked packages—as
-if it represented the app's test coverage.
+The PR comment also includes an informational production-scope percentage from
+`scripts/summarize-xccov.py`. It includes `Spot.app` production files (Views
+included); package dependencies, test targets, and `Models/Logs` are excluded.
+This avoids presenting the root `xccov` aggregate—which includes linked
+packages—as if it represented the app's test coverage.
 
 **Test output:**
 - Test results are formatted with `xcbeautify` for readable output
 - Test results (`.xcresult` bundles) are uploaded as artifacts for 7 days
 - Code coverage reports are uploaded as artifacts for 7 days
 - Validation results posted as PR comment with pass/fail status
+
+**Combined coverage job (`ui_coverage`):**
+- Runs `-scheme Spot -testPlan Spot` with coverage enabled
+- Reports informational production-scope % (Views included; `Models/Logs` excluded)
+- `continue-on-error: true` — does not gate PR merges
+- Uploads `combined-coverage` artifact for 7 days
 
 ---
 

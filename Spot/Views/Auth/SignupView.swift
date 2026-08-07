@@ -238,16 +238,12 @@ struct SignupView: View {
     }
 
     private var passwordRequirements: some View {
-        let checks: [(String, Bool)] = [
-            ("At least 8 characters", password.count >= 8),
-            ("A letter and a number", password.rangeOfCharacter(from: .letters) != nil && password.rangeOfCharacter(from: .decimalDigits) != nil),
-            ("One symbol", password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil)
-        ]
+        let checks = PasswordRequirementChecks.evaluate(password)
         return VStack(alignment: .leading, spacing: 4) {
-            ForEach(checks, id: \.0) { label, isMet in
-                Label(label, systemImage: isMet ? "checkmark.circle.fill" : "circle")
+            ForEach(checks, id: \.label) { requirement in
+                Label(requirement.label, systemImage: requirement.isMet ? "checkmark.circle.fill" : "circle")
                     .font(.caption2)
-                    .foregroundColor(isMet ? Constants.Colors.mapFilterMatch : Constants.Colors.welcomeMutedText)
+                    .foregroundColor(requirement.isMet ? Constants.Colors.mapFilterMatch : Constants.Colors.welcomeMutedText)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -63,4 +63,26 @@ struct SpotSupabaseRepositoryParseTests {
     @Test func postgresILikeEscapeEscapesWildcardsAndBackslash() {
         #expect(SpotSupabaseRepository.postgresILikeEscaped("a%b_c\\d") == "a\\%b\\_c\\\\d")
     }
+
+    @Test func detectsAbsoluteStoredURLs() {
+        #expect(SpotSupabaseRepository.isStoredAbsoluteURLForTests("https://cdn.example/p.jpg"))
+        #expect(SpotSupabaseRepository.isStoredAbsoluteURLForTests("http://cdn.example/p.jpg"))
+        #expect(!SpotSupabaseRepository.isStoredAbsoluteURLForTests("users/abc/photo.jpg"))
+    }
+
+    @Test func parseModerateImageJSONRequiresApprovedBoolean() throws {
+        let approved = try #require(#"{"approved":true,"reason":"ok"}"#.data(using: .utf8))
+        let parsedApproved = SpotSupabaseRepository.parseModerateImageJSON(approved)
+        #expect(parsedApproved.approved)
+        #expect(parsedApproved.reason == "ok")
+
+        let placeholder = try #require(#"{"ok":true}"#.data(using: .utf8))
+        let parsedPlaceholder = SpotSupabaseRepository.parseModerateImageJSON(placeholder)
+        #expect(!parsedPlaceholder.approved)
+
+        let invalid = try #require("not-json".data(using: .utf8))
+        let parsedInvalid = SpotSupabaseRepository.parseModerateImageJSON(invalid)
+        #expect(!parsedInvalid.approved)
+        #expect(parsedInvalid.reason == "moderation_unavailable")
+    }
 }

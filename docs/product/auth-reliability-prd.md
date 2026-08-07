@@ -326,7 +326,7 @@ These items cannot be established from repository code alone:
 
 - `Spot/Supabase/Supabase.swift`
 - `Spot/Services/Auth/AuthViewModel.swift`
-- `Spot/Services/AuthService.swift`
+- `Spot/Services/Auth/AuthService.swift`
 - `Spot/Views/Auth/SignupView.swift`
 - `Spot/Views/Auth/LoginView.swift`
 - `Spot/Views/Auth/ConfirmEmailView.swift`

@@ -218,5 +218,5 @@ When adding private account features:
 
 - `docs/engineering/database-and-rls.md` - RLS policies for private accounts
 - `docs/engineering/networking-and-auth.md` - Authentication flow
-- `Spot/Services/AuthorPrivacyCache.swift` - Privacy cache implementation
-- `Spot/Services/FollowRequestsService.swift` - Follow request logic
+- `Spot/Services/Social/AuthorPrivacyCache.swift` - Privacy cache implementation
+- `Spot/Services/Social/FollowRequestsService.swift` - Follow request logic

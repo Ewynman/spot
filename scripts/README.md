@@ -21,7 +21,8 @@ Enforces minimum code coverage requirements on changed files in pull requests.
 **What it does:**
 - Extracts coverage data using `xcrun xccov`
 - Identifies changed Swift files via `git diff`
-- Calculates coverage for changed executable lines in non-view `Spot/` files
+- Filters to the shared production coverage scope (`scripts/coverage_scope.py`)
+- Calculates coverage for changed executable lines in in-scope `Spot/` files (including Views; excluding `Models/Logs`)
 - Fails if an enforced file is below the threshold (files enter enforcement at 10 changed executable lines)
 - Provides detailed per-file coverage breakdown
 
@@ -30,16 +31,30 @@ Enforces minimum code coverage requirements on changed files in pull requests.
 - `git` for diff comparison
 - `xcrun` with xccov
 
+### `coverage_scope.py`
+
+Shared include/exclude rules for Spot production coverage:
+
+- **Include:** all `Spot/**` production Swift, including `Spot/Views/`
+- **Exclude:** `Spot/Models/Logs/`, `SpotTests/`, `SpotUITests/`, package dependencies
+
 ### `summarize-xccov.py`
 
-Calculates the informational unit-test scope metric shown in CI. It selects the
-`Spot.app` target and computes weighted line coverage for non-view production
-Swift files. Package dependencies, test targets, and `Spot/Views/` are excluded
-because they are outside the unit-test coverage boundary.
+Calculates the informational **Spot production scope** metric shown in CI. It
+selects the `Spot.app` target and computes weighted line coverage using
+`coverage_scope.py`.
 
 ```bash
 xcrun xccov view --report --json TestResults.xcresult > coverage-report.json
 python3 scripts/summarize-xccov.py coverage-report.json
+```
+
+### `show-uncovered-changed-lines.sh`
+
+Lists changed executable lines with zero hits for local pre-push debugging.
+
+```bash
+./scripts/show-uncovered-changed-lines.sh TestResults.xcresult origin/main
 ```
 
 **Example:**

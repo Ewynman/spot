@@ -129,29 +129,22 @@ struct VibeSelectionView: View {
     }
 
     private func toggleVibe(_ vibe: String) {
-        if selectedVibes.contains(vibe) {
-            selectedVibes.removeAll { $0 == vibe }
-            return
-        }
-        if !authVM.isPro {
-            if !selectedVibes.isEmpty {
-                validationMessage = Constants.PostLimits.freeMultipleVibesMessage
-                AnalyticsService.shared.logEvent("post_multiple_vibes_upsell_shown", parameters: [:])
-            } else {
-                validationMessage = nil
-            }
-            selectedVibes = [vibe]
-            reloadRecentAndFrequent()
-            return
-        }
-        if selectedVibes.count >= maxVibes {
-            validationMessage = Constants.PostLimits.proTooManyVibesMessage
+        let outcome = VibeSelectionPolicy.toggle(
+            current: selectedVibes,
+            vibe: vibe,
+            isPro: authVM.isPro,
+            maxVibes: maxVibes
+        )
+        if outcome.validationMessage == Constants.PostLimits.freeMultipleVibesMessage {
+            AnalyticsService.shared.logEvent("post_multiple_vibes_upsell_shown", parameters: [:])
+        } else if outcome.validationMessage == Constants.PostLimits.proTooManyVibesMessage {
             AnalyticsService.shared.logEvent("post_vibe_limit_reached", parameters: ["max": maxVibes])
-            return
         }
-        validationMessage = nil
-        selectedVibes.append(vibe)
-        reloadRecentAndFrequent()
+        selectedVibes = outcome.selectedVibes
+        validationMessage = outcome.validationMessage
+        if outcome.didChange {
+            reloadRecentAndFrequent()
+        }
     }
 
     private var customVibeInput: some View {

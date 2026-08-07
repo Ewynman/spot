@@ -11,7 +11,7 @@ SPEC.loader.exec_module(summarize_xccov)
 
 
 class SummarizeXccovTests(unittest.TestCase):
-    def test_summarizes_only_non_view_files_in_app_target(self):
+    def test_summarizes_production_scope_including_views_excluding_logs(self):
         report = {
             "targets": [
                 {
@@ -39,8 +39,13 @@ class SummarizeXccovTests(unittest.TestCase):
                         },
                         {
                             "path": "/runner/repo/Spot/Views/Home/HomeView.swift",
+                            "coveredLines": 30,
+                            "executableLines": 100,
+                        },
+                        {
+                            "path": "/runner/repo/Spot/Models/Logs/AuthViewModelLogs.swift",
                             "coveredLines": 0,
-                            "executableLines": 300,
+                            "executableLines": 50,
                         },
                     ],
                 },
@@ -57,13 +62,14 @@ class SummarizeXccovTests(unittest.TestCase):
             ]
         }
 
+        # 75+15+30 = 120 covered / 100+20+100 = 220 executable = 54.5%
         self.assertEqual(
             summarize_xccov.summarize(report),
             {
-                "percent": 75.0,
-                "coveredLines": 90,
-                "executableLines": 120,
-                "fileCount": 2,
+                "percent": 54.5,
+                "coveredLines": 120,
+                "executableLines": 220,
+                "fileCount": 3,
             },
         )
 
@@ -89,14 +95,14 @@ class SummarizeXccovTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Spot app target not found"):
             summarize_xccov.summarize({"targets": [{"name": "SpotTests.xctest"}]})
 
-    def test_rejects_empty_unit_test_scope(self):
+    def test_rejects_empty_production_scope(self):
         report = {
             "targets": [
                 {
                     "name": "Spot.app",
                     "files": [
                         {
-                            "path": "/runner/repo/Spot/Views/HomeView.swift",
+                            "path": "/runner/repo/Spot/Models/Logs/HomeViewLogs.swift",
                             "coveredLines": 1,
                             "executableLines": 1,
                         }

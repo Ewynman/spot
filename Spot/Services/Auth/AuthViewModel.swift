@@ -781,13 +781,7 @@ class AuthViewModel: ObservableObject {
     }
 
     var maskedEmail: String {
-        let e = verificationEmailMaskSource
-        guard let at = e.firstIndex(of: "@") else { return e }
-        let name = e[..<at]
-        let domain = e[at...]
-        let keep = min(2, name.count)
-        let head = name.prefix(keep)
-        return String(head) + "****" + String(domain)
+        VerificationEmailMask.mask(verificationEmailMaskSource)
     }
 
     // MARK: - Reauthentication

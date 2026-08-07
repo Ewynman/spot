@@ -1,28 +1,25 @@
 #!/usr/bin/env python3
-"""Summarize xccov data for Spot's unit-test coverage boundary."""
+"""Summarize xccov data for Spot's production coverage boundary."""
 
+import importlib.util
 import json
 import sys
-from pathlib import PurePosixPath
+from pathlib import Path
 
+
+def _load_coverage_scope():
+    script_dir = Path(__file__).resolve().parent
+    scope_path = script_dir / "coverage_scope.py"
+    spec = importlib.util.spec_from_file_location("coverage_scope", scope_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+coverage_scope = _load_coverage_scope()
 
 APP_TARGET_NAMES = ("Spot.app", "Spot")
-
-
-def is_unit_test_scope(path: str) -> bool:
-    parts = PurePosixPath(path).parts
-    try:
-        spot_index = parts.index("Spot")
-    except ValueError:
-        return False
-
-    relative_parts = parts[spot_index + 1 :]
-    return (
-        bool(relative_parts)
-        and relative_parts[0] != "Views"
-        and "SpotTests" not in parts
-        and "SpotUITests" not in parts
-    )
 
 
 def summarize(report: dict) -> dict:
@@ -46,7 +43,8 @@ def summarize(report: dict) -> dict:
     file_count = 0
 
     for file_report in target.get("files", []):
-        if not is_unit_test_scope(file_report.get("path", "")):
+        path = file_report.get("path", "")
+        if not coverage_scope.is_in_coverage_scope(path):
             continue
 
         executable = int(file_report.get("executableLines", 0))
@@ -59,7 +57,7 @@ def summarize(report: dict) -> dict:
         file_count += 1
 
     if executable_lines == 0:
-        raise ValueError("Spot app target has no executable lines in the unit-test scope")
+        raise ValueError("Spot app target has no executable lines in the production scope")
 
     return {
         "percent": round(covered_lines * 100 / executable_lines, 1),
