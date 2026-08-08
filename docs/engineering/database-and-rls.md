@@ -52,7 +52,10 @@ Curated security-sensitive inventory from committed migrations:
   caller's approved and unlinked replacement `media_assets`, and applies media
   order, cover metadata, vibes, and location in one transaction
   (`20260808215819_edit_spot_media_v1.sql`). The editor separately fetches all
-  ordered image rows instead of trusting feed/map cover-only payloads.
+  ordered image rows instead of trusting feed/map cover-only payloads. That
+  migration also revokes authenticated direct writes to `spot_images` and
+  removes legacy `spots` bucket write policies so clients cannot bypass image
+  moderation; reads for visible legacy media remain supported.
 - `public.staging_test_auth_attempts`: service-role-only attempt log for staging internal email verification rate limiting; RLS on, `anon`/`authenticated` revoked (`20260806191615_staging_test_auth_attempts_v1.sql`).
 - `public.users_public`: view rows include self, users you **block** (so Blocked Users settings can resolve `username` / avatar), and existing discoverability rules for unblocked users (`20260502120000_security_sweep_rls_part_1.sql`, `20260508120000_users_public_include_block_list_targets.sql`)
 - `public.user_blocks`: authenticated **select/insert/delete** on the table (RLS still applies); insert policy uses `user_blocks_duplicate_exists()` (**SECURITY DEFINER**, `row_security = off`) so duplicate checks do not recurse under FORCE RLS (`20260509120000_users_grants_user_blocks_insert_fix.sql`, `20260509130000_user_blocks_insert_policy_no_rls_recursion.sql`)

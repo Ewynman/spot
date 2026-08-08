@@ -15,6 +15,19 @@ alter table public.spot_images
 create unique index if not exists spot_images_id_uidx
   on public.spot_images (id);
 
+-- Media relationships are mutation-only through the moderation-gated RPCs.
+-- Legacy owner policies allowed a modified client to point a Spot at an
+-- unmoderated object in the old `spots` bucket.
+drop policy if exists spot_images_insert_own_spot on public.spot_images;
+drop policy if exists spot_images_update_own_spot on public.spot_images;
+drop policy if exists spot_images_delete_own_spot on public.spot_images;
+
+revoke insert, update, delete on table public.spot_images from authenticated;
+
+drop policy if exists spots_storage_insert_own_prefix on storage.objects;
+drop policy if exists spots_storage_update_own_prefix on storage.objects;
+drop policy if exists spots_storage_delete_own_prefix on storage.objects;
+
 create or replace function public.update_spot_editor_v1(
   p_spot_id uuid,
   p_vibe_tag_ids uuid[],
