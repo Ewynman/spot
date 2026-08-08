@@ -93,6 +93,11 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
+    func locallyReplaceSpot(_ spot: Spot) {
+        guard let index = spots.firstIndex(where: { $0.id == spot.id }) else { return }
+        spots[index] = spot
+    }
+
     /// Start listening to follow-request count for own private profile.
     func startFollowRequestsListener(ownUserId: String?) {
         stopFollowRequestsListener()

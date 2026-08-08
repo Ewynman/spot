@@ -60,6 +60,19 @@ struct FeedRepositoryStateTests {
         #expect(ids == ["a", "c"])
     }
 
+    @Test func locallyReplaceSpotPreservesPositionAndUpdatesContent() {
+        let repo = freshRepository()
+        repo.replaceSpots([
+            SpotTestHelpers.makeSpot(id: "a", vibeTag: "Chill"),
+            SpotTestHelpers.makeSpot(id: "b", vibeTag: "Scenic")
+        ])
+
+        repo.locallyReplaceSpot(SpotTestHelpers.makeSpot(id: "a", vibeTag: "Updated"))
+
+        #expect(repo.spots.map(\.id) == ["a", "b"])
+        #expect(repo.spots.first?.vibeTag == "Updated")
+    }
+
     @Test func locallyRemoveLastSpotEntersEmptyState() {
         let repo = freshRepository()
         repo.replaceSpots([SpotTestHelpers.makeSpot(id: "only")])

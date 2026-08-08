@@ -190,6 +190,13 @@ struct MapView: View {
                 dismissSelectedSpot(reason: .tabReselected, animated: true)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .spotDidUpdate)) { output in
+            guard let updatedSpot = output.object as? Spot else { return }
+            mapVM.locallyReplaceSpot(updatedSpot)
+            if selectedSpot?.id == updatedSpot.id {
+                selectedSpot = updatedSpot
+            }
+        }
     }
 
     // MARK: - Bottom drawer (root-level overlay, full width)

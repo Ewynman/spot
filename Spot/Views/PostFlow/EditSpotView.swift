@@ -579,6 +579,7 @@ struct EditSpotView: View {
         Task {
             if let updated = await viewModel.save(userId: authVM.userId) {
                 onSaved?(updated)
+                NotificationCenter.default.post(name: .spotDidUpdate, object: updated)
                 dismiss()
             }
         }

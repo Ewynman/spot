@@ -85,6 +85,10 @@ struct HomepageView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .spotDidUpdate)) { output in
+            guard let updatedSpot = output.object as? Spot else { return }
+            feedVM.locallyReplaceSpot(updatedSpot)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .spotDidPostSuccess)) { notification in
             postSuccessToastTask?.cancel()
             showPostSuccessToast = true
