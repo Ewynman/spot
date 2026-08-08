@@ -90,7 +90,7 @@ struct LocationSelectionView: View {
                     .font(FontManager.sectionHeader())
                     .foregroundColor(Constants.Colors.primary)
                 Text("Search for the place or choose one near you.")
-                    .font(FontManager.primaryText())
+                    .font(.system(size: 16))
                     .foregroundColor(Constants.Colors.welcomeMutedText)
             }
 
@@ -137,7 +137,7 @@ struct LocationSelectionView: View {
             }
             .padding(.horizontal, Constants.Layout.Padding.verticalLarge)
             .frame(height: 54)
-            .background(Color.white.opacity(0.72))
+            .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.large))
             .overlay {
                 RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.large)

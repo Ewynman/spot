@@ -169,6 +169,7 @@ struct VibeSelectionView: View {
                 )
                     .textInputAutocapitalization(.words)
                     .disableAutocorrection(true)
+                    .font(.system(size: 16))
                     .foregroundColor(Constants.Colors.primary)
                     .tint(Constants.Colors.primary)
                     .padding(Constants.Layout.Padding.verticalMedium)
