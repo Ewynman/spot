@@ -112,6 +112,24 @@ struct PostComposerPhotoTests {
         #expect(rendered !== source)
     }
 
+    @Test func editorPreviewUsesSmallerInteractiveRenderBudget() throws {
+        let source = testImage(.purple, size: CGSize(width: 1_800, height: 1_200))
+        var edits = PostComposerPhotoEdits.neutral
+        edits.crop = PostComposerPhotoCrop(
+            normalizedX: 0.1,
+            normalizedY: 0.1,
+            normalizedWidth: 0.8,
+            normalizedHeight: 0.8,
+            aspectRatio: "Free"
+        )
+
+        let preview = try PostPhotoProcessor.renderEditorPreview(original: source, edits: edits)
+
+        #expect(max(preview.size.width, preview.size.height) <= PostPhotoProcessor.editorPreviewMaxPixelSize)
+        #expect(preview.size.width > 0)
+        #expect(preview.size.height > 0)
+    }
+
     @Test func legacyDraftDecodesWithoutPhotoMetadata() throws {
         let json = """
         {

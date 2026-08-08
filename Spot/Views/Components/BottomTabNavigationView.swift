@@ -18,6 +18,7 @@ private struct PostTabView: View {
 
 private struct PublishBannerView: View {
     let title: String
+    let progress: Double
 
     var body: some View {
         VStack(spacing: 8) {
@@ -26,7 +27,7 @@ private struct PublishBannerView: View {
                 .foregroundColor(Constants.Colors.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            ProgressView()
+            ProgressView(value: progress, total: 1)
                 .progressViewStyle(.linear)
                 .tint(Constants.Colors.primary)
                 .scaleEffect(x: 1, y: 0.8, anchor: .center)
@@ -147,7 +148,10 @@ struct BottomTabNavigationView: View {
 
             VStack(spacing: 8) {
                 if spotPublishCoordinator.bannerPhase != .hidden {
-                    PublishBannerView(title: spotPublishCoordinator.bannerTitle)
+                    PublishBannerView(
+                        title: spotPublishCoordinator.bannerTitle,
+                        progress: spotPublishCoordinator.publishProgress.fraction
+                    )
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 if spotPublishCoordinator.showToast {

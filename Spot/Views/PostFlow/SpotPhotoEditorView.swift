@@ -22,6 +22,7 @@ struct SpotPhotoEditorView: View {
     @State private var preview: UIImage
     @State private var selectedTool: Tool = .crop
     @State private var renderTask: Task<Void, Never>?
+    @State private var renderRevision = 0
     @State private var showResetConfirmation = false
     @State private var cropGestureStart: PostComposerPhotoCrop?
     @State private var canvasSize: CGSize = CGSize(width: 400, height: 400)
@@ -53,6 +54,14 @@ struct SpotPhotoEditorView: View {
                     Image(uiImage: preview)
                         .resizable()
                         .scaledToFit()
+                        .overlay {
+                            if selectedTool == .crop ||
+                                (selectedTool == .rotate && abs(edits.straightenDegrees) > 0.01) {
+                                PhotoEditorGrid()
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .padding(12)
                         .background {
                             GeometryReader { proxy in
                                 Color.clear
@@ -62,16 +71,10 @@ struct SpotPhotoEditorView: View {
                         }
                         .gesture(cropGesture)
                         .accessibilityLabel("Photo editing preview")
-                    if selectedTool == .crop ||
-                        (selectedTool == .rotate && abs(edits.straightenDegrees) > 0.01) {
-                        PhotoEditorGrid()
-                            .padding(28)
-                            .allowsHitTesting(false)
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                VStack(spacing: 14) {
+                VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         ForEach(Tool.allCases) { tool in
                             Button {
@@ -99,7 +102,7 @@ struct SpotPhotoEditorView: View {
                     .accessibilityElement(children: .contain)
 
                     toolControls
-                        .frame(minHeight: 132, alignment: .top)
+                        .frame(minHeight: 108, alignment: .top)
                 }
                 .padding(16)
                 .background(Constants.Colors.background)
@@ -168,6 +171,10 @@ struct SpotPhotoEditorView: View {
     private var toolControls: some View {
         switch selectedTool {
         case .crop:
+            Text("Drag to reposition • Pinch to zoom")
+                .font(.caption)
+                .foregroundStyle(Constants.Colors.primary.opacity(0.72))
+                .frame(maxWidth: .infinity, alignment: .leading)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(cropOptions) { option in
@@ -194,9 +201,6 @@ struct SpotPhotoEditorView: View {
                     }
                 }
             }
-            Text("Choose an aspect ratio. Free keeps the current crop.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     editorIconButton("Move crop left", icon: "arrow.left") { adjustCrop(dx: -0.03) }
@@ -397,15 +401,17 @@ struct SpotPhotoEditorView: View {
 
     private func schedulePreviewRender() {
         renderTask?.cancel()
+        renderRevision += 1
+        let revision = renderRevision
         let original = photo.originalImage
         let editsSnapshot = edits
         renderTask = Task {
-            try? await Task.sleep(for: .milliseconds(80))
+            try? await Task.sleep(for: .milliseconds(100))
             guard !Task.isCancelled else { return }
             let rendered = await Task.detached(priority: .userInitiated) {
-                try? PostPhotoProcessor.render(original: original, edits: editsSnapshot)
+                try? PostPhotoProcessor.renderEditorPreview(original: original, edits: editsSnapshot)
             }.value
-            guard !Task.isCancelled, let rendered else { return }
+            guard !Task.isCancelled, revision == renderRevision, let rendered else { return }
             preview = rendered
         }
     }

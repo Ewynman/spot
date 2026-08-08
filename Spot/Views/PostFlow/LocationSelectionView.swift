@@ -99,9 +99,15 @@ struct LocationSelectionView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(Constants.Colors.primary)
 
-                TextField("Search a place, venue, or address", text: $searchText)
+                TextField(
+                    "",
+                    text: $searchText,
+                    prompt: Text("Search a place, venue, or address")
+                        .foregroundColor(Constants.Colors.primary.opacity(0.62))
+                )
                     .font(FontManager.primaryText())
                     .foregroundColor(Constants.Colors.primary)
+                    .tint(Constants.Colors.primary)
                     .focused($searchFieldFocused)
                     .submitLabel(.search)
                     .onChange(of: searchText) { _, query in

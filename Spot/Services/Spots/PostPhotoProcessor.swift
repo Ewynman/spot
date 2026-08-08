@@ -23,6 +23,7 @@ enum PostPhotoImportError: LocalizedError, Equatable {
 
 enum PostPhotoProcessor {
     static let previewMaxPixelSize: CGFloat = 1_600
+    static let editorPreviewMaxPixelSize: CGFloat = 900
     private static let context = CIContext(options: [.cacheIntermediates: false])
 
     static func importImage(
@@ -68,9 +69,34 @@ enum PostPhotoProcessor {
     }
 
     static func render(original: UIImage, edits proposedEdits: PostComposerPhotoEdits) throws -> UIImage {
+        try render(
+            original: original,
+            edits: proposedEdits,
+            maxPixelSize: previewMaxPixelSize
+        )
+    }
+
+    /// Fast, display-only render used while editor controls are moving. The
+    /// full 1600px render still runs after the user taps Done.
+    static func renderEditorPreview(
+        original: UIImage,
+        edits proposedEdits: PostComposerPhotoEdits
+    ) throws -> UIImage {
+        try render(
+            original: original,
+            edits: proposedEdits,
+            maxPixelSize: editorPreviewMaxPixelSize
+        )
+    }
+
+    private static func render(
+        original: UIImage,
+        edits proposedEdits: PostComposerPhotoEdits,
+        maxPixelSize: CGFloat
+    ) throws -> UIImage {
         var edits = proposedEdits
         edits.normalize()
-        guard var result = normalizeOrientationAndResize(original, maxPixelSize: previewMaxPixelSize) else {
+        guard var result = normalizeOrientationAndResize(original, maxPixelSize: maxPixelSize) else {
             throw PostPhotoImportError.decodeFailed
         }
 
