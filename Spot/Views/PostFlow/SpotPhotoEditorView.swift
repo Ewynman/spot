@@ -51,26 +51,30 @@ struct SpotPhotoEditorView: View {
             VStack(spacing: 0) {
                 ZStack {
                     Color.black.opacity(0.92)
-                    Image(uiImage: preview)
-                        .resizable()
-                        .scaledToFit()
-                        .overlay {
-                            if selectedTool == .crop ||
-                                (selectedTool == .rotate && abs(edits.straightenDegrees) > 0.01) {
-                                PhotoEditorGrid()
-                                    .allowsHitTesting(false)
+                    GeometryReader { proxy in
+                        let fittedSize = PhotoEditorCanvasLayout.fittedSize(
+                            imageSize: preview.size,
+                            containerSize: proxy.size,
+                            inset: 12
+                        )
+                        Image(uiImage: preview)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: fittedSize.width, height: fittedSize.height)
+                            .overlay {
+                                if selectedTool == .crop ||
+                                    (selectedTool == .rotate && abs(edits.straightenDegrees) > 0.01) {
+                                    PhotoEditorGrid()
+                                        .allowsHitTesting(false)
+                                }
                             }
-                        }
-                        .padding(12)
-                        .background {
-                            GeometryReader { proxy in
-                                Color.clear
-                                    .onAppear { canvasSize = proxy.size }
-                                    .onChange(of: proxy.size) { _, size in canvasSize = size }
-                            }
-                        }
-                        .gesture(cropGesture)
-                        .accessibilityLabel("Photo editing preview")
+                            .contentShape(Rectangle())
+                            .gesture(cropGesture)
+                            .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                            .onAppear { canvasSize = fittedSize }
+                            .onChange(of: fittedSize) { _, size in canvasSize = size }
+                            .accessibilityLabel("Photo editing preview")
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -414,6 +418,28 @@ struct SpotPhotoEditorView: View {
             guard !Task.isCancelled, revision == renderRevision, let rendered else { return }
             preview = rendered
         }
+    }
+}
+
+enum PhotoEditorCanvasLayout {
+    static func fittedSize(
+        imageSize: CGSize,
+        containerSize: CGSize,
+        inset: CGFloat
+    ) -> CGSize {
+        let availableWidth = max(1, containerSize.width - inset * 2)
+        let availableHeight = max(1, containerSize.height - inset * 2)
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return CGSize(width: availableWidth, height: availableHeight)
+        }
+        let scale = min(
+            availableWidth / imageSize.width,
+            availableHeight / imageSize.height
+        )
+        return CGSize(
+            width: imageSize.width * scale,
+            height: imageSize.height * scale
+        )
     }
 }
 

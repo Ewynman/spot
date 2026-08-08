@@ -130,6 +130,23 @@ struct PostComposerPhotoTests {
         #expect(preview.size.height > 0)
     }
 
+    @Test func editorGridFitsDisplayedImageAspectRatio() {
+        let landscape = PhotoEditorCanvasLayout.fittedSize(
+            imageSize: CGSize(width: 1_600, height: 900),
+            containerSize: CGSize(width: 390, height: 500),
+            inset: 12
+        )
+        let square = PhotoEditorCanvasLayout.fittedSize(
+            imageSize: CGSize(width: 900, height: 900),
+            containerSize: CGSize(width: 390, height: 500),
+            inset: 12
+        )
+
+        #expect(abs(landscape.width / landscape.height - 16.0 / 9.0) < 0.001)
+        #expect(abs(square.width / square.height - 1) < 0.001)
+        #expect(landscape.height < square.height)
+    }
+
     @Test func legacyDraftDecodesWithoutPhotoMetadata() throws {
         let json = """
         {
