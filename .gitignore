@@ -11,6 +11,12 @@ Packages/
 .swiftpm/
 .build/
 
+# Node (Mock seeder and accidental root installs)
+node_modules/
+
+# Supabase CLI local cache
+supabase/.temp/
+
 # Python tooling
 __pycache__/
 *.py[cod]
