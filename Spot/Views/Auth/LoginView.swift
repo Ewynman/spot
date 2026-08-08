@@ -22,20 +22,7 @@ struct LoginView: View {
     }
 
     private func handleLoginError(_ error: Error) -> String {
-        let text = error.localizedDescription.lowercased()
-        if text.contains("network") || text.contains("internet") {
-            return "Network error. Please check your connection."
-        }
-        if text.contains("email not confirmed") || text.contains("email_not_confirmed") {
-            return "Verify your email to finish creating your account."
-        }
-        if text.contains("enter the email") {
-            return "Enter the email address for your account."
-        }
-        if text.contains("username") || text.contains("no account found") {
-            return "No account found for that username."
-        }
-        return "Incorrect email or password."
+        LoginErrorMapper.message(for: error)
     }
 
     var body: some View {

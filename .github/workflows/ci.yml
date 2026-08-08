@@ -96,28 +96,37 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             test | xcbeautify
       
-      - name: Extract unit-test scope coverage
+      - name: Extract production-scope coverage
         id: coverage
         if: always()
         run: |
+          TITLE="Spot production-scope coverage (SpotTests)"
           if [ -d "TestResults.xcresult" ]; then
             if xcrun xccov view --report --json TestResults.xcresult > coverage-report.json &&
-              SUMMARY=$(python3 scripts/summarize-xccov.py coverage-report.json); then
+              SUMMARY=$(python3 scripts/summarize-xccov.py coverage-report.json \
+                --write-markdown coverage-summary.md \
+                --title "$TITLE"); then
               PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
               COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
               EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
-              echo "Spot unit-test scope coverage: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
+              echo "Spot production scope coverage: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
               echo "percent=${PERCENT}" >> "$GITHUB_OUTPUT"
               echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
               echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
+          python3 scripts/summarize-xccov.py \
+            --write-unavailable-markdown coverage-summary.md \
+            --title "$TITLE" \
+            --reason "TestResults.xcresult missing or could not be summarized" >/dev/null
           echo "percent=unknown" >> "$GITHUB_OUTPUT"
       
       - name: Validate Code Coverage
         id: coverage_validation
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: |
+          always() &&
+          (github.event_name == 'pull_request' || github.event_name == 'merge_group')
         run: |
           set -o pipefail
           echo "Validating coverage of the lines changed by this PR..."
@@ -132,6 +141,7 @@ jobs:
           name: test-results
           path: TestResults.xcresult
           retention-days: 7
+          if-no-files-found: warn
       
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -141,24 +151,25 @@ jobs:
           path: |
             coverage-report.json
             coverage-report.txt
-            ~/Library/Developer/Xcode/DerivedData/**/ProfileData
+            coverage-summary.md
           retention-days: 7
+          if-no-files-found: warn
       
       - name: Generate coverage report summary
         if: always()
         run: |
-          if [ -d "TestResults.xcresult" ]; then
-            echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            PERCENT="${{ steps.coverage.outputs.percent }}"
-            if [ -n "$PERCENT" ] && [ "$PERCENT" != "unknown" ]; then
-              echo "**Spot unit-test scope:** ${PERCENT}% (${{ steps.coverage.outputs.covered }}/${{ steps.coverage.outputs.executable }} executable lines)" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "This informational metric includes non-view production Swift files in Spot.app. Package dependencies, tests, and SwiftUI views are excluded." >> $GITHUB_STEP_SUMMARY
-            else
-              echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
-            fi
+          echo "## Code Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f coverage-summary.md ]; then
+            # Drop the H1 — the step summary already has a section heading.
+            tail -n +2 coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Coverage data not available" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          PERCENT="${{ steps.coverage.outputs.percent }}"
+          if [ -n "$PERCENT" ] && [ "$PERCENT" != "unknown" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Artifact: \`coverage-reports\` (JSON + Markdown)." >> "$GITHUB_STEP_SUMMARY"
           fi
       
       - name: Comment PR with results
@@ -182,11 +193,11 @@ jobs:
             
             comment += '### Coverage\n';
             if (unitScopeCoverage && unitScopeCoverage !== 'unknown' && unitScopeCoverage !== '') {
-              comment += `**Spot unit-test scope coverage (informational): ${unitScopeCoverage}%**\n\n`;
+              comment += `**Spot production scope coverage (informational): ${unitScopeCoverage}%**\n\n`;
             } else {
-              comment += 'Unit-test scope coverage data was not available for this run.\n\n';
+              comment += 'Production scope coverage data was not available for this run.\n\n';
             }
-            comment += 'This metric excludes package dependencies, test targets, and `Spot/Views/`; those previously made the project aggregate misleading.\n\n';
+            comment += 'This metric includes `Spot/` production Swift (including Views). It excludes package dependencies, test targets, and `Spot/Models/Logs/`.\n\n';
             comment += `**Changed-line coverage gate (80% minimum): ${icon(coverageOutcome)}**\n\n`;
             
             // Include the per-changed-file coverage breakdown when available.
@@ -238,3 +249,111 @@ jobs:
                 body: comment
               });
             }
+
+  # Combined unit+UI coverage trend. Informational only — does not gate PRs.
+  # Changed-line enforcement stays on the validation job (SpotTests).
+  ui_coverage:
+    name: Combined Coverage (Spot.xctestplan)
+    runs-on: macos-15
+    # Job-level continue-on-error still marks the check red; keep the job green
+    # and surface UI-test flakes in the step summary instead.
+    if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Install dependencies
+        run: |
+          brew install xcbeautify
+          brew install jq
+
+      - name: Run Spot test plan with coverage
+        id: ui_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -scheme Spot \
+            -testPlan Spot \
+            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -parallel-testing-enabled NO \
+            -maximum-parallel-testing-workers 1 \
+            -enableCodeCoverage YES \
+            -resultBundlePath CombinedCoverage.xcresult \
+            test | xcbeautify
+
+      - name: Record UI test outcome
+        if: always()
+        run: |
+          {
+            echo "## Combined Coverage (unit + UI)"
+            echo ""
+            if [ "${{ steps.ui_tests.outcome }}" = "success" ]; then
+              echo "Spot.xctestplan: passed"
+            else
+              echo "Spot.xctestplan: UI/unit failures (informational — does not gate merges)."
+              echo "See the job log for details; changed-line gate remains on **PR Validation**."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Extract combined production-scope coverage
+        id: combined_coverage
+        if: always()
+        run: |
+          TITLE="Spot production-scope coverage (Spot.xctestplan)"
+          if [ -d "CombinedCoverage.xcresult" ]; then
+            if xcrun xccov view --report --json CombinedCoverage.xcresult > combined-coverage-report.json &&
+              SUMMARY=$(python3 scripts/summarize-xccov.py combined-coverage-report.json \
+                --write-markdown combined-coverage-summary.md \
+                --title "$TITLE"); then
+              PERCENT=$(jq -r '.percent' <<< "$SUMMARY")
+              COVERED=$(jq -r '.coveredLines' <<< "$SUMMARY")
+              EXECUTABLE=$(jq -r '.executableLines' <<< "$SUMMARY")
+              echo "Combined Spot production scope: ${PERCENT}% (${COVERED}/${EXECUTABLE} lines)"
+              echo "percent=${PERCENT}" >> "$GITHUB_OUTPUT"
+              echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
+              echo "executable=${EXECUTABLE}" >> "$GITHUB_OUTPUT"
+              {
+                echo ""
+                tail -n +2 combined-coverage-summary.md
+                echo ""
+                echo "Artifact: \`combined-coverage\` (JSON + Markdown + xcresult)."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          python3 scripts/summarize-xccov.py \
+            --write-unavailable-markdown combined-coverage-summary.md \
+            --title "$TITLE" \
+            --reason "CombinedCoverage.xcresult missing or could not be summarized" >/dev/null
+          echo "percent=unknown" >> "$GITHUB_OUTPUT"
+          {
+            echo ""
+            tail -n +2 combined-coverage-summary.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload combined coverage results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combined-coverage
+          path: |
+            CombinedCoverage.xcresult
+            combined-coverage-report.json
+            combined-coverage-summary.md
+          retention-days: 7
+          if-no-files-found: warn

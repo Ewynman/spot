@@ -27,15 +27,7 @@ class BookmarksViewModel: ObservableObject {
         do {
             let result = try await UserSpotService.shared.fetchBookmarkedSpots(pageSize: pageSize)
 
-            // Filter out duplicates within session
-            let newSpots = result.spots.filter { spot in
-                guard let spotId = spot.id else { return false }
-                let isNew = !loadedSpotIds.contains(spotId)
-                if isNew {
-                    loadedSpotIds.insert(spotId)
-                }
-                return isNew
-            }
+            let newSpots = SpotListDeduper.accepting(result.spots, into: &loadedSpotIds)
 
             spots = newSpots
             lastCursor = result.lastCursor

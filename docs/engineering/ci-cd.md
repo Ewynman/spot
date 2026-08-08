@@ -248,24 +248,25 @@ CI collects code coverage data on every run and **enforces coverage requirements
 
 The gate measures **changed-line coverage**, not whole-file coverage. The question it asks is "are the lines this PR wrote tested?" rather than "is this entire file well tested?". Whole-file thresholds punish any edit to a legacy low-coverage file — a four-line threading fix in a 341-line Supabase repository would have required retro-covering the whole repository to land, which pushes people toward not touching those files at all.
 
-CI also reports an informational **Spot unit-test scope** metric. It is a
-line-weighted summary of non-view production Swift files in the `Spot.app`
-target. The summary intentionally excludes package dependencies, test targets,
-and `Spot/Views/`, so it describes the code the unit-test job can meaningfully
-exercise. Do not use the root `xccov` `lineCoverage` value: that aggregate mixes
-Spot code with linked Firebase, Supabase, and transitive package targets and
-therefore produces a misleadingly low percentage.
+CI also reports an informational **Spot production scope** metric. It is a
+line-weighted summary of production Swift in the `Spot.app` target, including
+`Spot/Views/`. The summary intentionally excludes package dependencies, test
+targets, and `Spot/Models/Logs/` (declarative log enums). Do not use the root
+`xccov` `lineCoverage` value: that aggregate mixes Spot code with linked
+Firebase, Supabase, and transitive package targets and therefore produces a
+misleadingly low percentage.
 
 **Coverage Requirements:**
 - **80% of the executable lines a PR adds or modifies** must be covered
-- Applies to files under `Spot/`, excluding tests and `Spot/Views/`
-- SwiftUI view execution belongs to the separate `SpotUITests` scheme
+- Applies to in-scope files under `Spot/` (excluding Views and `Models/Logs`; skips pure renames). Informational whole-file metrics still include Views.
+- Scope rules live in `scripts/coverage_scope.py`
+- Extract pure view logic into `Spot/Utils/` (or ViewModels) so unit tests can hit it; use `SpotUITests` for body/navigation coverage
 - Measured using `xcrun xccov` against `.xcresult` bundles
 - Validation runs automatically on every PR
 
 **How it works:**
 1. Tests run with `-enableCodeCoverage YES`
-2. Changed files identified via `git diff --diff-filter=d`
+2. Changed files identified via `git diff --diff-filter=d` and filtered by `coverage_scope.py`
 3. Changed line numbers extracted from `git diff -U0` hunk headers
 4. Per-line execution counts read with `xcrun xccov view --archive --file`
 5. The two are intersected, ignoring non-executable lines (comments, declarations)
@@ -276,6 +277,7 @@ therefore produces a misleadingly low percentage.
 **Coverage validation script:**
 - Location: `scripts/validate-coverage.sh`
 - Usage: `./scripts/validate-coverage.sh <xcresult-path> <base-branch> <threshold> [min-changed-lines]`
+- Local uncovered-line helper: `./scripts/show-uncovered-changed-lines.sh <xcresult> [base]`
 - Can be run locally before pushing
 - Written for bash 3.2 (the default `/bin/bash` on macOS runners), so no associative arrays
 
@@ -289,16 +291,20 @@ xcodebuild -scheme SpotTests -destination "id=$SIM" \
 xcrun simctl delete "$SIM"
 ```
 
+**Combined coverage job:** CI also runs an informational `ui_coverage` job with
+`-scheme Spot -testPlan Spot` so unit + UI execution contribute to the
+production-scope trend. That job is `continue-on-error` and does not gate PRs.
+
 **Coverage reports:**
 - Uploaded as artifacts (retained for 7 days)
-- Unit-test scope summary and changed-line gate result posted to the PR
+- Production-scope summary and changed-line gate result posted to the PR
 - Raw `xccov` JSON and changed-line details included in the coverage artifact
+- Combined unit+UI coverage artifact from the `ui_coverage` job
 - Full report available in GitHub Actions logs
 
 **Exemptions:**
 - Files with no executable lines changed (e.g., comment or declaration-only edits)
-- Files not in production code path
-- SwiftUI view files, which are outside the unit-test scheme's coverage boundary
+- Files outside production coverage scope (`Spot/Models/Logs/`, tests, packages)
 - Code that can only run behind a system permission prompt, which unit tests must not raise
 - Can be discussed with team if threshold is impractical for specific cases
 

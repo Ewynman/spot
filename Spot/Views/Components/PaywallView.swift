@@ -18,25 +18,32 @@ struct PaywallView: View {
     @State private var isLoadingProduct: Bool = false
 
     private var isStoreBusy: Bool {
-        subscriptionManager.isPurchasing || subscriptionManager.isRestoring
+        PaywallPurchaseUIState.isStoreBusy(
+            isPurchasing: subscriptionManager.isPurchasing,
+            isRestoring: subscriptionManager.isRestoring
+        )
     }
 
     private var isPurchaseDisabled: Bool {
-        isStoreBusy || !subscriptionManager.hasProduct
+        PaywallPurchaseUIState.isPurchaseDisabled(
+            isStoreBusy: isStoreBusy,
+            hasProduct: subscriptionManager.hasProduct
+        )
     }
 
     private var productLoadFailed: Bool {
-        !isLoadingProduct && !subscriptionManager.hasProduct
+        PaywallPurchaseUIState.productLoadFailed(
+            isLoadingProduct: isLoadingProduct,
+            hasProduct: subscriptionManager.hasProduct
+        )
     }
 
     private var primaryButtonTitle: String {
-        if subscriptionManager.isPurchasing {
-            return "Processing…"
-        }
-        if subscriptionManager.isRestoring {
-            return "Restoring…"
-        }
-        return priceLine.isEmpty ? "Subscribe to Spot Pro" : "Subscribe to Spot Pro • \(priceLine)"
+        PaywallPurchaseUIState.primaryButtonTitle(
+            isPurchasing: subscriptionManager.isPurchasing,
+            isRestoring: subscriptionManager.isRestoring,
+            priceLine: priceLine
+        )
     }
 
     /// Status line shown under the plan name. Three exclusive states:
@@ -45,18 +52,14 @@ struct PaywallView: View {
     ///   3. loaded   → localized price (`priceLine`)
     /// We never sit indefinitely on (1).
     private var priceOrStatusLine: String {
-        if isLoadingProduct {
-            return "Loading subscription details…"
-        }
-        if !priceLine.isEmpty {
-            return priceLine
-        }
-        return ""
+        PaywallPurchaseUIState.priceOrStatusLine(
+            isLoadingProduct: isLoadingProduct,
+            priceLine: priceLine
+        )
     }
 
     private var productLoadMessage: String? {
-        guard productLoadFailed else { return nil }
-        return "We couldn’t load Spot Pro right now.\nPlease check your connection and try again."
+        PaywallPurchaseUIState.productLoadMessage(productLoadFailed: productLoadFailed)
     }
 
     var body: some View {

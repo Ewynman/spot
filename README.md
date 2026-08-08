@@ -14,9 +14,9 @@
 
 | Path | Contents |
 | --- | --- |
-| `Spot/` | iOS app sources (Views, ViewModels, Services, Models, Utils) |
-| `SpotTests/` | Swift Testing unit tests |
-| `SpotUITests/` | XCTest UI tests |
+| `Spot/` | iOS app sources — see [`Spot/README.md`](Spot/README.md) |
+| `SpotTests/` | Swift Testing unit tests (mirrors `Spot/`) — see [`SpotTests/README.md`](SpotTests/README.md) |
+| `SpotUITests/` | XCTest UI tests — see [`SpotUITests/README.md`](SpotUITests/README.md) |
 | `supabase/migrations/` | Postgres / RLS / storage / moderation SQL |
 | `docs/` | Product, engineering, diagram, and operations documentation |
 | `Spot.xcodeproj` | Xcode project |

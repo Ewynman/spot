@@ -22,10 +22,7 @@ struct SpotGridSkeletonCells: View {
     }
 
     private var tileSide: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        let padding: CGFloat = 12 * 2
-        let spacing: CGFloat = 12 * CGFloat(columns - 1)
-        return (screenWidth - padding - spacing) / CGFloat(columns)
+        SpotGridLayout.itemWidth(columns: columns, containerWidth: UIScreen.main.bounds.width)
     }
 
     var body: some View {

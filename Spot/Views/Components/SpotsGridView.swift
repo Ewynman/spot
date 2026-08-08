@@ -57,10 +57,7 @@ struct SpotGridItem: View {
     let columns: Int
 
     private var itemWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        let padding: CGFloat = 12 * 2 // horizontal padding
-        let spacing: CGFloat = 12 * CGFloat(columns - 1) // spacing between items
-        return (screenWidth - padding - spacing) / CGFloat(columns)
+        SpotGridLayout.itemWidth(columns: columns, containerWidth: UIScreen.main.bounds.width)
     }
 
     var body: some View {

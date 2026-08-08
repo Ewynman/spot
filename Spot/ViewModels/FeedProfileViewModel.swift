@@ -25,8 +25,7 @@ final class FeedProfileViewModel: ObservableObject {
     var lastComputedAt: Date? { row?.lastComputedAt ?? row?.profile.computedAt }
 
     var hasContent: Bool {
-        guard let p = profile else { return false }
-        return !p.topVibes.isEmpty || !p.topCreators.isEmpty || p.eventSummary30d.total > 0
+        FeedProfileContentPolicy.hasContent(profile)
     }
 
     /// Initial fetch from the cached profile row. Cheap and idempotent.

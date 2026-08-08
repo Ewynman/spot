@@ -31,7 +31,7 @@ Spot is a **social place-discovery** iOS app. A **Spot** is a saved place recomm
 - Handle **loading, empty, error, and unauthenticated** states in user-facing flows.
 - Prefer **typed services** and **mockable** boundaries for testability.
 - Avoid broad architecture refactors unless explicitly requested.
-- **Data plane:** Supabase only for users, spots, media, and social data. Do **not** add `SpotUploader`, Firestore, or Firebase Storage upload paths. See `docs/engineering/data-plane.md` and `SpotTests/DataPlaneGuardTests.swift`.
+- **Data plane:** Supabase only for users, spots, media, and social data. Do **not** add `SpotUploader`, Firestore, or Firebase Storage upload paths. See `docs/engineering/data-plane.md` and `SpotTests/Guards/DataPlaneGuardTests.swift`.
 - **Supabase DDL**: When you add or change schema under `supabase/migrations/`, **apply it to the Spot Supabase project using the Supabase MCP** `apply_migration` (server `plugin-supabase-supabase`). Use MCP `list_projects` to resolve `project_id` if it is not already known. Do not treat “SQL committed locally” as done until the MCP migration has succeeded (or the user explicitly opts out for a non-linked database).
 
 ## Git workflow
@@ -104,12 +104,12 @@ Global **`@EnvironmentObject`** for auth, deep links, permissions; per-screen **
 
 ## Data / service highlights
 
-- **`Spot/Services/AuthService.swift`** — Supabase Auth + `public.users` lifecycle.
+- **`Spot/Services/Auth/AuthService.swift`** — Supabase Auth + `public.users` lifecycle.
 - **`Spot/Services/Feed/FeedRepository.swift`** — home feed via `get_home_feed_v1` + image signing.
 - **`Spot/Services/Feed/FeedRanker.swift`** — on-device scoring (tests / experiments).
 - **`Spot/Services/Supabase/SpotSupabaseRepository.swift`** — spots, media, RPCs (e.g. publish with approved assets).
-- **`Spot/Services/AuthorPrivacyCache.swift`** — actor-based privacy/follow cache.
-- **`Spot/Services/DeepLinkRouter.swift`**, **`Spot/ViewModels/DeepLinkState.swift`** — Universal Links and custom scheme routing.
+- **`Spot/Services/Social/AuthorPrivacyCache.swift`** — actor-based privacy/follow cache.
+- **`Spot/Services/Core/DeepLinkRouter.swift`**, **`Spot/ViewModels/DeepLinkState.swift`** — Universal Links and custom scheme routing.
 
 ## External integrations
 
@@ -145,6 +145,6 @@ Optional: `-enableCodeCoverage YES` on `xcodebuild test` when collecting coverag
 
 ## Code coverage expectations
 
-For new production code, aim for **meaningful** tests: happy path, empty/error branches, and guard rules. Keep test-only production changes minimal and DEBUG- or test-gated when they must exist.
+For new production code, aim for **meaningful** tests: happy path, empty/error branches, and guard rules. CI enforces **80% changed-line coverage** on in-scope `Spot/` files (excluding Views (body via UITests) and `Models/Logs`). Prefer extracting pure logic from SwiftUI into `Utils` / ViewModels for unit tests. Keep test-only production changes minimal and DEBUG- or test-gated when they must exist.
 
 Agents should run the **relevant scheme(s)** after substantive non-doc changes.

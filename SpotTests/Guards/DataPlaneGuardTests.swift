@@ -11,9 +11,15 @@ import Testing
 struct DataPlaneGuardTests {
 
     private static let repoRoot: URL = {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // SpotTests
-            .deletingLastPathComponent() // repo root
+        var url = URL(fileURLWithPath: #filePath)
+        while !url.pathComponents.isEmpty {
+            let spotRoot = url.appendingPathComponent("Spot", isDirectory: true)
+            if FileManager.default.fileExists(atPath: spotRoot.path) {
+                return url
+            }
+            url.deleteLastPathComponent()
+        }
+        fatalError("Could not locate repo root from \(#filePath)")
     }()
 
     private static let spotSourcesRoot = repoRoot.appendingPathComponent("Spot", isDirectory: true)

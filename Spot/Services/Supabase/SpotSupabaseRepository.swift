@@ -95,6 +95,11 @@ enum SpotSupabaseRepository {
         return lower.hasPrefix("https://") || lower.hasPrefix("http://")
     }
 
+    /// Exposed for unit tests.
+    static func isStoredAbsoluteURLForTests(_ s: String) -> Bool {
+        isStoredAbsoluteURL(s)
+    }
+
     /// Maps stored object paths to HTTPS URLs (signed per `storage_bucket`, default `spots`).
     static func resolveStoredImageURLs(paths: [String], buckets: [String?]) async throws -> [String] {
         guard !paths.isEmpty else { return [] }
@@ -1063,7 +1068,7 @@ enum SpotSupabaseRepository {
 
     /// Parses Edge Function JSON. **Contract:** body must include boolean `approved` (see `supabase/functions/moderate-image/index.ts`).
     /// A placeholder that returns only `{ "ok": true }` will parse as not approved and trigger the generic 503 user message.
-    private static func parseModerateImageJSON(_ data: Data) -> (approved: Bool, reason: String?, jsonKeys: String) {
+    static func parseModerateImageJSON(_ data: Data) -> (approved: Bool, reason: String?, jsonKeys: String) {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return (false, "moderation_unavailable", "")
         }

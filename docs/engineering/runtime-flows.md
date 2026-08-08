@@ -121,13 +121,13 @@ See the linked safety and feature docs before changing these paths.
 | --- | --- |
 | Launch and root gate | `Spot/SpotApp.swift`, `Spot/AppDelegate.swift`, `Spot/Views/RootView.swift` |
 | Tab shell | `Spot/Views/MainTabView.swift`, `Spot/Views/Components/BottomTabNavigationView.swift` |
-| Auth | `Spot/Services/Auth/AuthViewModel.swift`, `Spot/Services/AuthService.swift` |
+| Auth | `Spot/Services/Auth/AuthViewModel.swift`, `Spot/Services/Auth/AuthService.swift` |
 | Feed | `Spot/ViewModels/FeedViewModel.swift`, `Spot/Services/Feed/` |
 | Map | `Spot/ViewModels/MapViewModel.swift`, `Spot/Services/Map/`, `Spot/Views/Home/MapView.swift` |
 | Search | `Spot/ViewModels/SearchViewModel.swift`, `Spot/Services/Search/` |
-| Profile/social | `Spot/ViewModels/ProfileViewModel.swift`, `Spot/Views/Profile/ProfileService.swift`, `Spot/Services/FollowRequestsService.swift` |
+| Profile/social | `Spot/ViewModels/ProfileViewModel.swift`, `Spot/Services/Profile/ProfileService.swift`, `Spot/Services/Social/FollowRequestsService.swift` |
 | Publish | `Spot/ViewModels/PostFlowViewModel.swift`, `Spot/Services/Spots/`, `Spot/Services/Supabase/SpotSupabaseRepository.swift` |
-| Deep links | `Spot/Services/DeepLinkRouter.swift`, `Spot/ViewModels/DeepLinkState.swift` |
+| Deep links | `Spot/Services/Core/DeepLinkRouter.swift`, `Spot/ViewModels/DeepLinkState.swift` |
 
 ## Related docs
 

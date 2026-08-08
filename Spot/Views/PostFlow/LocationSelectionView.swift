@@ -3,30 +3,6 @@ import MapKit
 import CoreLocation
 import UIKit
 
-enum LocationSelectionPolicy {
-    static let meaningfulMoveMeters: CLLocationDistance = 20
-
-    static func hasMeaningfullyMoved(
-        from initial: CLLocationCoordinate2D,
-        to candidate: CLLocationCoordinate2D
-    ) -> Bool {
-        let start = CLLocation(latitude: initial.latitude, longitude: initial.longitude)
-        let end = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
-        return start.distance(from: end) >= meaningfulMoveMeters
-    }
-
-    static func resolvedPlaceName(
-        originalName: String,
-        reverseGeocodedName: String,
-        isCustomName: Bool,
-        hasMeaningfullyMoved: Bool
-    ) -> String {
-        guard !isCustomName, hasMeaningfullyMoved else { return originalName }
-        let candidate = reverseGeocodedName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return candidate.isEmpty ? originalName : candidate
-    }
-}
-
 struct LocationSelectionView: View {
     @Binding var selectedLocation: LocationData?
     @StateObject private var locationManager = LocationManager.shared
@@ -75,10 +51,7 @@ struct LocationSelectionView: View {
         }
         .onChange(of: locationManager.userLocation) { _, newLocation in
             guard let newLocation else { return }
-            let movedFarEnough = currentLocation.map {
-                $0.distance(from: newLocation) > 250
-            } ?? true
-            guard movedFarEnough else { return }
+            guard LocationSearchPolicy.shouldRefreshNearby(from: currentLocation, to: newLocation) else { return }
             currentLocation = newLocation
             nearbyRadius = LocationSearchPolicy.nearbyRadiusMeters
             searchNearbyPlaces(around: newLocation, radius: nearbyRadius)
@@ -548,23 +521,12 @@ struct LocationSelectionView: View {
         guard !name.isEmpty, var current = selectedLocation else { return }
         // Validate with BlockedTerms
         let validator = PlaceNameValidator()
-        switch validator.validate(name) {
+        let validation = validator.validate(name)
+        switch validation {
         case .ok:
             break
-        case .tooShort:
-            blockedReason = "Please use at least 3 characters."
-            showBlockedAlert = true
-            pendingCustomName = ""
-            showCustomNameAlert = false
-            return
-        case .tooLong:
-            blockedReason = "Please keep it shorter."
-            showBlockedAlert = true
-            pendingCustomName = ""
-            showCustomNameAlert = false
-            return
-        case .blocked:
-            blockedReason = "That name isn’t allowed."
+        case .tooShort, .tooLong, .blocked:
+            blockedReason = PlaceNameFeedback.message(for: validation) ?? "That name isn’t allowed."
             showBlockedAlert = true
             pendingCustomName = ""
             showCustomNameAlert = false
@@ -591,9 +553,7 @@ struct CanonicalPlace: Decodable {
     let address: String?
 
     func matches(_ q: String) -> Bool {
-        let s = q.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.lowercased() == s { return true }
-        return aliases.contains(s)
+        CanonicalPlaceMatcher.matches(name: name, aliases: aliases, query: q)
     }
 
     static func load() -> [CanonicalPlace] {
@@ -617,10 +577,11 @@ struct ImprovedLocationRow: View {
     }
 
     private var subtitle: String? {
-        let city = item.placemark.locality
-        let state = item.placemark.administrativeArea
-        let parts = [city, state].compactMap { $0 }
-        return parts.isEmpty ? item.placemark.title : parts.joined(separator: ", ")
+        LocationPlacemarkFormatter.subtitle(
+            city: item.placemark.locality,
+            state: item.placemark.administrativeArea,
+            title: item.placemark.title
+        )
     }
 
     var body: some View {
@@ -628,11 +589,15 @@ struct ImprovedLocationRow: View {
             let city = item.placemark.locality
             let state = item.placemark.administrativeArea
             let country = item.placemark.country
-            let parts = [city, state, country].compactMap { $0 }.joined(separator: ", ")
             let locationData = LocationData(
                 coordinate: item.placemark.coordinate,
-                placeName: item.name ?? (city ?? state ?? country ?? "Unknown Location"),
-                address: parts.isEmpty ? nil : parts,
+                placeName: LocationPlacemarkFormatter.placeName(
+                    itemName: item.name,
+                    city: city,
+                    state: state,
+                    country: country
+                ),
+                address: LocationPlacemarkFormatter.address(city: city, state: state, country: country),
                 isCustomName: false
             )
             
@@ -727,13 +692,7 @@ struct LocationMapView: View {
     }
     
     private static func calculateOptimalSpan(for location: LocationData) -> MKCoordinateSpan {
-        if location.isCustomName {
-            return MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-        } else if location.address?.contains(",") == true {
-            return MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
-        } else {
-            return MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-        }
+        LocationMapCameraPolicy.optimalSpan(for: location)
     }
     
 
@@ -934,13 +893,17 @@ struct LocationMapView: View {
                     return
                 }
                 guard let placemark = placemarks?.first else { return }
-                let name = placemark.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let city = placemark.locality?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let state = placemark.administrativeArea?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let country = placemark.country?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let cityState = [city, state].compactMap { $0 }.joined(separator: ", ")
-                let address = [city, state, country].compactMap { $0 }.joined(separator: ", ")
-                let prettyName = (name?.isEmpty == false ? name! : (cityState.isEmpty ? self.draggedLocation.placeName : cityState))
+                let prettyName = LocationPlacemarkFormatter.reverseGeocodedPlaceName(
+                    placemarkName: placemark.name,
+                    city: placemark.locality,
+                    state: placemark.administrativeArea,
+                    previousPlaceName: self.draggedLocation.placeName
+                )
+                let address = LocationPlacemarkFormatter.address(
+                    city: placemark.locality?.trimmingCharacters(in: .whitespacesAndNewlines),
+                    state: placemark.administrativeArea?.trimmingCharacters(in: .whitespacesAndNewlines),
+                    country: placemark.country?.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
                 let resolvedName = LocationSelectionPolicy.resolvedPlaceName(
                     originalName: self.initialLocation.placeName,
                     reverseGeocodedName: prettyName,
@@ -951,7 +914,7 @@ struct LocationMapView: View {
                 self.draggedLocation = LocationData(
                     coordinate: newCenter,
                     placeName: resolvedName,
-                    address: address.isEmpty ? nil : address,
+                    address: address,
                     isCustomName: self.draggedLocation.isCustomName
                 )
                 self.currentLocationName = resolvedName

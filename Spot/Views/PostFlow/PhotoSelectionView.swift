@@ -526,19 +526,25 @@ struct PhotoSelectionView: View {
 
 private extension PhotoSelectionView {
     var maxPhotoCount: Int {
-        authVM.isPro ? Constants.PostLimits.maxProPostImages : Constants.PostLimits.maxFreePostImages
+        PostPhotoSelectionLimits.maxPhotoCount(isPro: authVM.isPro)
     }
 
     var remainingCapacityText: String {
-        let remaining = max(0, maxPhotoCount - selectedPhotos.count)
-        return remaining == 1 ? "You can add 1 more photo." : "You can add \(remaining) more photos."
+        PostPhotoSelectionLimits.remainingCapacityText(
+            maxCount: maxPhotoCount,
+            selectedCount: selectedPhotos.count
+        )
     }
 
     var galleryPickerMaxSelectionCount: Int {
-        switch galleryPickMode {
-        case .add: max(1, maxPhotoCount - selectedPhotos.count)
-        case .replace: 1
-        }
+        PostPhotoSelectionLimits.galleryPickerMaxSelectionCount(
+            modeIsReplace: {
+                if case .replace = galleryPickMode { return true }
+                return false
+            }(),
+            maxCount: maxPhotoCount,
+            selectedCount: selectedPhotos.count
+        )
     }
 
     var activePhotoIndex: Int {
@@ -554,8 +560,11 @@ private extension PhotoSelectionView {
 
     var activePreviewHeight: CGFloat {
         guard let activePhoto else { return 300 }
-        let ratio = activePhoto.image.size.width / max(activePhoto.image.size.height, 1)
-        return min(390, max(230, (UIScreen.main.bounds.width - 48) / ratio))
+        return PostPhotoPreviewLayout.height(
+            imageWidth: activePhoto.image.size.width,
+            imageHeight: activePhoto.image.size.height,
+            containerWidth: UIScreen.main.bounds.width
+        )
     }
 
     var errorBinding: Binding<Bool> {
@@ -571,13 +580,10 @@ private extension PhotoSelectionView {
     }
 
     func repairActiveSelection() {
-        guard !selectedPhotos.isEmpty else {
-            activePhotoID = nil
-            return
-        }
-        if activePhotoID == nil || !selectedPhotos.contains(where: { $0.id == activePhotoID }) {
-            activePhotoID = selectedPhotos.first?.id
-        }
+        activePhotoID = PostPhotoSelectionState.repairedActiveID(
+            photos: selectedPhotos.map(\.id),
+            current: activePhotoID
+        )
     }
 
     func beginPickerPresentation(mode: GalleryPickMode) {
@@ -594,7 +600,7 @@ private extension PhotoSelectionView {
 
     func openGalleryAddIfPermitted() {
         guard selectedPhotos.count < maxPhotoCount else {
-            errorMessage = "You can add up to \(maxPhotoCount) photos."
+            errorMessage = PostPhotoSelectionLimits.overflowMessage(maxCount: maxPhotoCount)
             return
         }
         guard !isOpeningPicker, !isImporting else { return }
@@ -687,12 +693,15 @@ private extension PhotoSelectionView {
         }
         switch mode {
         case .add:
-            let available = max(0, maxPhotoCount - selectedPhotos.count)
+            let available = PostPhotoSelectionLimits.remainingCapacity(
+                maxCount: maxPhotoCount,
+                selectedCount: selectedPhotos.count
+            )
             let accepted = Array(imported.prefix(available))
             selectedPhotos.append(contentsOf: accepted)
             activePhotoID = accepted.first?.id
             if imported.count > available {
-                errorMessage = "You can add up to \(maxPhotoCount) photos."
+                errorMessage = PostPhotoSelectionLimits.overflowMessage(maxCount: maxPhotoCount)
                 AnalyticsService.shared.logEvent("spot_photo_max_reached", parameters: [:])
             }
             if !authVM.isPro, items.count > 1 {
@@ -720,7 +729,7 @@ private extension PhotoSelectionView {
 
     func openCameraIfPermitted() {
         guard selectedPhotos.count < maxPhotoCount else {
-            errorMessage = "You can add up to \(maxPhotoCount) photos."
+            errorMessage = PostPhotoSelectionLimits.overflowMessage(maxCount: maxPhotoCount)
             return
         }
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
@@ -834,7 +843,10 @@ private extension PhotoSelectionView {
         guard selectedPhotos.indices.contains(activePhotoIndex) else { return }
         let index = activePhotoIndex
         let photo = selectedPhotos.remove(at: index)
-        activePhotoID = selectedPhotos.isEmpty ? nil : selectedPhotos[min(index, selectedPhotos.count - 1)].id
+        activePhotoID = PostPhotoSelectionState.nextActiveIDAfterRemoval(
+            remaining: selectedPhotos.map(\.id),
+            removedIndex: index
+        )
         removedPhoto = RemovedPhoto(photo: photo, index: index)
         AnalyticsService.shared.logEvent("spot_photo_removed", parameters: ["wasCover": index == 0])
         undoTask?.cancel()
@@ -847,7 +859,10 @@ private extension PhotoSelectionView {
 
     func undoRemoval(_ removal: RemovedPhoto) {
         undoTask?.cancel()
-        let index = min(removal.index, selectedPhotos.count)
+        let index = PostPhotoSelectionState.undoInsertIndex(
+            savedIndex: removal.index,
+            currentCount: selectedPhotos.count
+        )
         selectedPhotos.insert(removal.photo, at: index)
         activePhotoID = removal.photo.id
         removedPhoto = nil
@@ -866,7 +881,14 @@ private extension PhotoSelectionView {
 
     func move(_ id: UUID, by offset: Int) {
         guard let source = selectedPhotos.firstIndex(where: { $0.id == id }) else { return }
-        move(id, to: min(max(0, source + offset), selectedPhotos.count - 1))
+        move(
+            id,
+            to: PostPhotoSelectionState.clampedMoveDestination(
+                source: source,
+                offset: offset,
+                count: selectedPhotos.count
+            )
+        )
     }
 
     func move(_ id: UUID, to destination: Int) {

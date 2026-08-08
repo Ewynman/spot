@@ -7,7 +7,8 @@ Spot uses one structured logging path for console and DEBUG device-file output.
 ## Pattern
 
 Define events in a `SpotLog` enum under `Spot/Models/Logs/`. Every log file owns a
-stable component tag, severity, and message:
+stable component tag, severity, and message. These enums are excluded from CI
+coverage scope (`scripts/coverage_scope.py`) — do not add tests solely for log cases:
 
 ```swift
 enum AuthServiceLogs: SpotLog {
@@ -108,4 +109,4 @@ Call sites must still follow these rules:
 - `Spot/Utils/LoggingConfig.swift`
 - `Spot/Config/LoggingDefaults.plist`
 - `Spot/Models/Logs/`
-- `SpotTests/SpotLoggerTests.swift`
+- `SpotTests/Utils/SpotLoggerTests.swift`

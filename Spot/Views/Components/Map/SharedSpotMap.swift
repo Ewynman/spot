@@ -387,11 +387,11 @@ struct SharedSpotMap: UIViewRepresentable {
             mapHeight: CGFloat,
             liftPoints: CGFloat
         ) -> CLLocationCoordinate2D {
-            guard mapHeight > 0, liftPoints > 0 else { return coord }
-            let latPerPoint = span.latitudeDelta / Double(mapHeight)
-            return CLLocationCoordinate2D(
-                latitude: coord.latitude - latPerPoint * Double(liftPoints),
-                longitude: coord.longitude
+            MapCameraLift.liftedCoordinate(
+                for: coord,
+                span: span,
+                mapHeight: mapHeight,
+                liftPoints: liftPoints
             )
         }
 
@@ -541,36 +541,23 @@ extension SharedSpotMap {
     fileprivate func softClusters(
         for spots: [Spot]
     ) -> [(spot: Spot, coordinate: CLLocationCoordinate2D, isCluster: Bool, clusterMemberIds: [String])] {
-        let cap = Constants.MapDesign.farZoomPinCap
         let withCoords = spots.compactMap { s -> (Spot, CLLocationCoordinate2D)? in
             guard let lat = s.latitude, let lon = s.longitude else { return nil }
             return (s, CLLocationCoordinate2D(latitude: lat, longitude: lon))
         }
-        if withCoords.count <= cap {
-            return withCoords.map { ($0.0, $0.1, false, []) }
+        let built = MapSoftClusterBuilder.build(
+            coordinates: withCoords.map { ($0.0.id, $0.1.latitude, $0.1.longitude) },
+            pinCap: Constants.MapDesign.farZoomPinCap
+        )
+        return built.map { entry in
+            let spot = withCoords[entry.representativeIndex].0
+            let memberIds = entry.memberIndexes.compactMap { withCoords[$0].0.id }
+            return (
+                spot,
+                CLLocationCoordinate2D(latitude: entry.latitude, longitude: entry.longitude),
+                entry.isCluster,
+                memberIds
+            )
         }
-        // Bucket the overflow with a coarse grid (~0.05° ≈ ~5 km cells).
-        let bucketSize = 0.05
-        var buckets: [String: [(Spot, CLLocationCoordinate2D)]] = [:]
-        for entry in withCoords {
-            let key = String(format: "%.2f,%.2f",
-                             (entry.1.latitude / bucketSize).rounded() * bucketSize,
-                             (entry.1.longitude / bucketSize).rounded() * bucketSize)
-            buckets[key, default: []].append(entry)
-        }
-        var output: [(spot: Spot, coordinate: CLLocationCoordinate2D, isCluster: Bool, clusterMemberIds: [String])] = []
-        for (_, members) in buckets {
-            if members.count == 1 {
-                let only = members[0]
-                output.append((only.0, only.1, false, []))
-            } else {
-                let lat = members.map { $0.1.latitude }.reduce(0, +) / Double(members.count)
-                let lon = members.map { $0.1.longitude }.reduce(0, +) / Double(members.count)
-                let memberIds = members.compactMap { $0.0.id }
-                let placeholderSpot = members[0].0
-                output.append((placeholderSpot, CLLocationCoordinate2D(latitude: lat, longitude: lon), true, memberIds))
-            }
-        }
-        return output
     }
 }

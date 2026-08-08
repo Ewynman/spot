@@ -34,15 +34,25 @@ flowchart LR
 
 | Path | Role |
 | --- | --- |
-| `Spot/Views` | SwiftUI screens and components |
+| `Spot/Views` | SwiftUI screens and components (`Auth`, `Home`, `PostFlow`, `Profile`, `Launch`, …) |
 | `Spot/ViewModels` | `ObservableObject` state for screens |
-| `Spot/Services` | Auth, feed, map, search, spots, subscriptions, analytics |
+| `Spot/Services/Auth` | Auth session, credentials, staging verification |
+| `Spot/Services/Feed` | Home feed RPC, ranking helpers, flags |
+| `Spot/Services/Spots` | Publish coordinator, drafts, vibe usage |
 | `Spot/Services/Supabase` | `SpotSupabaseRepository` and related Postgres/Storage access |
+| `Spot/Services/Subscriptions` | StoreKit manager, paywall routing |
+| `Spot/Services/Social` | Follows, privacy cache, bookmarks collections |
+| `Spot/Services/Profile` | Profile service, avatars, user spots |
+| `Spot/Services/Core` | Deep links, token service |
+| `Spot/Services/{Map,Moderation,Search,Media,Content,Analytics,Notifications}` | Domain services |
 | `Spot/Supabase` | `SupabaseClient` bootstrap and environment selection |
-| `Spot/Models` | Codable models and log enums |
-| `Spot/Utils` | Constants, logging, URL config, validators |
+| `Spot/Models` | Codable models |
+| `Spot/Models/Logs` | `SpotLog` event enums (excluded from coverage scope) |
+| `Spot/Utils` | Constants, logging, URL config, validators, extracted view policies |
 | `Spot/Managers` | Cross-feature managers (e.g. onboarding tours) |
 | `supabase/migrations` | Schema, RLS, storage, moderation SQL |
+
+See also [`Spot/README.md`](../../Spot/README.md).
 
 ### Data flow (typical read)
 

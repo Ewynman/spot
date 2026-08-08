@@ -304,7 +304,7 @@ This aligns with Apple's 3.1.2(a) requirements for subscription apps providing "
 - **Entitlement Refresh** - Background listener for transaction updates via `Transaction.updates`
 - **Restore Purchases** - Full `AppStore.sync()` + entitlement check flow
 
-See `Spot/Services/SubscriptionManager.swift` for implementation details.
+See `Spot/Services/Subscriptions/SubscriptionManager.swift` for implementation details.
 
 ---
 

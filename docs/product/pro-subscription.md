@@ -10,7 +10,7 @@ Product, engineering, App Store review.
 
 ## Current status
 
-StoreKit integration: `Spot/Services/SubscriptionManager.swift`, product IDs in `Spot/Utils/SpotProProducts.swift`. Subscription return deep link: `spotapp://subscription/return` handled in `DeepLinkRouter`.
+StoreKit integration: `Spot/Services/Subscriptions/SubscriptionManager.swift`, product IDs in `Spot/Utils/SpotProProducts.swift`. Subscription return deep link: `spotapp://subscription/return` handled in `DeepLinkRouter`.
 
 ## Details
 

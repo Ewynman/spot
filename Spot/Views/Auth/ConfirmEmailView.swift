@@ -60,15 +60,7 @@ struct ConfirmEmailView: View {
                     TextField("", text: Binding(
                         get: { otpDigits[index] },
                         set: { newValue in
-                            let filtered = newValue.filter(\.isNumber)
-                            if filtered.count <= 1 {
-                                otpDigits[index] = String(filtered.prefix(1))
-                            } else {
-                                let chars = Array(filtered.prefix(6))
-                                for i in 0..<min(chars.count, 6) {
-                                    otpDigits[i] = String(chars[i])
-                                }
-                            }
+                            otpDigits = OTPDigitField.applyPaste(newValue, into: otpDigits, at: index)
                             if !newValue.isEmpty, index < 5 {
                                 focusedIndex = index + 1
                             }

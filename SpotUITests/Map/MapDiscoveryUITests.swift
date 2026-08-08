@@ -41,4 +41,24 @@ final class MapDiscoveryUITests: XCTestCase {
         let filter = app.descendants(matching: .any)["map.filterButton"]
         XCTAssertTrue(filter.waitForExistence(timeout: 15), "Pro synthetic session should surface map filter chrome")
     }
+
+    @MainActor
+    func testFreeTierHidesFilterChrome() throws {
+        let app = XCUIApplication()
+        SpotUITestAppConfiguration.applyLoggedInSyntheticSession(to: app)
+        app.launchEnvironment["SPOT_USER_TIER"] = "free"
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["main.tabShell"].waitForExistence(timeout: 25))
+        app.buttons["navigation.mapTab"].tap()
+
+        let mapHost = app.descendants(matching: .any)["map.mapView"]
+        XCTAssertTrue(mapHost.waitForExistence(timeout: 20))
+
+        let filter = app.descendants(matching: .any)["map.filterButton"]
+        XCTAssertFalse(
+            filter.waitForExistence(timeout: 3),
+            "Free synthetic session should not surface Pro-only map filter chrome"
+        )
+    }
 }

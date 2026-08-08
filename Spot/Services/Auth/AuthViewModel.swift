@@ -43,13 +43,20 @@ class AuthViewModel: ObservableObject {
     private var sessionRefreshTask: Task<Void, Never>?
 
     init() {
-        restoreVerificationRecovery()
         #if DEBUG
-        if SpotLaunchConfiguration.uiTestAuthBootstrap == .loggedIn {
-            Task { @MainActor in
-                self.configureUITestSyntheticAuthIfNeeded()
+        if Self.shouldBootstrapUITestSyntheticAuth {
+            // Keep UI tests off the indefinite LaunchView path even if Supabase
+            // authStateChanges is slow/hanging on CI simulators.
+            uiTestSyntheticSessionActive = true
+            isLoading = false
+            Task { @MainActor [weak self] in
+                self?.configureUITestSyntheticAuthIfNeeded()
             }
+        } else {
+            restoreVerificationRecovery()
         }
+        #else
+        restoreVerificationRecovery()
         #endif
         listenToSupabaseAuthState()
     }
@@ -58,6 +65,29 @@ class AuthViewModel: ObservableObject {
         supabaseAuthTask?.cancel()
         sessionRefreshTask?.cancel()
     }
+
+    #if DEBUG
+    /// Unit-test override for the UI-test bootstrap path (avoids ProcessInfo launch args).
+    static var uiTestBootstrapOverrideForTests: UITestSyntheticAuthConfiguration?
+    static var uiTestAccountDeletionReauthOverrideForTests: AccountDeletionReauthMethod?
+
+    private static var shouldBootstrapUITestSyntheticAuth: Bool {
+        SpotLaunchConfiguration.isUITestMode || uiTestBootstrapOverrideForTests != nil
+    }
+
+    /// Unit tests: stop listening to live Supabase auth so simulator sessions cannot clobber pending state.
+    func cancelAuthStateListeningForTests() {
+        supabaseAuthTask?.cancel()
+        supabaseAuthTask = nil
+        sessionRefreshTask?.cancel()
+        sessionRefreshTask = nil
+        uiTestSyntheticSessionActive = true
+        isAuthenticated = false
+        isEmailVerified = false
+        awaitingEmailVerification = false
+        userId = nil
+    }
+    #endif
 
     private var previousUserId: String?
     /// True while `delete_my_account` is in flight (password re-auth triggers `.signedIn`; skip profile sync / feed refreshes).
@@ -79,20 +109,57 @@ class AuthViewModel: ObservableObject {
     @MainActor
     private func configureUITestSyntheticAuthIfNeeded() {
         #if DEBUG
-        guard SpotLaunchConfiguration.uiTestAuthBootstrap == .loggedIn else { return }
-        uiTestSyntheticSessionActive = true
-        userId = SpotLaunchConfiguration.uiTestSyntheticUserId
-        isAuthenticated = true
-        isEmailVerified = true
-        isLoading = false
-        awaitingEmailVerification = false
-        isPro = SpotLaunchConfiguration.uiTestUserIsPro
-        proUntil = nil
-        if let reauth = SpotLaunchConfiguration.uiTestAccountDeletionReauth {
-            accountDeletionReauthMethod = reauth
+        let configuration: UITestSyntheticAuthConfiguration
+        let accountDeletionReauth: AccountDeletionReauthMethod?
+        if let override = Self.uiTestBootstrapOverrideForTests {
+            configuration = override
+            accountDeletionReauth = Self.uiTestAccountDeletionReauthOverrideForTests
+        } else if SpotLaunchConfiguration.isUITestMode,
+                  let bootstrap = SpotLaunchConfiguration.uiTestAuthBootstrap {
+            configuration = UITestSyntheticAuthConfiguration.make(bootstrap: bootstrap)
+            accountDeletionReauth = SpotLaunchConfiguration.uiTestAccountDeletionReauth
+        } else {
+            return
         }
+        applyUITestSyntheticAuthConfiguration(
+            configuration,
+            accountDeletionReauth: accountDeletionReauth
+        )
         #endif
     }
+
+    #if DEBUG
+    /// Test/UI-test helper: apply synthetic auth flags without requiring ProcessInfo UI-test env.
+    @MainActor
+    func applyUITestSyntheticAuthConfigurationForTests(
+        _ configuration: UITestSyntheticAuthConfiguration,
+        accountDeletionReauth: AccountDeletionReauthMethod? = nil
+    ) {
+        applyUITestSyntheticAuthConfiguration(
+            configuration,
+            accountDeletionReauth: accountDeletionReauth
+        )
+    }
+
+    @MainActor
+    private func applyUITestSyntheticAuthConfiguration(
+        _ configuration: UITestSyntheticAuthConfiguration,
+        accountDeletionReauth: AccountDeletionReauthMethod?
+    ) {
+        uiTestSyntheticSessionActive = true
+        isLoading = false
+        awaitingEmailVerification = false
+        userId = configuration.userId
+        isAuthenticated = configuration.isAuthenticated
+        isEmailVerified = configuration.isEmailVerified
+        isPro = configuration.isPro
+        proUntil = nil
+        if configuration.isAuthenticated, let accountDeletionReauth {
+            accountDeletionReauthMethod = accountDeletionReauth
+        }
+    }
+    #endif
+
 
     @MainActor
     private func applySupabaseAuthChange(event: AuthChangeEvent, session: Session?) {
@@ -781,13 +848,7 @@ class AuthViewModel: ObservableObject {
     }
 
     var maskedEmail: String {
-        let e = verificationEmailMaskSource
-        guard let at = e.firstIndex(of: "@") else { return e }
-        let name = e[..<at]
-        let domain = e[at...]
-        let keep = min(2, name.count)
-        let head = name.prefix(keep)
-        return String(head) + "****" + String(domain)
+        VerificationEmailMask.mask(verificationEmailMaskSource)
     }
 
     // MARK: - Reauthentication

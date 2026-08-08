@@ -138,9 +138,9 @@ where created_at < now() - interval '24 hours';
 
 | Test | File |
 | --- | --- |
-| Reason enum stability + log severity | `SpotTests/ModerationServiceTests.swift` |
-| Pre-auth gate state machine | `SpotTests/PreAuthTermsAgreementStoreTests.swift` |
-| Image scoring policy | `SpotTests/ModerationPolicyTests.swift` |
+| Reason enum stability + log severity | `SpotTests/Services/Moderation/ModerationServiceTests.swift` |
+| Pre-auth gate state machine | `SpotTests/Services/Moderation/PreAuthTermsAgreementStoreTests.swift` |
+| Image scoring policy | `SpotTests/Utils/ModerationPolicyTests.swift` |
 
 Networked RPC tests live in higher-level integration suites (run against a
 seeded Supabase project) and are intentionally omitted from `SpotTests`.

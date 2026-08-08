@@ -57,6 +57,7 @@ fi
 echo -e "${BLUE}=== Changed-Line Coverage Validation ===${NC}"
 echo "Coverage threshold: ${COVERAGE_THRESHOLD}% of changed executable lines"
 echo "Enforced once a file has at least ${MIN_CHANGED_LINES} changed executable lines"
+echo "Scope: Spot/ production Swift excluding Views and Models/Logs (Views covered via UITests / extraction)"
 echo "Base branch: ${BASE_BRANCH}"
 echo "xcresult: ${XCRESULT_PATH}"
 echo ""
@@ -65,18 +66,42 @@ echo ""
 echo -e "${BLUE}Getting changed files...${NC}"
 git fetch origin "${BASE_BRANCH##*/}" --depth=1 2>/dev/null || true
 
-# SwiftUI view execution is measured by the separate SpotUITests scheme, not by
-# this unit-test job. Enforce unit coverage on changed non-view production code.
-# `--diff-filter=d` drops deleted files, which have no lines left to cover.
-CHANGED_FILES=$(git diff --name-only --diff-filter=d "${BASE_BRANCH}" -- '*.swift' | grep -E '^Spot/' | grep -v '^Spot/Views/' | grep -v 'SpotTests/' | grep -v 'SpotUITests/' || true)
+# Production scope includes Spot/ (informational) but the changed-line gate
+# excludes Views — see coverage_scope.is_in_changed_line_enforcement_scope.
+# `--find-renames` + skipping R100 avoids treating folder moves as full-file
+# rewrites. `--diff-filter=d` drops deleted files.
+NAME_STATUS=$(
+    git diff --find-renames --name-status --diff-filter=d "${BASE_BRANCH}" -- '*.swift' || true
+)
 
-if [ -z "$CHANGED_FILES" ]; then
-    echo -e "${GREEN}✓ No production Swift files changed - skipping coverage check${NC}"
+CHANGED_ENTRIES=$(
+    NAME_STATUS="$NAME_STATUS" python3 -c '
+import os
+from pathlib import Path
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "coverage_scope",
+    Path("scripts/coverage_scope.py"),
+)
+mod = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(mod)
+for new_path, old_path in mod.changed_files_from_name_status(
+    os.environ.get("NAME_STATUS", ""),
+    for_enforcement=True,
+):
+    # new_path<TAB>old_path_or_empty
+    print("%s\t%s" % (new_path, old_path or ""))
+'
+)
+
+if [ -z "$CHANGED_ENTRIES" ]; then
+    echo -e "${GREEN}✓ No in-scope production Swift files with enforceable changed lines - skipping coverage check${NC}"
     exit 0
 fi
 
-echo "Changed production files:"
-echo "$CHANGED_FILES" | sed 's/^/  - /'
+echo "Changed production files (enforcement scope; pure renames omitted):"
+echo "$CHANGED_ENTRIES" | cut -f1 | sed 's/^/  - /'
 echo ""
 
 # Extract coverage data
@@ -107,7 +132,7 @@ SKIPPED_FILES=()
 TOTAL_LINES=0
 COVERED_LINES=0
 
-while IFS= read -r file; do
+while IFS=$'\t' read -r file old_path; do
     [ -z "$file" ] && continue
 
     # The archive records absolute build-machine paths, so resolve the recorded
@@ -126,7 +151,14 @@ while IFS= read -r file; do
 
     # New-side line numbers touched by this PR. `-U0` keeps hunks tight to the
     # actual edits; each header looks like `@@ -12,3 +40,5 @@`.
-    git diff -U0 "${BASE_BRANCH}" -- "$file" | awk '
+    # For renames, pass both old and new paths so git does not treat the move
+    # as a full-file add.
+    if [ -n "$old_path" ]; then
+        DIFF_ARGS=(--find-renames "${BASE_BRANCH}" -- "$old_path" "$file")
+    else
+        DIFF_ARGS=(--find-renames "${BASE_BRANCH}" -- "$file")
+    fi
+    git diff -U0 "${DIFF_ARGS[@]}" | awk '
         /^@@/ {
             match($0, /\+[0-9]+(,[0-9]+)?/)
             spec = substr($0, RSTART + 1, RLENGTH - 1)
@@ -187,7 +219,7 @@ while IFS= read -r file; do
         echo -e "${GREEN}✓ $file: ${FILE_PERCENT}% (${FILE_COVERED}/${FILE_TOTAL} changed lines)${NC}"
         PASSED_FILES+=("$file")
     fi
-done <<< "$CHANGED_FILES"
+done <<< "$CHANGED_ENTRIES"
 
 echo ""
 echo -e "${BLUE}=== Summary ===${NC}"
