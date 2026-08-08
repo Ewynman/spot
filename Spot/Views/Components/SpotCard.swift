@@ -959,58 +959,19 @@ struct SpotCard: View {
     }
 
     private var removeSavedConfirmationOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.35)
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: Constants.Layout.Spacing.large) {
-                Text("Remove from saved?")
-                    .font(FontManager.sectionHeader())
-                    .foregroundColor(Constants.Colors.primary)
-
-                Text("This spot is in \(collectionMembershipCount ?? 0) \((collectionMembershipCount ?? 0) == 1 ? "collection" : "collections"). Removing it will also remove it from those collections.")
-                    .font(FontManager.primaryText())
-                    .foregroundColor(Constants.Colors.primary.opacity(0.72))
-
-                HStack(spacing: Constants.Layout.Spacing.medium) {
-                    Button {
-                        showRemoveSavedConfirmation = false
-                    } label: {
-                        Text("Cancel")
-                            .font(FontManager.buttonText())
-                            .foregroundColor(Constants.Colors.primary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Constants.Layout.Spacing.medium)
-                            .background(Constants.Colors.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.medium))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        showRemoveSavedConfirmation = false
-                        persistSavedState(false)
-                    } label: {
-                        Text("Remove")
-                            .font(FontManager.buttonText())
-                            .foregroundColor(Constants.Colors.buttonText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Constants.Layout.Spacing.medium)
-                            .background(Constants.Colors.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.medium))
-                    }
-                    .buttonStyle(.plain)
-                }
+        CustomConfirmationDialog(
+            title: "Remove from saved?",
+            message: "This spot is in \(collectionMembershipCount ?? 0) \((collectionMembershipCount ?? 0) == 1 ? "collection" : "collections"). Removing it will also remove it from those collections.",
+            confirmTitle: "Remove",
+            cancelTitle: "Cancel",
+            onConfirm: {
+                showRemoveSavedConfirmation = false
+                persistSavedState(false)
+            },
+            onCancel: {
+                showRemoveSavedConfirmation = false
             }
-            .padding(Constants.Layout.Spacing.large)
-            .background(Constants.Colors.background)
-            .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.large))
-            .overlay {
-                RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.large)
-                    .stroke(Constants.Colors.primary.opacity(0.18), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
-            .padding(.horizontal, Constants.Layout.Spacing.extraLarge)
-        }
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("spot.removeSavedConfirmation")
     }
