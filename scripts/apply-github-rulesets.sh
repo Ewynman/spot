@@ -35,11 +35,6 @@ apply_payload() {
   fi
 }
 
-should_retry_without_extras() {
-  local err="$1"
-  [[ "$err" == *"merge_queue"* || "$err" == *"bypass_actors"* || "$err" == *"GitHub Actions integration"* ]]
-}
-
 apply_ruleset() {
   local file="$1"
   local name payload fallback err status
@@ -58,18 +53,35 @@ apply_ruleset() {
     return 0
   fi
 
-  if ! should_retry_without_extras "$err"; then
-    echo "error: failed to apply ${file}" >&2
-    echo "$err" >&2
-    return 1
+  # Prefer dropping merge_queue first (often unsupported via REST) while keeping
+  # RepositoryRole Admin bypass for this user-owned repository.
+  if [[ "$err" == *"merge_queue"* ]]; then
+    echo "  API rejected merge_queue; retrying without it."
+    echo "  Enable merge queue in the UI if needed — see .github/rulesets/README.md"
+    fallback="$(jq '.rules = [.rules[] | select(.type != "merge_queue")]' "$file")"
+    set +e
+    err="$(apply_payload "$name" "$fallback" 2>&1)"
+    status=$?
+    set -e
+    if [[ "$status" -eq 0 ]]; then
+      echo "  applied (without merge_queue)"
+      return 0
+    fi
   fi
 
-  echo "  API rejected merge_queue and/or bypass_actors; retrying with core rules only."
-  echo "  Finish merge queue + GitHub Actions bypass in the UI — see .github/rulesets/README.md"
+  if [[ "$err" == *"bypass_actors"* || "$err" == *"GitHub Actions integration"* ]]; then
+    echo "  API rejected bypass_actors; retrying without bypass list."
+    echo "  Note: GitHub Actions integration bypass is not available on user-owned repos."
+    echo "  Deploy workflows use SPOT_IOS_BUILD_NUMBER instead of pushing bump commits."
+    fallback="$(jq 'del(.bypass_actors) | .rules = [.rules[] | select(.type != "merge_queue")]' "$file")"
+    apply_payload "$name" "$fallback" >/dev/null
+    echo "  applied core rules"
+    return 0
+  fi
 
-  fallback="$(jq 'del(.bypass_actors) | .rules = [.rules[] | select(.type != "merge_queue")]' "$file")"
-  apply_payload "$name" "$fallback" >/dev/null
-  echo "  applied core rules"
+  echo "error: failed to apply ${file}" >&2
+  echo "$err" >&2
+  return 1
 }
 
 for file in "${RULESET_DIR}"/*.json; do

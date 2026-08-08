@@ -2,7 +2,7 @@
 
 GitHub rulesets for `main` and `release/*` enforce:
 
-- **No direct pushes** — changes must land via pull request (`pull_request` rule).
+- **No direct pushes for non-admins** — changes must land via pull request (`pull_request` rule).
 - **Required CI** — the `PR Validation` check from `.github/workflows/ci.yml` must pass.
 - **No force-push** — `non_fast_forward` blocks history rewrites.
 - **`main` only: merge queue** — use **Merge when ready** so merges go through the queue (see manual step below).
@@ -22,11 +22,21 @@ From repo root (requires `gh` authenticated as a repo admin):
 ./scripts/apply-github-rulesets.sh
 ```
 
-The script creates or updates rulesets by name. If GitHub rejects `merge_queue` or `bypass_actors` via API, it retries without those fields and prints what to finish in the UI.
+The script creates or updates rulesets by name. If GitHub rejects `merge_queue` via API, it retries without that field and prints what to finish in the UI.
+
+## Bypass actors (user-owned repository)
+
+This repository is owned by a **user account**, not an organization. GitHub rejects the **GitHub Actions** integration (`actor_id` 15368) as a ruleset bypass on user-owned repos:
+
+> Actor GitHub Actions integration must be part of the ruleset source or owner organization
+
+`bypass_actors` therefore uses **Repository role: Admin** (`actor_id` 5) so the owner can emergency-push if needed.
+
+Deploy workflows **must not** rely on `GITHUB_TOKEN` pushing bump commits to protected branches. Instead they allocate build numbers via the repository Actions variable `SPOT_IOS_BUILD_NUMBER` (`scripts/allocate-ci-build-number.sh`).
 
 ## One-time UI steps (if API apply skips them)
 
-### 1. Enable merge queue on `main`
+### Enable merge queue on `main`
 
 GitHub may reject the `merge_queue` rule via REST on some accounts. If **Merge when ready** is not available after applying:
 
@@ -39,17 +49,6 @@ GitHub may reject the `merge_queue` rule via REST on some accounts. If **Merge w
 4. Save.
 
 `ci.yml` already listens for `merge_group` so queue checks run once this is enabled.
-
-### 2. Allow deploy workflows to push build numbers
-
-`deploy.yml` and `testflight.yml` push automated build-number commits to protected branches. Add a bypass so `GITHUB_TOKEN` is not blocked:
-
-1. Edit each ruleset (**main** and **release branches**).
-2. **Bypass list → Add bypass → GitHub Actions**.
-3. Mode: **Always**.
-4. Save.
-
-Without this bypass, Firebase/TestFlight deploys fail when pushing `[skip ci]` build bumps.
 
 ## Current live rulesets
 
