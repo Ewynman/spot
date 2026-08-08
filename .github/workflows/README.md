@@ -76,7 +76,7 @@ Documentation and repository-maintenance-only pushes are ignored, so they do not
 This trigger does not depend on the separate CI workflow. Repository branch protection and merge policy are responsible for preventing unvalidated changes from reaching `main`.
 
 **What it does:**
-- Automatically allocates the next build number via repository variable `SPOT_IOS_BUILD_NUMBER` and updates `CURRENT_PROJECT_VERSION` for the archive only (no push to `main`; Actions cannot bypass rulesets on this user-owned repo)
+- Automatically allocates the next build number on unprotected branch `ci/build-number` (`BUILD_NUMBER`) and updates `CURRENT_PROJECT_VERSION` for the archive only (no push to `main` / `release/*`)
 - Persists the allocated number before building (prevents duplicate Firebase build numbers)
 - Resolves the merged PR associated with the deployed commit
 - Converts the PR's `Changes` section to concise plain-text Firebase release notes (Markdown and checklist boilerplate are removed)
@@ -110,7 +110,7 @@ See [docs/engineering/firebase-distribution-setup.md](../../docs/engineering/fir
 - GoogleService-Info.plist is required for Firebase initialization - without it, the app will crash on launch
 - Build number is committed and pushed before archiving to prevent duplicate Firebase builds
 - Concurrent deploys are serialized via the `deploy-firebase-main` concurrency group
-- Build numbers are stored in Actions variable `SPOT_IOS_BUILD_NUMBER` (seed/update with `gh variable set`)
+- Build numbers are stored on `ci/build-number` (`BUILD_NUMBER`); do not protect that branch
 - Legacy bump commits (`Bump build number to ... [skip ci]`) still do not re-trigger deploy workflows
 - Firebase App Distribution treats release notes as plain text; `scripts/format-firebase-release-notes.py` keeps the tester notes and rendered Actions summary readable
 - Documentation/Markdown, agent configuration, ignore-file, and license-only changes do not trigger a Firebase build
@@ -225,9 +225,9 @@ See [docs/engineering/firebase-distribution-setup.md](../../docs/engineering/fir
 
 ### Duplicate Firebase build numbers
 
-**Cause**: Deploy workflow uploaded an IPA but failed to persist the incremented build number (historically a blocked push to `main` under branch rulesets).
+**Cause**: Deploy workflow uploaded an IPA but failed to persist the incremented build number (historically a blocked push to `main`, or Actions-variable APIs that `GITHUB_TOKEN` cannot call).
 
-**Solution**: The workflow allocates and writes `SPOT_IOS_BUILD_NUMBER` *before* archiving. If duplicates appear from older runs, bump the variable ahead of the highest Firebase build (`gh variable set SPOT_IOS_BUILD_NUMBER --body <n>`) and re-run deploy.
+**Solution**: The workflow allocates and pushes `ci/build-number` *before* archiving. If duplicates appear, set `BUILD_NUMBER` on that branch ahead of the highest Firebase build and re-run deploy.
 
 ---
 

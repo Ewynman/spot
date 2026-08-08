@@ -72,7 +72,7 @@ apply_ruleset() {
   if [[ "$err" == *"bypass_actors"* || "$err" == *"GitHub Actions integration"* ]]; then
     echo "  API rejected bypass_actors; retrying without bypass list."
     echo "  Note: GitHub Actions integration bypass is not available on user-owned repos."
-    echo "  Deploy workflows use SPOT_IOS_BUILD_NUMBER instead of pushing bump commits."
+    echo "  Deploy workflows persist build numbers on unprotected ci/build-number."
     fallback="$(jq 'del(.bypass_actors) | .rules = [.rules[] | select(.type != "merge_queue")]' "$file")"
     apply_payload "$name" "$fallback" >/dev/null
     echo "  applied core rules"

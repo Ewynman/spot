@@ -16,10 +16,8 @@ jobs:
     name: Build and Upload to App Store Connect / TestFlight
     runs-on: macos-15
     permissions:
-      contents: read
-      # Persist SPOT_IOS_BUILD_NUMBER (GITHUB_TOKEN cannot push bump commits on
-      # protected release branches for this user-owned repository).
-      actions: write
+      # Push allocated build numbers to unprotected ci/build-number only.
+      contents: write
 
     # Skip legacy automated bump commits ([skip ci]).
     if: |
@@ -63,11 +61,9 @@ jobs:
 
       - name: Allocate CI build number
         id: increment_build
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Persist the next build in SPOT_IOS_BUILD_NUMBER before archive/upload
+          # Persist the next build on unprotected ci/build-number before archive
           # so a failed upload cannot reuse the same App Store Connect build number.
           ./scripts/allocate-ci-build-number.sh
           echo "Build numbers in project file:"

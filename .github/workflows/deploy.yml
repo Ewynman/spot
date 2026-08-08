@@ -27,11 +27,9 @@ jobs:
     name: Build and Deploy to Firebase App Distribution
     runs-on: macos-15
     permissions:
-      contents: read
+      # Push allocated build numbers to unprotected ci/build-number only.
+      contents: write
       pull-requests: read
-      # Persist SPOT_IOS_BUILD_NUMBER (GITHUB_TOKEN cannot push bump commits on
-      # this user-owned repo's protected branches).
-      actions: write
 
     # Deploy on merges/direct pushes to main, but skip legacy bump commits.
     if: |
@@ -95,11 +93,9 @@ jobs:
 
       - name: Allocate CI build number
         id: increment_build
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Persist the next build in SPOT_IOS_BUILD_NUMBER before archive/upload
+          # Persist the next build on unprotected ci/build-number before archive
           # so a failed deploy cannot reuse the same Firebase build number.
           ./scripts/allocate-ci-build-number.sh
           echo "Build numbers in project file:"
