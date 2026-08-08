@@ -115,6 +115,7 @@ struct SpotCard: View {
         self.onImageRetry = onImageRetry
         self.mediaPresentation = mediaPresentation
         _currentSpot = State(initialValue: spot)
+        _isSaved = State(initialValue: spot.isSaved ?? false)
     }
 
     var body: some View {

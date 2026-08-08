@@ -40,7 +40,7 @@ struct SpotSaveMutationGateTests {
         async let second: Void = gate.perform(spotId: "spot-2", isSaved: true) {
             await counter.increment()
         }
-        try await (first, second)
+        _ = try await (first, second)
 
         #expect(await counter.value == 2)
     }

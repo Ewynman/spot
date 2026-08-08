@@ -240,6 +240,7 @@ struct CollectionManagerSheet: View {
         } else {
             selectedIds.insert(collection.id)
         }
+        updateLocalMembership(collectionId: collection.id, isSelected: !wasSelected)
         mutatingIds.insert(collection.id)
         onMembershipChange(selectedIds.count)
 
@@ -250,17 +251,28 @@ struct CollectionManagerSheet: View {
                 } else {
                     try await BookmarksCollectionsService.shared.addSpot(spotId, to: collection.id)
                 }
-                await load()
             } catch {
                 if wasSelected {
                     selectedIds.insert(collection.id)
                 } else {
                     selectedIds.remove(collection.id)
                 }
+                updateLocalMembership(collectionId: collection.id, isSelected: wasSelected)
                 onMembershipChange(selectedIds.count)
                 showError("Couldn't update collection")
             }
             mutatingIds.remove(collection.id)
+        }
+    }
+
+    private func updateLocalMembership(collectionId: String, isSelected: Bool) {
+        guard let index = collections.firstIndex(where: { $0.id == collectionId }) else { return }
+        if isSelected {
+            if !collections[index].spotIds.contains(spotId) {
+                collections[index].spotIds.append(spotId)
+            }
+        } else {
+            collections[index].spotIds.removeAll { $0 == spotId }
         }
     }
 

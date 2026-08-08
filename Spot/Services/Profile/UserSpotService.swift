@@ -31,19 +31,18 @@ class UserSpotService {
     }
 
     private func fetchUserLists(for uid: UUID) async throws -> (liked: [String], bookmarked: [String]) {
-        async let likesRequest: [SpotRefRow] = supabase
+        let likesRows: [SpotRefRow] = (try? await supabase
             .from("spot_likes")
             .select("spot_id")
             .eq("user_id", value: uid)
             .execute()
-            .value
-        async let bookmarksRequest: [SpotRefRow] = supabase
+            .value) ?? []
+        let bookmarkRows: [SpotRefRow] = (try? await supabase
             .from("spot_bookmarks")
             .select("spot_id")
             .eq("user_id", value: uid)
             .execute()
-            .value
-        let (likesRows, bookmarkRows) = try await (likesRequest, bookmarksRequest)
+            .value) ?? []
         return (
             likesRows.map { $0.spot_id.uuidString },
             bookmarkRows.map { $0.spot_id.uuidString }
@@ -171,14 +170,13 @@ class UserSpotService {
                     .rpc("remove_saved_spot_v1", params: ["p_spot_id": sid])
                     .execute()
             }
-        }
-
-        await MainActor.run {
-            AnalyticsService.shared.trackUserAction(
-                isSaved ? "spot_saved" : "spot_unsaved",
-                contentType: "spot",
-                contentId: spotId
-            )
+            await MainActor.run {
+                AnalyticsService.shared.trackUserAction(
+                    isSaved ? "spot_saved" : "spot_unsaved",
+                    contentType: "spot",
+                    contentId: spotId
+                )
+            }
         }
     }
 
