@@ -105,11 +105,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Summarize Spot production-scope coverage from an xccov JSON report."
     )
-    parser.add_argument("report_json", help="Path to xcrun xccov --report --json output")
+    parser.add_argument(
+        "report_json",
+        nargs="?",
+        help="Path to xcrun xccov --report --json output",
+    )
     parser.add_argument(
         "--write-markdown",
         metavar="PATH",
         help="Also write a human-readable Markdown summary to PATH",
+    )
+    parser.add_argument(
+        "--write-unavailable-markdown",
+        metavar="PATH",
+        help="Write an unavailable Markdown report to PATH and exit (no JSON input required)",
+    )
+    parser.add_argument(
+        "--reason",
+        default="Coverage data was not produced for this run",
+        help="Reason text for --write-unavailable-markdown",
     )
     parser.add_argument(
         "--title",
@@ -117,6 +131,27 @@ def main() -> int:
         help="Markdown report title",
     )
     args = parser.parse_args()
+
+    if args.write_unavailable_markdown:
+        Path(args.write_unavailable_markdown).write_text(
+            unavailable_markdown(title=args.title, reason=args.reason),
+            encoding="utf-8",
+        )
+        print(
+            json.dumps(
+                {
+                    "percent": "unknown",
+                    "coveredLines": 0,
+                    "executableLines": 0,
+                    "fileCount": 0,
+                },
+                separators=(",", ":"),
+            )
+        )
+        return 0
+
+    if not args.report_json:
+        parser.error("report_json is required unless --write-unavailable-markdown is set")
 
     try:
         with open(args.report_json, encoding="utf-8") as report_file:

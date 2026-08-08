@@ -116,20 +116,10 @@ jobs:
               exit 0
             fi
           fi
-          python3 - <<'PY'
-from pathlib import Path
-import importlib.util
-spec = importlib.util.spec_from_file_location("summarize_xccov", "scripts/summarize-xccov.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-Path("coverage-summary.md").write_text(
-    mod.unavailable_markdown(
-        title="Spot production-scope coverage (SpotTests)",
-        reason="TestResults.xcresult missing or could not be summarized",
-    ),
-    encoding="utf-8",
-)
-PY
+          python3 scripts/summarize-xccov.py \
+            --write-unavailable-markdown coverage-summary.md \
+            --title "$TITLE" \
+            --reason "TestResults.xcresult missing or could not be summarized" >/dev/null
           echo "percent=unknown" >> "$GITHUB_OUTPUT"
       
       - name: Validate Code Coverage
@@ -346,20 +336,10 @@ PY
               exit 0
             fi
           fi
-          python3 - <<'PY'
-from pathlib import Path
-import importlib.util
-spec = importlib.util.spec_from_file_location("summarize_xccov", "scripts/summarize-xccov.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-Path("combined-coverage-summary.md").write_text(
-    mod.unavailable_markdown(
-        title="Spot production-scope coverage (Spot.xctestplan)",
-        reason="CombinedCoverage.xcresult missing or could not be summarized",
-    ),
-    encoding="utf-8",
-)
-PY
+          python3 scripts/summarize-xccov.py \
+            --write-unavailable-markdown combined-coverage-summary.md \
+            --title "$TITLE" \
+            --reason "CombinedCoverage.xcresult missing or could not be summarized" >/dev/null
           echo "percent=unknown" >> "$GITHUB_OUTPUT"
           {
             echo ""

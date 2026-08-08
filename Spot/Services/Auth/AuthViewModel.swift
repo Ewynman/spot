@@ -101,30 +101,48 @@ class AuthViewModel: ObservableObject {
     @MainActor
     private func configureUITestSyntheticAuthIfNeeded() {
         #if DEBUG
-        guard SpotLaunchConfiguration.isUITestMode else { return }
+        guard SpotLaunchConfiguration.isUITestMode,
+              let bootstrap = SpotLaunchConfiguration.uiTestAuthBootstrap
+        else { return }
+        applyUITestSyntheticAuthConfiguration(
+            UITestSyntheticAuthConfiguration.make(bootstrap: bootstrap),
+            accountDeletionReauth: SpotLaunchConfiguration.uiTestAccountDeletionReauth
+        )
+        #endif
+    }
+
+    #if DEBUG
+    /// Test/UI-test helper: apply synthetic auth flags without requiring ProcessInfo UI-test env.
+    @MainActor
+    func applyUITestSyntheticAuthConfigurationForTests(
+        _ configuration: UITestSyntheticAuthConfiguration,
+        accountDeletionReauth: AccountDeletionReauthMethod? = nil
+    ) {
+        applyUITestSyntheticAuthConfiguration(
+            configuration,
+            accountDeletionReauth: accountDeletionReauth
+        )
+    }
+
+    @MainActor
+    private func applyUITestSyntheticAuthConfiguration(
+        _ configuration: UITestSyntheticAuthConfiguration,
+        accountDeletionReauth: AccountDeletionReauthMethod?
+    ) {
         uiTestSyntheticSessionActive = true
         isLoading = false
         awaitingEmailVerification = false
-
-        switch SpotLaunchConfiguration.uiTestAuthBootstrap {
-        case .loggedIn:
-            userId = SpotLaunchConfiguration.uiTestSyntheticUserId
-            isAuthenticated = true
-            isEmailVerified = true
-            isPro = SpotLaunchConfiguration.uiTestUserIsPro
-            proUntil = nil
-            if let reauth = SpotLaunchConfiguration.uiTestAccountDeletionReauth {
-                accountDeletionReauthMethod = reauth
-            }
-        case .loggedOut, nil:
-            userId = nil
-            isAuthenticated = false
-            isEmailVerified = false
-            isPro = false
-            proUntil = nil
+        userId = configuration.userId
+        isAuthenticated = configuration.isAuthenticated
+        isEmailVerified = configuration.isEmailVerified
+        isPro = configuration.isPro
+        proUntil = nil
+        if configuration.isAuthenticated, let accountDeletionReauth {
+            accountDeletionReauthMethod = accountDeletionReauth
         }
-        #endif
     }
+    #endif
+
 
     @MainActor
     private func applySupabaseAuthChange(event: AuthChangeEvent, session: Session?) {
