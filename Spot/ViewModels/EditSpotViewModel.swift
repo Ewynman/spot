@@ -109,7 +109,7 @@ final class EditSpotViewModel: ObservableObject {
             }
             hasLoaded = true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ErrorMessageSanitizer.sanitize(error)
         }
         isLoading = false
     }
@@ -227,7 +227,7 @@ final class EditSpotViewModel: ObservableObject {
             return refreshed
         } catch {
             isSaving = false
-            errorMessage = error.localizedDescription
+            errorMessage = ErrorMessageSanitizer.sanitize(error)
             return nil
         }
     }
