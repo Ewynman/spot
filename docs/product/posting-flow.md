@@ -40,6 +40,20 @@ User picks from known tags and adds caption/details as the UI allows.
 
 Submission persists a snapshot before JPEG encoding and queueing. The composer resets as soon as `SpotPublishCoordinator` accepts the job, allowing the user to leave the Post tab while the global publish banner reports progress.
 
+### Editing an existing Spot
+
+Edit Spot is a content editor, not a second publishing wizard. It loads the
+complete ordered `spot_images` collection even when the feed or map supplied
+only a cover image. The editor shows every existing photo in a compact grid;
+users can drag to reorder, replace one position, or delete a photo while
+retaining at least one. The first item is the cover.
+
+Current vibe tags and location are hydrated with the media. Save is enabled
+only after the draft changes and applies ordered media, vibes, and location
+together. Replacement photos pass through image moderation; unchanged photos
+are not uploaded again. Back navigation asks before discarding dirty edits, and
+a failed save preserves the draft for retry.
+
 ### Publish and moderation
 
 Every image for Spots must pass **moderation** before being treated as approved media. Client coordinates upload to **pending** storage and server-side moderation; publish completes via RPC when assets are approved.

@@ -23,6 +23,10 @@ The Spot-image path is implemented through `supabase/functions/moderate-image/in
 - Upload to pending storage only for new moderated assets.
 - Invoke the function with the owned `mediaAssetId` and await its response.
 - Show **safe** rejection messages when blocked.
+- Edit Spot replacements use the same pending upload and moderation path. The
+  approved replacement remains unlinked until `update_spot_editor_v1` atomically
+  applies the editor's final ordered media list; unchanged images are not
+  downloaded or re-uploaded.
 
 ### Server / function responsibilities
 
@@ -31,6 +35,9 @@ The Spot-image path is implemented through `supabase/functions/moderate-image/in
 - Persist scores and outcomes on `media_assets` / `media_moderation_events`.
 - Promote approved objects from pending to the appropriate approved bucket.
 - Gate final publish on approved status.
+- Gate Edit Spot replacement/linking on approved status and ownership. The edit
+  RPC accepts existing image row IDs only from the owned Spot and new media
+  asset IDs only when they are approved, owned, and not already linked.
 
 ### Threshold policy
 

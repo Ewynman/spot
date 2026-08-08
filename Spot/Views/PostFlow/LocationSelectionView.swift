@@ -5,6 +5,7 @@ import UIKit
 
 struct LocationSelectionView: View {
     @Binding var selectedLocation: LocationData?
+    var onLocationConfirmed: ((LocationData) -> Void)?
     @StateObject private var locationManager = LocationManager.shared
     @State private var searchText = ""
     @State private var searchResults: [MKMapItem] = []
@@ -66,6 +67,7 @@ struct LocationSelectionView: View {
                 LocationMapView(location: selectedLocation, onConfirm: { location in
                     self.selectedLocation = location
                     showingMap = false
+                    onLocationConfirmed?(location)
                 })
             }
         }
