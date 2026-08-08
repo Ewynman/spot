@@ -22,6 +22,7 @@ struct SpotLaunchConfigurationTests {
     }
 }
 
+@Suite(.serialized)
 struct UITestSyntheticAuthConfigurationTests {
     @Test func loggedOutClearsSessionFlags() {
         let config = UITestSyntheticAuthConfiguration.make(
@@ -69,5 +70,39 @@ struct UITestSyntheticAuthConfigurationTests {
         #expect(auth.isEmailVerified == false)
         #expect(auth.isPro == false)
         #expect(auth.userId == nil)
+    }
+
+    @MainActor
+    @Test func authViewModelInitBootstrapOverrideAppliesSyntheticSession() async {
+        AuthViewModel.uiTestBootstrapOverrideForTests = .loggedIn(
+            userId: SpotLaunchConfiguration.uiTestSyntheticUserId,
+            isPro: true
+        )
+        AuthViewModel.uiTestAccountDeletionReauthOverrideForTests = .password
+        defer {
+            AuthViewModel.uiTestBootstrapOverrideForTests = nil
+            AuthViewModel.uiTestAccountDeletionReauthOverrideForTests = nil
+        }
+
+        let auth = AuthViewModel()
+        var becameAuthenticated = false
+        for _ in 0..<50 {
+            if auth.isAuthenticated {
+                becameAuthenticated = true
+                break
+            }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(becameAuthenticated)
+        #expect(auth.isLoading == false)
+        #expect(auth.isEmailVerified)
+        #expect(auth.isPro)
+        #expect(auth.userId == SpotLaunchConfiguration.uiTestSyntheticUserId)
+        #expect(auth.accountDeletionReauthMethod == .password)
+        #expect(auth.maskedEmail == VerificationEmailMask.mask(""))
+
+        auth.verificationEmailMaskSource = "eddie@example.com"
+        #expect(auth.maskedEmail == "ed****@example.com")
+        auth.cancelAuthStateListeningForTests()
     }
 }

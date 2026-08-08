@@ -44,7 +44,7 @@ class AuthViewModel: ObservableObject {
 
     init() {
         #if DEBUG
-        if SpotLaunchConfiguration.isUITestMode {
+        if Self.shouldBootstrapUITestSyntheticAuth {
             // Keep UI tests off the indefinite LaunchView path even if Supabase
             // authStateChanges is slow/hanging on CI simulators.
             uiTestSyntheticSessionActive = true
@@ -67,6 +67,14 @@ class AuthViewModel: ObservableObject {
     }
 
     #if DEBUG
+    /// Unit-test override for the UI-test bootstrap path (avoids ProcessInfo launch args).
+    static var uiTestBootstrapOverrideForTests: UITestSyntheticAuthConfiguration?
+    static var uiTestAccountDeletionReauthOverrideForTests: AccountDeletionReauthMethod?
+
+    private static var shouldBootstrapUITestSyntheticAuth: Bool {
+        SpotLaunchConfiguration.isUITestMode || uiTestBootstrapOverrideForTests != nil
+    }
+
     /// Unit tests: stop listening to live Supabase auth so simulator sessions cannot clobber pending state.
     func cancelAuthStateListeningForTests() {
         supabaseAuthTask?.cancel()
@@ -101,12 +109,21 @@ class AuthViewModel: ObservableObject {
     @MainActor
     private func configureUITestSyntheticAuthIfNeeded() {
         #if DEBUG
-        guard SpotLaunchConfiguration.isUITestMode,
-              let bootstrap = SpotLaunchConfiguration.uiTestAuthBootstrap
-        else { return }
+        let configuration: UITestSyntheticAuthConfiguration
+        let accountDeletionReauth: AccountDeletionReauthMethod?
+        if let override = Self.uiTestBootstrapOverrideForTests {
+            configuration = override
+            accountDeletionReauth = Self.uiTestAccountDeletionReauthOverrideForTests
+        } else if SpotLaunchConfiguration.isUITestMode,
+                  let bootstrap = SpotLaunchConfiguration.uiTestAuthBootstrap {
+            configuration = UITestSyntheticAuthConfiguration.make(bootstrap: bootstrap)
+            accountDeletionReauth = SpotLaunchConfiguration.uiTestAccountDeletionReauth
+        } else {
+            return
+        }
         applyUITestSyntheticAuthConfiguration(
-            UITestSyntheticAuthConfiguration.make(bootstrap: bootstrap),
-            accountDeletionReauth: SpotLaunchConfiguration.uiTestAccountDeletionReauth
+            configuration,
+            accountDeletionReauth: accountDeletionReauth
         )
         #endif
     }
