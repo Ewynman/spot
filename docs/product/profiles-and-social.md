@@ -34,9 +34,9 @@ Public profiles use direct follow/unfollow actions. Private profiles use request
 
 ### Bookmarks and likes
 
-Users save Spots (**bookmarks**) and react with **likes**; both feed ranking and profile grids.
+Users save Spots (**bookmarks**) and react with **likes**; both feed ranking and profile grids. Saving is an immediate bookmark toggle for every user. Pro collections are optional metadata on an already-saved Spot and never create another canonical save.
 
-Likes and bookmarks are loaded as complete ID sets rather than truly paginated grids. Pro users receive bookmark collections; free users use a flat bookmark grid and have a 50-bookmark cap.
+Likes and bookmarks are loaded from their canonical relationship tables as complete ID sets rather than truly paginated grids. A Pro user can add one saved Spot to multiple collections. Removing a saved Spot also removes its collection memberships after confirmation.
 
 ### Privacy boundary
 

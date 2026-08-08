@@ -40,7 +40,7 @@ Profile and Settings expose “Go Pro.” Feature limits route through `PaywallR
 | --- | --- | --- |
 | Photos per Spot | 1 | Up to 5 |
 | Vibe tags per Spot | 1 | Up to 5, including composer custom-vibe support |
-| Bookmarks | 50 | Unlimited with collections UI |
+| Saved Spots | Unlimited | Unlimited, with optional collections |
 | Map filters | Hidden | Vibe, saved, liked, following |
 | Search filters | Basic grids | Location plus selected vibe tags |
 | Map user marker | Standard green ring | Gold ring |

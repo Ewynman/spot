@@ -87,6 +87,10 @@ struct SpotCard: View {
     @State private var retryToken: UUID = UUID()
     @State private var currentSpot: Spot
     @State private var showVibeTagsSheet = false
+    @State private var toastMessage: String?
+    @State private var toastShowsCollectionAction = false
+    @State private var collectionMembershipCount: Int?
+    @State private var showRemoveSavedConfirmation = false
 
     init(
         spot: Spot,
@@ -155,6 +159,9 @@ struct SpotCard: View {
             isLiked = authVM.likedSpots.contains(spot.safeId)
             isSaved = authVM.bookmarkedSpots.contains(spot.safeId)
         }
+        .onChange(of: authVM.bookmarkedSpots) { _, bookmarkedSpots in
+            isSaved = bookmarkedSpots.contains(currentSpot.safeId)
+        }
         .onAppear {
             isLiked = authVM.likedSpots.contains(currentSpot.safeId)
             isSaved = authVM.bookmarkedSpots.contains(currentSpot.safeId)
@@ -188,6 +195,13 @@ struct SpotCard: View {
             }
             .presentationBackground(.clear)
         }
+        .fullScreenCover(isPresented: $showRemoveSavedConfirmation) {
+            ZStack {
+                Color.clear.ignoresSafeArea()
+                removeSavedConfirmationOverlay
+            }
+            .presentationBackground(.clear)
+        }
         .onPreferenceChange(MenuButtonFrameKey.self) { frame in
             menuButtonFrame = frame
         }
@@ -199,10 +213,12 @@ struct SpotCard: View {
                 .environmentObject(authVM)
         }
         .sheet(isPresented: $showCollectionPicker) {
-            CollectionPickerSheet(spotId: currentSpot.safeId, onDone: { showCollectionPicker = false }) {
-                // Mark as saved when user successfully saves to collection
-                isSaved = true
-            }
+            CollectionManagerSheet(
+                spotId: currentSpot.safeId,
+                onDone: { showCollectionPicker = false },
+                onMembershipChange: { collectionMembershipCount = $0 }
+            )
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showEditSheet) {
             EditSpotView(spot: currentSpot) { updatedSpot in
@@ -232,6 +248,21 @@ struct SpotCard: View {
             }
             .presentationDetents([.fraction(0.4)])
             .background(Constants.Colors.background)
+        }
+        .overlay(alignment: .top) {
+            if let toastMessage {
+                if toastMessage == "Couldn't save spot" || toastMessage == "Couldn't remove saved spot" {
+                    ToastView(message: toastMessage, isError: true)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                } else {
+                    SuccessToastView(
+                        message: toastMessage,
+                        actionTitle: toastShowsCollectionAction ? "Add to collection" : nil,
+                        action: toastShowsCollectionAction ? openCollectionManager : nil
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
         }
     }
 
@@ -538,25 +569,7 @@ struct SpotCard: View {
                 .buttonStyle(PlainButtonStyle())
 
                 Button {
-                    guard !isLoadingSave, let spotId = currentSpot.id, authVM.userId != nil else { return }
-                    if !isSaved, !authVM.isPro, authVM.bookmarkedSpots.count >= 50 {
-                        NotificationCenter.default.post(name: .showPaywall, object: nil)
-                        return
-                    }
-
-                    if authVM.isPro && !isSaved {
-                        showCollectionPicker = true
-                    } else {
-                        isSaved.toggle()
-                        isLoadingSave = true
-                        if isSaved {
-                            authVM.bookmarkSpot(spotId)
-                            isLoadingSave = false
-                        } else {
-                            authVM.unbookmarkSpot(spotId)
-                            isLoadingSave = false
-                        }
-                    }
+                    handleBookmarkTap()
                 } label: {
                     Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                         .font(.system(size: 22))
@@ -564,6 +577,9 @@ struct SpotCard: View {
                         .measure(target: .bookmarkButton)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(isLoadingSave)
+                .accessibilityLabel(isSaved ? "Remove saved spot" : "Save spot")
+                .accessibilityIdentifier("spot.bookmark")
 
                 Button {
                     SpotLogger.log(SpotCardLogs.menuTapped, details: ["spotId": currentSpot.safeId, "source": source])
@@ -728,21 +744,24 @@ struct SpotCard: View {
             }
             .buttonStyle(PlainButtonStyle())
 
-            Divider()
+            if authVM.isPro && isSaved {
+                Divider()
 
-            Button {
-                showCustomMenu = false
-                if authVM.isPro { showCollectionPicker = true } else { NotificationCenter.default.post(name: .showPaywall, object: nil) }
-            } label: {
-                HStack {
-                    Image(systemName: "folder.badge.plus")
-                    Text("Add to Collection")
-                        .font(FontManager.primaryText())
+                Button {
+                    showCustomMenu = false
+                    openCollectionManager()
+                } label: {
+                    HStack {
+                        Image(systemName: "folder.badge.plus")
+                        Text("Manage collections")
+                            .font(FontManager.primaryText())
+                    }
+                    .foregroundColor(Constants.Colors.primary)
+                    .padding(12)
                 }
-                .foregroundColor(Constants.Colors.primary)
-                .padding(12)
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("spot.manageCollections")
             }
-            .buttonStyle(PlainButtonStyle())
 
             if !isOwner {
                 Divider()
@@ -839,248 +858,159 @@ struct SpotCard: View {
         .frame(width: 150)
     }
 
-    // MARK: - Collection Picker Sheet
-    private struct CollectionPickerSheet: View {
-        let spotId: String
-        var onDone: () -> Void
-        var onSave: (() -> Void)? = nil
-        @State private var collections: [BookmarkCollection] = []
-        @State private var previews: [String: [String]] = [:]
-        @State private var newName: String = ""
-        @State private var isLoading: Bool = true
-        @State private var showCreateModal: Bool = false
+    private func handleBookmarkTap() {
+        guard !isLoadingSave, currentSpot.id != nil, authVM.userId != nil else { return }
+        if isSaved {
+            prepareToRemoveSavedSpot()
+        } else {
+            persistSavedState(true)
+        }
+    }
 
-        private let grid = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-
-        var body: some View {
-            NavigationStack {
-                ZStack {
-                    Constants.Colors.background.ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        if isLoading {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        } else {
-                            ScrollView {
-                                VStack(spacing: 12) {
-                                    // "Just Save" button at the top
-                                    Button {
-                                        Task {
-                                            // Just bookmark without collection
-                                            await withCheckedContinuation { continuation in
-                                                UserSpotService.shared.bookmarkSpot(spotId: spotId) { _ in
-                                                    continuation.resume()
-                                                }
-                                            }
-                                            onSave?()
-                                            onDone()
-                                        }
-                                    } label: {
-                                        HStack {
-                                            Image(systemName: "bookmark.fill")
-                                            Text("Just Save")
-                                                .font(FontManager.primaryText())
-                                        }
-                                        .foregroundColor(Constants.Colors.buttonText)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Constants.Colors.primary)
-                                        .cornerRadius(12)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .padding(.horizontal, 12)
-                                    .padding(.top, 12)
-                                    
-                                    LazyVGrid(columns: grid, spacing: 12) {
-                                        // "+" tile to create a new collection
-                                        Button {
-                                            showCreateModal = true
-                                        } label: {
-                                            NewCollectionTile()
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-
-                                        ForEach(collections) { c in
-                                            Button {
-                                                Task { await add(to: c.id) }
-                                            } label: {
-                                                CollectionCardView(
-                                                    title: c.name,
-                                                    previewURLs: previews[c.id] ?? [],
-                                                    count: c.spotIds.count
-                                                )
-                                            }
-                                            .buttonStyle(PlainButtonStyle())
-                                        }
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .padding(.bottom, 12)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
-                }
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Text("Add to Collection")
-                            .font(FontManager.sectionHeader())
-                            .foregroundColor(Constants.Colors.primary)
-                    }
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Done") { onDone() }
-                            .foregroundColor(Constants.Colors.primary)
-                            .buttonStyle(.plain)
-                    }
-                }
-                .onAppear { Task { await load() } }
-                .sheet(isPresented: $showCreateModal) {
-                    CreateCollectionModal(newName: $newName, onCreate: {
-                        Task { await create() }
-                    })
-                    .presentationDetents([.fraction(0.28)])
-                    .presentationDragIndicator(.visible)
-                }
+    private func prepareToRemoveSavedSpot() {
+        if let collectionMembershipCount {
+            if collectionMembershipCount > 0 {
+                showRemoveSavedConfirmation = true
+            } else {
+                persistSavedState(false)
             }
+            return
         }
 
-        private func load() async {
-            isLoading = true
+        isLoadingSave = true
+        Task {
             do {
-                let cols = try await BookmarksCollectionsService.shared.listCollections()
-                collections = cols
-                await loadPreviews()
+                let ids = try await BookmarksCollectionsService.shared.collectionIds(containing: currentSpot.safeId)
+                collectionMembershipCount = ids.count
+                isLoadingSave = false
+                if ids.isEmpty {
+                    persistSavedState(false)
+                } else {
+                    showRemoveSavedConfirmation = true
+                }
             } catch {
-                collections = []
-            }
-            isLoading = false
-        }
-
-        private func loadPreviews() async {
-            await withTaskGroup(of: (String, [String]).self) { group in
-                for c in collections {
-                    let ids = Array(c.spotIds.prefix(4))
-                    group.addTask {
-                        let urls = await fetchSpotPreviewURLs(spotIds: ids)
-                        return (c.id, urls)
-                    }
-                }
-                for await (cid, urls) in group {
-                    previews[cid] = urls
-                }
+                isLoadingSave = false
+                showToast("Couldn't remove saved spot")
             }
         }
+    }
 
-        private func fetchSpotPreviewURLs(spotIds: [String], limit: Int = 4) async -> [String] {
-            let ids = Array(spotIds.prefix(limit))
-            guard !ids.isEmpty else { return [] }
-            let urls = await SpotSupabaseRepository.fetchPreviewImageURLs(spotIds: ids)
-            return urls.filter { !$0.isEmpty }
-        }
+    private func persistSavedState(_ target: Bool) {
+        guard let spotId = currentSpot.id, !isLoadingSave else { return }
+        let previous = isSaved
 
-        private func create() async {
-            let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { return }
+        isSaved = target
+        isLoadingSave = true
+        updateBookmarkCache(spotId: spotId, isSaved: target)
+
+        Task {
             do {
-                let collectionId = try await BookmarksCollectionsService.shared.createCollection(name: name)
-                // Add the spot to the new collection
-                try await BookmarksCollectionsService.shared.addSpot(spotId, to: collectionId)
-                // Also add to bookmarks so it shows up in bookmarks view
-                await withCheckedContinuation { continuation in
-                    UserSpotService.shared.bookmarkSpot(spotId: spotId) { result in
-                        continuation.resume()
-                    }
+                try await UserSpotService.shared.setBookmark(spotId: spotId, isSaved: target)
+                isLoadingSave = false
+                if !target {
+                    collectionMembershipCount = 0
                 }
-                // Notify parent that spot was saved
-                onSave?()
-                newName = ""
-                showCreateModal = false
-                await load()
-            } catch { }
-        }
-
-        private func add(to collectionId: String) async {
-            guard !spotId.isEmpty else { return }
-            do {
-                try await BookmarksCollectionsService.shared.addSpot(spotId, to: collectionId)
-                // Also add to bookmarks so it shows up in bookmarks view
-                await withCheckedContinuation { continuation in
-                    UserSpotService.shared.bookmarkSpot(spotId: spotId) { result in
-                        continuation.resume()
-                    }
-                }
-                // Notify parent that spot was saved
-                onSave?()
-                // Refresh collections to update counts and previews
-                await load()
-                onDone()
-            } catch { }
-        }
-
-        private struct NewCollectionTile: View {
-            private var itemWidth: CGFloat {
-                let screenWidth = UIScreen.main.bounds.width
-                let padding: CGFloat = 12 * 2
-                let spacing: CGFloat = 12 * 1
-                return (screenWidth - padding - spacing) / 2
-            }
-            var body: some View {
-                ZStack {
-                    Rectangle()
-                        .fill(Color.white)
-                        .frame(width: itemWidth, height: itemWidth)
-                    Image(systemName: "plus")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Constants.Colors.primary)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Constants.Colors.primary, lineWidth: 1)
-                )
+                showToast(target ? "Saved" : "Removed from saved", collectionAction: target && authVM.isPro)
+            } catch {
+                isSaved = previous
+                isLoadingSave = false
+                updateBookmarkCache(spotId: spotId, isSaved: previous)
+                showToast(target ? "Couldn't save spot" : "Couldn't remove saved spot")
             }
         }
+    }
 
-        private struct CreateCollectionModal: View {
-            @Binding var newName: String
-            var onCreate: () -> Void
+    private func updateBookmarkCache(spotId: String, isSaved: Bool) {
+        if isSaved {
+            if !authVM.bookmarkedSpots.contains(spotId) {
+                authVM.bookmarkedSpots.append(spotId)
+            }
+        } else {
+            authVM.bookmarkedSpots.removeAll { $0 == spotId }
+        }
+    }
 
-            var body: some View {
-                VStack(spacing: 12) {
-                    Text("New Collection")
-                        .font(FontManager.sectionHeader())
-                        .foregroundColor(Constants.Colors.primary)
-                        .padding(.top, 8)
+    private func openCollectionManager() {
+        guard authVM.isPro, isSaved else { return }
+        toastMessage = nil
+        showCollectionPicker = true
+        AnalyticsService.shared.trackUserAction(
+            "collection_picker_opened",
+            contentType: "spot",
+            contentId: currentSpot.safeId
+        )
+    }
 
-                    HStack(spacing: 8) {
-                        TextField("Collection Name", text: $newName)
+    private func showToast(_ message: String, collectionAction: Bool = false) {
+        toastShowsCollectionAction = collectionAction
+        withAnimation(.easeInOut(duration: 0.2)) {
+            toastMessage = message
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if toastMessage == message {
+                    toastMessage = nil
+                    toastShowsCollectionAction = false
+                }
+            }
+        }
+    }
+
+    private var removeSavedConfirmationOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: Constants.Layout.Spacing.large) {
+                Text("Remove from saved?")
+                    .font(FontManager.sectionHeader())
+                    .foregroundColor(Constants.Colors.primary)
+
+                Text("This spot is in \(collectionMembershipCount ?? 0) \((collectionMembershipCount ?? 0) == 1 ? "collection" : "collections"). Removing it will also remove it from those collections.")
+                    .font(FontManager.primaryText())
+                    .foregroundColor(Constants.Colors.primary.opacity(0.72))
+
+                HStack(spacing: Constants.Layout.Spacing.medium) {
+                    Button {
+                        showRemoveSavedConfirmation = false
+                    } label: {
+                        Text("Cancel")
+                            .font(FontManager.buttonText())
                             .foregroundColor(Constants.Colors.primary)
-                            .padding(10)
-                            .background(Color.white)
-                            .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Constants.Colors.primary, lineWidth: 1))
-                        Button {
-                            onCreate()
-                        } label: {
-                            Text("Create")
-                                .font(FontManager.primaryText())
-                                .foregroundColor(Constants.Colors.buttonText)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Constants.Colors.primary)
-                                .cornerRadius(10)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Constants.Layout.Spacing.medium)
+                            .background(Constants.Colors.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.medium))
                     }
-                    .padding(.horizontal, 16)
+                    .buttonStyle(.plain)
 
-                    Spacer()
+                    Button {
+                        showRemoveSavedConfirmation = false
+                        persistSavedState(false)
+                    } label: {
+                        Text("Remove")
+                            .font(FontManager.buttonText())
+                            .foregroundColor(Constants.Colors.buttonText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Constants.Layout.Spacing.medium)
+                            .background(Constants.Colors.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.medium))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .background(Constants.Colors.background)
             }
+            .padding(Constants.Layout.Spacing.large)
+            .background(Constants.Colors.background)
+            .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.large))
+            .overlay {
+                RoundedRectangle(cornerRadius: Constants.Layout.CornerRadius.large)
+                    .stroke(Constants.Colors.primary.opacity(0.18), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+            .padding(.horizontal, Constants.Layout.Spacing.extraLarge)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("spot.removeSavedConfirmation")
     }
 }

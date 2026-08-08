@@ -86,6 +86,13 @@ final class BookmarksCollectionsService {
             .single()
             .execute()
             .value
+        await MainActor.run {
+            AnalyticsService.shared.trackUserAction(
+                "collection_created",
+                contentType: "collection",
+                contentId: row.id.uuidString
+            )
+        }
         return row.id.uuidString
     }
 
@@ -119,8 +126,19 @@ final class BookmarksCollectionsService {
         let maxSort: Int = (try? await maxSortIndex(collectionId: coll)) ?? -1
         try await supabase
             .from("bookmark_collection_spots")
-            .insert(LinkInsert(collection_id: coll, spot_id: spot, sort_index: maxSort + 1))
+            .upsert(
+                LinkInsert(collection_id: coll, spot_id: spot, sort_index: maxSort + 1),
+                onConflict: "collection_id,spot_id",
+                ignoreDuplicates: true
+            )
             .execute()
+        await MainActor.run {
+            AnalyticsService.shared.trackUserAction(
+                "spot_added_to_collection",
+                contentType: "spot",
+                contentId: spotId
+            )
+        }
     }
 
     private func maxSortIndex(collectionId: UUID) async throws -> Int {
@@ -163,5 +181,44 @@ final class BookmarksCollectionsService {
             .eq("collection_id", value: coll)
             .eq("spot_id", value: spot)
             .execute()
+        await MainActor.run {
+            AnalyticsService.shared.trackUserAction(
+                "spot_removed_from_collection",
+                contentType: "spot",
+                contentId: spotId
+            )
+        }
+    }
+
+    func collectionIds(containing spotId: String) async throws -> Set<String> {
+        let userId = try uid()
+        guard let spot = UUID(uuidString: spotId) else {
+            throw NSError(
+                domain: "BookmarksCollectionsService",
+                code: 0,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid spot id"]
+            )
+        }
+
+        struct MembershipRow: Decodable {
+            let collection_id: UUID
+        }
+
+        let collections: [CollectionRow] = try await supabase
+            .from("bookmark_collections")
+            .select("id,name,sort_index,created_at")
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        guard !collections.isEmpty else { return [] }
+
+        let rows: [MembershipRow] = try await supabase
+            .from("bookmark_collection_spots")
+            .select("collection_id")
+            .eq("spot_id", value: spot)
+            .in("collection_id", values: collections.map(\.id))
+            .execute()
+            .value
+        return Set(rows.map { $0.collection_id.uuidString })
     }
 }

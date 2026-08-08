@@ -480,34 +480,34 @@ private struct MockCollectionsFlow: View {
                 }
                 .padding(.horizontal, 8)
 
-                HStack(spacing: 8) {
-                    Image(systemName: "bookmark.fill")
-                    Text("Just Save")
-                        .fontWeight(.semibold)
+                ForEach([("Europe", true), ("Coffee runs", false)], id: \.0) { name, selected in
+                    HStack {
+                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        Text(name).fontWeight(.semibold)
+                        Spacer()
+                        Text(selected ? "8 spots" : "12 spots")
+                            .font(.caption2)
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(Constants.Colors.primary)
+                    .padding(12)
+                    .background(selected ? Constants.Colors.accent : Color.white)
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Constants.Colors.primary.opacity(0.2), lineWidth: 1))
+                }
+
+                HStack {
+                    Image(systemName: "plus")
+                    Text("New collection").fontWeight(.semibold)
+                    Spacer()
                 }
                 .font(.subheadline)
-                .foregroundColor(Constants.Colors.buttonText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Constants.Colors.primary)
-                .cornerRadius(14)
-
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
-                    .frame(height: 120)
-                    .overlay {
-                        Image(systemName: "plus")
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundColor(Constants.Colors.primary)
-                            .scaleEffect(substep == 0 && plusPulse ? 1.12 : 1.0)
-                            .animation(substep == 0 ? .easeInOut(duration: 0.85).repeatForever(autoreverses: true) : .default, value: plusPulse)
-                    }
-                    .overlay {
-                        if substep == 0 {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Constants.Colors.primary, lineWidth: 2.5)
-                        }
-                    }
+                .foregroundColor(Constants.Colors.primary)
+                .padding(12)
+                .background(Constants.Colors.accent.opacity(0.6))
+                .cornerRadius(12)
+                .scaleEffect(substep == 0 && plusPulse ? 1.03 : 1.0)
+                .animation(substep == 0 ? .easeInOut(duration: 0.85).repeatForever(autoreverses: true) : .default, value: plusPulse)
             }
             .padding(16)
             .background(Color.white)

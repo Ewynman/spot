@@ -5,11 +5,6 @@ class UserSpotService {
     static let shared = UserSpotService()
     private var userId: String? { SpotAuthBridge.currentUserId }
 
-    private struct UserListsRow: Decodable {
-        let liked_spots: [UUID]?
-        let bookmarked_spots: [UUID]?
-    }
-
     private struct SpotRefInsert: Encodable {
         let user_id: UUID
         let spot_id: UUID
@@ -36,30 +31,19 @@ class UserSpotService {
     }
 
     private func fetchUserLists(for uid: UUID) async throws -> (liked: [String], bookmarked: [String]) {
-        if let row: UserListsRow = try? await supabase
-            .from("users")
-            .select("liked_spots,bookmarked_spots")
-            .eq("id", value: uid)
-            .single()
-            .execute()
-            .value {
-            let liked = (row.liked_spots ?? []).map(\.uuidString)
-            let bookmarked = (row.bookmarked_spots ?? []).map(\.uuidString)
-            return (liked, bookmarked)
-        }
-
-        let likesRows: [SpotRefRow] = (try? await supabase
+        async let likesRequest: [SpotRefRow] = supabase
             .from("spot_likes")
             .select("spot_id")
             .eq("user_id", value: uid)
             .execute()
-            .value) ?? []
-        let bookmarkRows: [SpotRefRow] = (try? await supabase
+            .value
+        async let bookmarksRequest: [SpotRefRow] = supabase
             .from("spot_bookmarks")
             .select("spot_id")
             .eq("user_id", value: uid)
             .execute()
-            .value) ?? []
+            .value
+        let (likesRows, bookmarkRows) = try await (likesRequest, bookmarksRequest)
         return (
             likesRows.map { $0.spot_id.uuidString },
             bookmarkRows.map { $0.spot_id.uuidString }
@@ -143,76 +127,58 @@ class UserSpotService {
 
     // MARK: - Bookmark/Unbookmark
     func bookmarkSpot(spotId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        withCurrentUserUUID { result in
-            guard case .success(let uid) = result else {
-                completion(result.map { _ in () })
-                return
-            }
-            Task {
-                do {
-                    guard let sid = UUID(uuidString: spotId) else {
-                        throw NSError(domain: "UserSpotService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid spot id"])
-                    }
-                    do {
-                        try await supabase
-                            .from("spot_bookmarks")
-                            .insert(SpotRefInsert(user_id: uid, spot_id: sid))
-                            .execute()
-                    } catch {
-                        var current = try await self.fetchUserLists(for: uid).bookmarked
-                        if !current.contains(spotId) { current.append(spotId) }
-                        try await supabase
-                            .from("users")
-                            .update(["bookmarked_spots": current])
-                            .eq("id", value: uid)
-                            .execute()
-                    }
-                    await MainActor.run {
-                        AnalyticsService.shared.trackUserAction("spot_saved", contentType: "spot", contentId: spotId)
-                    }
-                    completion(.success(()))
-                } catch {
-                    completion(.failure(error))
-                }
+        Task {
+            do {
+                try await setBookmark(spotId: spotId, isSaved: true)
+                completion(.success(()))
+            } catch {
+                completion(.failure(error))
             }
         }
     }
 
     func unbookmarkSpot(spotId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        withCurrentUserUUID { result in
-            guard case .success(let uid) = result else {
-                completion(result.map { _ in () })
-                return
+        Task {
+            do {
+                try await setBookmark(spotId: spotId, isSaved: false)
+                completion(.success(()))
+            } catch {
+                completion(.failure(error))
             }
-            Task {
-                do {
-                    guard let sid = UUID(uuidString: spotId) else {
-                        throw NSError(domain: "UserSpotService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid spot id"])
-                    }
-                    do {
-                        try await supabase
-                            .from("spot_bookmarks")
-                            .delete()
-                            .eq("user_id", value: uid)
-                            .eq("spot_id", value: sid)
-                            .execute()
-                    } catch {
-                        var current = try await self.fetchUserLists(for: uid).bookmarked
-                        current.removeAll { $0 == spotId }
-                        try await supabase
-                            .from("users")
-                            .update(["bookmarked_spots": current])
-                            .eq("id", value: uid)
-                            .execute()
-                    }
-                    await MainActor.run {
-                        AnalyticsService.shared.trackUserAction("spot_unsaved", contentType: "spot", contentId: spotId)
-                    }
-                    completion(.success(()))
-                } catch {
-                    completion(.failure(error))
-                }
+        }
+    }
+
+    func setBookmark(spotId: String, isSaved: Bool) async throws {
+        guard let userId, let uid = UUID(uuidString: userId) else {
+            throw NSError(domain: "UserSpotService", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user"])
+        }
+        guard let sid = UUID(uuidString: spotId) else {
+            throw NSError(domain: "UserSpotService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid spot id"])
+        }
+
+        try await SpotSaveMutationGate.shared.perform(spotId: spotId, isSaved: isSaved) {
+            if isSaved {
+                try await supabase
+                    .from("spot_bookmarks")
+                    .upsert(
+                        SpotRefInsert(user_id: uid, spot_id: sid),
+                        onConflict: "user_id,spot_id",
+                        ignoreDuplicates: true
+                    )
+                    .execute()
+            } else {
+                try await supabase
+                    .rpc("remove_saved_spot_v1", params: ["p_spot_id": sid])
+                    .execute()
             }
+        }
+
+        await MainActor.run {
+            AnalyticsService.shared.trackUserAction(
+                isSaved ? "spot_saved" : "spot_unsaved",
+                contentType: "spot",
+                contentId: spotId
+            )
         }
     }
 

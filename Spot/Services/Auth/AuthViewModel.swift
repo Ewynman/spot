@@ -509,12 +509,6 @@ class AuthViewModel: ObservableObject {
         }
     }
     func bookmarkSpot(_ spotId: String) {
-        // Free users capped at 50 bookmarks
-        if !isPro && bookmarkedSpots.count >= 50 {
-            SpotLogger.log(AuthViewModelLogs.bookmarkCapReached, details: ["cap": 50])
-            NotificationCenter.default.post(name: .showPaywall, object: nil)
-            return
-        }
         UserSpotService.shared.bookmarkSpot(spotId: spotId) { [weak self] result in
             DispatchQueue.main.async {
                 if case .success = result {
