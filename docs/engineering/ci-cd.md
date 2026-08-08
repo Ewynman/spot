@@ -88,7 +88,7 @@ Documentation, Markdown, agent configuration, ignore-file, and license-only push
 **Pipeline stages:**
 
 1. **Checkout:** Pull repository code with full history
-2. **Version Management:** Allocate next build number (`SPOT_IOS_BUILD_NUMBER` Actions variable + local `CURRENT_PROJECT_VERSION` update)
+2. **Version Management:** Allocate next build number (`ci/build-number` + local `CURRENT_PROJECT_VERSION` update)
 3. **Release Notes:** Resolve the PR associated with the deployed commit and convert its `Changes` section to plain text
 4. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
 5. **Supabase Configuration:** Inject and verify staging project credentials
@@ -97,9 +97,9 @@ Documentation, Markdown, agent configuration, ignore-file, and license-only push
 8. **Deploy:** Upload to Firebase App Distribution
 
 **What it does:**
-- Allocates the next build via `scripts/allocate-ci-build-number.sh` (repository variable `SPOT_IOS_BUILD_NUMBER`, floored by `CURRENT_PROJECT_VERSION` in the checked-out project)
+- Allocates the next build via `scripts/allocate-ci-build-number.sh` (unprotected `ci/build-number` / `BUILD_NUMBER`, floored by `CURRENT_PROJECT_VERSION` in the checked-out project)
 - **Persists the allocated number before building** (prevents duplicate Firebase build numbers when upload succeeds but a later step fails)
-- Does **not** push bump commits to `main` — on this user-owned repository, `GITHUB_TOKEN` cannot bypass branch rulesets
+- Does **not** push bump commits to `main` / `release/*` — `GITHUB_TOKEN` cannot bypass those rulesets, and cannot use the repository Actions variables API either
 - Pins Firebase-distributed internal builds to staging Supabase project `aeurigbbohyxvtsfiyul`; the workflow fails if another project URL is embedded
 - Defines `INTERNAL_TESTING` through the Spot target's `SPOT_DISTRIBUTION_CONDITION` setting; it is not applied to Swift Package targets
 - Builds signed IPA for distribution
@@ -138,7 +138,7 @@ See [firebase-distribution-setup.md](firebase-distribution-setup.md) for detaile
 **Pipeline stages:**
 
 1. **Checkout:** Pull repository code with full history
-2. **Resolve version:** Derive `MARKETING_VERSION` from the branch name and allocate the next build via `scripts/allocate-ci-build-number.sh` (`SPOT_IOS_BUILD_NUMBER`)
+2. **Resolve version:** Derive `MARKETING_VERSION` from the branch name and allocate the next build via `scripts/allocate-ci-build-number.sh` (`ci/build-number`)
 3. **Firebase Configuration:** Inject GoogleService-Info.plist from secrets
 4. **Code Signing:** Install `TESTFLIGHT_APPLE_CERT` + `TESTFLIGHT_APPLE_PROFILE` into a temporary keychain
 5. **Build:** Archive unsigned, then export an App Store `.ipa`
@@ -148,7 +148,7 @@ See [firebase-distribution-setup.md](firebase-distribution-setup.md) for detaile
 
 **Versioning rule:**
 - The release branch name controls the user-facing version. `release/1.1.0` → `MARKETING_VERSION = 1.1.0`.
-- The build number is allocated the same way as the Firebase lane (`SPOT_IOS_BUILD_NUMBER`, floored by checked-in `CURRENT_PROJECT_VERSION`); the workflow does not push bump commits to protected `release/*` branches
+- The build number is allocated the same way as the Firebase lane (`ci/build-number`, floored by checked-in `CURRENT_PROJECT_VERSION`); the workflow does not push bump commits to protected `release/*` branches
 - The pipeline never bumps `1.1.0` → `1.2.0` automatically. To ship a new version, create a new `release/<version>` branch.
 - TestFlight upload does **not** submit the build to App Store Review.
 
@@ -405,7 +405,7 @@ If Xcode Cloud starts building again:
    - All tests pass
 3. PR is reviewed and merged to `main`
 4. **Deployment workflow triggers** (`deploy.yml`):
-   - Build number auto-increments (e.g., 52 → 53) via `SPOT_IOS_BUILD_NUMBER`
+   - Build number auto-increments (e.g., 52 → 53) via `ci/build-number`
    - **Allocated number is persisted before archive/upload** so a failed deploy cannot reuse the same Firebase build number
    - Plain-text release notes generated from the merged PR associated with the deployed commit
    - App is built and signed
@@ -414,24 +414,24 @@ If Xcode Cloud starts building again:
 
 **Build versioning:**
 - Marketing version: `1.000` (manual updates for releases)
-- Build number: Auto-incremented from the max of `SPOT_IOS_BUILD_NUMBER` and checked-in `CURRENT_PROJECT_VERSION`
-- CI source of truth for shipped builds is the Actions variable; the Xcode project is updated in the runner workspace for the archive only
+- Build number: Auto-incremented from the max of `ci/build-number`’s `BUILD_NUMBER` and checked-in `CURRENT_PROJECT_VERSION`
+- CI source of truth for shipped builds is `ci/build-number`; the Xcode project is updated in the runner workspace for the archive only
 
 **Deploy safeguards:**
 - **Concurrency:** Only one deploy runs at a time (`deploy-firebase-main` group)
 - **Path filter:** Documentation and repository-maintenance-only pushes do not create Firebase deploy runs
 - **Skip legacy bump commits:** Pushes with message `Bump build number to … [skip ci]` do not re-trigger deploy
 - **Skip CI on `[skip ci]` commits:** `ci.yml` skips validation on those commits
-- **Allocate before build:** `scripts/allocate-ci-build-number.sh` writes `SPOT_IOS_BUILD_NUMBER` before archiving/uploading
+- **Allocate before build:** `scripts/allocate-ci-build-number.sh` pushes `ci/build-number` before archiving/uploading
 
 **Troubleshooting duplicate Firebase build numbers**
 
-If multiple Firebase releases show the same build number (e.g. three `1.000 (7)` entries), the usual cause is deploy runs that **uploaded an IPA but failed to persist** the next build number. Historically this was a blocked `git push` to `main` under branch rulesets (`GITHUB_TOKEN` cannot bypass rules on this user-owned repo).
+If multiple Firebase releases show the same build number (e.g. three `1.000 (7)` entries), the usual cause is deploy runs that **uploaded an IPA but failed to persist** the next build number. Historically this was a blocked `git push` to `main`, or a 403 writing repository Actions variables with `GITHUB_TOKEN`.
 
 Common failure modes:
-1. Ruleset rejection of bump commits to `main` (fixed by using `SPOT_IOS_BUILD_NUMBER` instead of pushing)
+1. Ruleset rejection of bump commits to `main` (fixed by persisting on unprotected `ci/build-number`)
 2. Concurrent deploy runs before concurrency was added — both read the same base build number
-3. Stale variable — set it ahead of the highest Firebase build: `gh variable set SPOT_IOS_BUILD_NUMBER --body <n>`
+3. Stale counter — set `BUILD_NUMBER` on `ci/build-number` ahead of the highest Firebase build and re-run deploy
 
 Allocate-before-build ordering prevents new duplicates even when archive or Firebase upload fails later in the job.
 

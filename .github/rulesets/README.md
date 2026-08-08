@@ -32,7 +32,7 @@ This repository is owned by a **user account**, not an organization. GitHub reje
 
 `bypass_actors` therefore uses **Repository role: Admin** (`actor_id` 5) so the owner can emergency-push if needed.
 
-Deploy workflows **must not** rely on `GITHUB_TOKEN` pushing bump commits to protected branches. Instead they allocate build numbers via the repository Actions variable `SPOT_IOS_BUILD_NUMBER` (`scripts/allocate-ci-build-number.sh`).
+Deploy workflows **must not** rely on `GITHUB_TOKEN` pushing bump commits to protected branches, and cannot use repository Actions variables (`GITHUB_TOKEN` lacks admin rights for that API). They allocate build numbers on the unprotected `ci/build-number` branch (`scripts/allocate-ci-build-number.sh`).
 
 ## One-time UI steps (if API apply skips them)
 
