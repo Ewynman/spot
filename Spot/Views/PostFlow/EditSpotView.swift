@@ -72,7 +72,9 @@ struct EditSpotView: View {
             }
             .onChange(of: replacementPickerItem) { _, item in
                 guard let item, let targetID = replacementTargetID else { return }
-                Task { await importReplacement(item, for: targetID) }
+                Task { @MainActor in
+                    await importReplacement(item, for: targetID)
+                }
             }
         }
         .preferredColorScheme(.light)
@@ -372,7 +374,9 @@ struct EditSpotView: View {
                 .foregroundColor(Constants.Colors.primary)
                 .multilineTextAlignment(.center)
             AuthSecondaryButton(title: "Try Again") {
-                Task { await viewModel.load() }
+                Task { @MainActor in
+                    await viewModel.load()
+                }
             }
             .frame(maxWidth: 220)
         }
@@ -576,7 +580,7 @@ struct EditSpotView: View {
     }
 
     private func save() {
-        Task {
+        Task { @MainActor in
             if let updated = await viewModel.save(userId: authVM.userId) {
                 onSaved?(updated)
                 NotificationCenter.default.post(name: .spotDidUpdate, object: updated)
@@ -585,6 +589,7 @@ struct EditSpotView: View {
         }
     }
 
+    @MainActor
     private func importReplacement(_ item: PhotosPickerItem, for targetID: UUID) async {
         defer {
             replacementPickerItem = nil
