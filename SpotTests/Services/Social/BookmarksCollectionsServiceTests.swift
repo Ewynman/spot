@@ -101,7 +101,10 @@ struct BookmarksCollectionsServiceTests {
         #expect(upserts[0].sortIndex == 3)
 
         let actions = await tracker.actions
-        #expect(actions == [("spot_added_to_collection", "spot", spotId.uuidString)])
+        #expect(actions.count == 1)
+        #expect(actions[0].0 == "spot_added_to_collection")
+        #expect(actions[0].1 == "spot")
+        #expect(actions[0].2 == spotId.uuidString)
     }
 
     @Test func addSpotRejectsInvalidIds() async {
@@ -134,7 +137,10 @@ struct BookmarksCollectionsServiceTests {
         #expect(await store.deletes[0].spotId == spotId)
 
         let actions = await tracker.actions
-        #expect(actions == [("spot_removed_from_collection", "spot", spotId.uuidString)])
+        #expect(actions.count == 1)
+        #expect(actions[0].0 == "spot_removed_from_collection")
+        #expect(actions[0].1 == "spot")
+        #expect(actions[0].2 == spotId.uuidString)
     }
 
     @Test func collectionIdsReturnsMembershipSet() async throws {

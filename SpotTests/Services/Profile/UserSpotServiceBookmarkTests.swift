@@ -51,7 +51,10 @@ struct UserSpotServiceBookmarkTests {
         #expect(await store.removeCalls.isEmpty)
 
         let actions = await tracker.actions
-        #expect(actions == [("spot_saved", "spot", spotId.uuidString)])
+        #expect(actions.count == 1)
+        #expect(actions[0].0 == "spot_saved")
+        #expect(actions[0].1 == "spot")
+        #expect(actions[0].2 == spotId.uuidString)
     }
 
     @Test func setBookmarkUnsaveUsesRemoveRPCPathAndTracks() async throws {
@@ -72,7 +75,10 @@ struct UserSpotServiceBookmarkTests {
         #expect(await store.removeCalls == [spotId])
 
         let actions = await tracker.actions
-        #expect(actions == [("spot_unsaved", "spot", spotId.uuidString)])
+        #expect(actions.count == 1)
+        #expect(actions[0].0 == "spot_unsaved")
+        #expect(actions[0].1 == "spot")
+        #expect(actions[0].2 == spotId.uuidString)
     }
 
     @Test func setBookmarkRequiresAuthenticatedUser() async {
