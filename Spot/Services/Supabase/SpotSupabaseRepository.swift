@@ -802,7 +802,7 @@ enum SpotSupabaseRepository {
         try await SpotVibeSyncHydration.enrichSpotsForCardPresentation(
             spots,
             fetchLabels: { try await fetchVibeLabelListsBySpotId(spotIds: $0) },
-            fetchModes: { try await SpotVibeSyncRemote.fetchDisplayModes(spotIds: $0) },
+            fetchModes: { try await SpotVibeSyncHydration.displayModes(spotIds: $0, loadRows: SpotVibeSyncModeLoader.loadModeRows) },
             fetchPro: { try await fetchAuthorProFlags(userIds: $0) }
         )
     }

@@ -136,24 +136,3 @@ struct SpotVibeSyncHydrationTests {
         #expect(empty.isEmpty)
     }
 }
-
-struct SpotVibeSyncRemoteTests {
-    @Test func fetchDisplayModesUsesInjectedLoader() async throws {
-        let id = UUID()
-        let modes = try await SpotVibeSyncRemote.fetchDisplayModes(spotIds: [id]) { ids in
-            #expect(ids == [id])
-            return [.init(id: id, vibeDisplayMode: "rotating")]
-        }
-        #expect(modes[id] == .rotating)
-    }
-
-    @Test func fetchDisplayModesEmptyIdsSkipsLoader() async throws {
-        var loaded = false
-        let modes = try await SpotVibeSyncRemote.fetchDisplayModes(spotIds: []) { _ in
-            loaded = true
-            return []
-        }
-        #expect(modes.isEmpty)
-        #expect(loaded == false)
-    }
-}
