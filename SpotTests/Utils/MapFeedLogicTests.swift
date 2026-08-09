@@ -66,6 +66,20 @@ struct SpotMenuPlacementTests {
         #expect(center.x == 297)
         #expect(center.y > 64)
     }
+
+    @Test func placesMenuNearInteractionBarNotTopLeadingOrigin() {
+        // Typical feed card: ⋮ sits under the media, not at the card origin.
+        let buttonFrame = CGRect(x: 72, y: 480, width: 24, height: 24)
+        let center = SpotMenuPlacement.center(
+            buttonFrame: buttonFrame,
+            menuSize: CGSize(width: 170, height: 180),
+            containerSize: CGSize(width: 390, height: 640)
+        )
+
+        #expect(center.x > 80)
+        #expect(center.y > 300)
+        #expect(abs(center.x - buttonFrame.midX) < 1 || center.x >= 93)
+    }
 }
 
 struct SpotMapFilterStateTransitionTests {
