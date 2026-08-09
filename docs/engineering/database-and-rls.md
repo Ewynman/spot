@@ -42,6 +42,7 @@ Curated security-sensitive inventory from committed migrations:
 - `terms_versions`, `user_terms_acceptances`: active legal versions and per-user acceptance records.
 - `moderation_events`, `content_moderation_results`, and `moderation_queue`: service-role moderation audit and work queue.
 - `spot_vibe_tags`: multi-vibe junction used by Pro publishing and discovery.
+- `spots.vibe_display_mode` (`rotating` | `photo_synced`) and optional `spot_images.vibe_tag_id` for Pro photo↔vibe mapping (`20260809181352_vibe_photo_sync_v1.sql`). Existing spots stay `rotating` with null image vibes.
 - `users`, `spots` (including `media_display_aspect_ratio`, `media_count`, `media_layout_version` for feed layout), `spot_images` (per-image width/height and clamped display ratio), follow-related tables (see dated migrations)
 - `public.follows`: RLS policies `follows_select_related`, `follows_insert_self`, `follows_delete_related` (`20260502120000_security_sweep_rls_part_1.sql`); **unique** `(follower_id, followee_id)` via `follows_follower_followee_uidx` (`20260503120000_follows_unique_follower_followee.sql`)
 - **Saved Spots and collections**: `spot_bookmarks` is the canonical saved relationship and is unique on `(user_id, spot_id)`; `bookmark_collection_spots` is optional grouping metadata and is unique on `(collection_id, spot_id)`. Membership inserts require an existing bookmark (`bookmark_collection_spots_require_save`). Direct bookmark deletes clean up memberships via `spot_bookmarks_cleanup_collection_spots`. `remove_saved_spot_v1(uuid)` atomically removes the caller's collection memberships before the canonical save. See `20260808220600_canonical_spot_saves_v1.sql`.
@@ -51,8 +52,9 @@ Curated security-sensitive inventory from committed migrations:
 - **Edit Spot atomic mutation**: `update_spot_editor_v1` validates the caller owns
   the Spot, preserves referenced existing `spot_images`, accepts only the
   caller's approved and unlinked replacement `media_assets`, and applies media
-  order, cover metadata, vibes, and location in one transaction
-  (`20260808215819_edit_spot_media_v1.sql`). The editor separately fetches all
+  order, cover metadata, vibes, location, and optional `p_vibe_display_mode`
+  (photo-synced mappings written onto `spot_images.vibe_tag_id`) in one transaction
+  (`20260808215819_edit_spot_media_v1.sql`, `20260809181352_vibe_photo_sync_v1.sql`). The editor separately fetches all
   ordered image rows instead of trusting feed/map cover-only payloads. That
   migration also revokes authenticated direct writes to `spot_images` and
   removes legacy `spots` bucket write policies so clients cannot bypass image

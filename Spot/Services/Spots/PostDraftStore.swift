@@ -37,6 +37,13 @@ struct PostComposerDraft: Codable, Identifiable {
     let imageFileNames: [String]
     let photoRecords: [PostComposerDraftPhoto]?
     let updatedAt: Date
+    let matchVibesToPhotos: Bool?
+    let vibePhotoMappings: [PostComposerDraftVibeMapping]?
+}
+
+struct PostComposerDraftVibeMapping: Codable, Equatable {
+    let photoId: UUID
+    let vibe: String
 }
 
 struct PostComposerDraftPhoto: Codable, Equatable {
@@ -124,6 +131,8 @@ enum PostDraftStore {
         photos: [PostComposerPhoto],
         selectedLocation: LocationData?,
         selectedVibes: [String],
+        matchVibesToPhotos: Bool = false,
+        vibePhotoMappings: [UUID: String] = [:],
         draftID: String? = nil,
         status: PostComposerDraftStatus = .autosaved
     ) -> String? {
@@ -159,6 +168,10 @@ enum PostDraftStore {
             ))
         }
 
+        let mappingRecords = vibePhotoMappings.map {
+            PostComposerDraftVibeMapping(photoId: $0.key, vibe: $0.value)
+        }
+
         let draft = PostComposerDraft(
             schemaVersion: currentSchemaVersion,
             id: resolvedID,
@@ -172,7 +185,9 @@ enum PostDraftStore {
             isCustomName: selectedLocation?.isCustomName ?? false,
             imageFileNames: imageNames,
             photoRecords: photoRecords,
-            updatedAt: Date()
+            updatedAt: Date(),
+            matchVibesToPhotos: matchVibesToPhotos,
+            vibePhotoMappings: mappingRecords
         )
 
         guard let encoded = try? JSONEncoder().encode(draft) else {

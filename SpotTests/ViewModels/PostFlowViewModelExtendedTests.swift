@@ -124,4 +124,145 @@ struct PostFlowViewModelExtendedTests {
         #expect(vm.showToast == true)
         #expect(vm.toastIsError == true)
     }
+
+    @Test func vibePhotoMappingRequiresProEqualCountsAndOrdersPublishVibes() {
+        let vm = PostFlowViewModel()
+        let auth = AuthViewModel()
+        auth.cancelAuthStateListeningForTests()
+        auth.isPro = true
+        vm.authViewModel = auth
+
+        let p1 = PostComposerPhoto(image: UIImage())
+        let p2 = PostComposerPhoto(image: UIImage())
+        vm.selectedPhotos = [p1, p2]
+        vm.selectedVibes = ["A", "B"]
+
+        #expect(vm.canMatchVibesToPhotos)
+        vm.setMatchVibesToPhotos(true)
+        #expect(vm.matchVibesToPhotos)
+        #expect(vm.vibePhotoMappings[p1.id] == "A")
+        #expect(vm.resolvedPublishVibeDisplayMode == .photoSynced)
+
+        vm.assignVibe("B", toPhotoId: p1.id)
+        #expect(vm.vibePhotoMappings[p1.id] == "B")
+        #expect(vm.vibePhotoMappings[p2.id] == "A")
+        #expect(vm.orderedVibesForPublish == ["B", "A"])
+
+        vm.selectedVibes = ["A"]
+        vm.reconcileVibePhotoMappings()
+        #expect(vm.matchVibesToPhotos == false)
+        #expect(vm.vibeMappingStatusMessage == VibePhotoMappingPolicy.unequalCountsMessage)
+        #expect(vm.resolvedPublishVibeDisplayMode == .rotating)
+
+        vm.selectedVibes = ["A", "B"]
+        vm.setMatchVibesToPhotos(true)
+        vm.setMatchVibesToPhotos(false)
+        #expect(vm.matchVibesToPhotos == false)
+        #expect(vm.vibePhotoMappings.isEmpty)
+    }
+
+    @Test func setMatchVibesToPhotosNoopsWhenIneligible() {
+        let vm = PostFlowViewModel()
+        let auth = AuthViewModel()
+        auth.cancelAuthStateListeningForTests()
+        auth.isPro = false
+        vm.authViewModel = auth
+        vm.selectedPhotos = [PostComposerPhoto(image: UIImage()), PostComposerPhoto(image: UIImage())]
+        vm.selectedVibes = ["A", "B"]
+        vm.setMatchVibesToPhotos(true)
+        #expect(vm.matchVibesToPhotos == false)
+        #expect(vm.canMatchVibesToPhotos == false)
+    }
+
+    @Test func orderedVibesForPublishFallsBackWhenNotMatching() {
+        let vm = PostFlowViewModel()
+        vm.selectedVibes = ["A", "B"]
+        vm.matchVibesToPhotos = false
+        #expect(vm.orderedVibesForPublish == ["A", "B"])
+        #expect(vm.resolvedPublishVibeDisplayMode == .rotating)
+        vm.assignVibe("B", toPhotoId: UUID())
+        #expect(vm.vibePhotoMappings.isEmpty)
+    }
+
+    @Test func draftPersistLoadAndManualSaveRoundTripVibeMappings() {
+        PostDraftStore.clearAutosave()
+        defer { PostDraftStore.clearAutosave() }
+
+        let vm = PostFlowViewModel()
+        let auth = AuthViewModel()
+        auth.cancelAuthStateListeningForTests()
+        auth.isPro = true
+        vm.authViewModel = auth
+
+        let p1 = PostComposerPhoto(image: solidImage())
+        let p2 = PostComposerPhoto(image: solidImage())
+        vm.selectedPhotos = [p1, p2]
+        vm.selectedVibes = ["A", "B"]
+        vm.selectedLocation = makeLocation()
+        vm.setMatchVibesToPhotos(true)
+        vm.persistDraftSnapshot()
+        #expect(vm.activeDraftID != nil)
+
+        let vm2 = PostFlowViewModel()
+        let auth2 = AuthViewModel()
+        auth2.cancelAuthStateListeningForTests()
+        auth2.isPro = true
+        vm2.authViewModel = auth2
+        #expect(vm2.loadPersistedDraftIfAvailable())
+        #expect(vm2.matchVibesToPhotos)
+        #expect(vm2.vibePhotoMappings.count == 2)
+
+        #expect(vm2.saveDraftManually())
+        #expect(vm2.matchVibesToPhotos == false)
+        #expect(vm2.vibePhotoMappings.isEmpty)
+    }
+
+    @Test func submitPostQueuesDraftWithPhotoSyncedMode() async {
+        let vm = PostFlowViewModel()
+        let auth = AuthViewModel()
+        auth.cancelAuthStateListeningForTests()
+        auth.applyUITestSyntheticAuthConfigurationForTests(
+            .loggedIn(userId: SpotLaunchConfiguration.uiTestSyntheticUserId, isPro: true)
+        )
+        vm.authViewModel = auth
+
+        let publisher = FakeSpotPublisher()
+        vm.spotPublisher = publisher
+        let p1 = PostComposerPhoto(image: solidImage())
+        let p2 = PostComposerPhoto(image: solidImage())
+        vm.selectedPhotos = [p1, p2]
+        vm.selectedVibes = ["A", "B"]
+        vm.selectedLocation = makeLocation()
+        vm.setMatchVibesToPhotos(true)
+
+        var queued = false
+        vm.onPostQueued = { queued = true }
+        vm.submitPost()
+
+        for _ in 0..<100 where publisher.lastDraft == nil {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(publisher.lastDraft?.vibeDisplayMode == .photoSynced)
+        #expect(publisher.lastDraft?.vibeTags == ["A", "B"])
+        #expect(queued)
+        #expect(vm.matchVibesToPhotos == false)
+    }
+
+    private func solidImage() -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8))
+        return renderer.image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+    }
+}
+
+@MainActor
+private final class FakeSpotPublisher: SpotPublishing {
+    private(set) var lastDraft: SpotPublishDraft?
+
+    func enqueue(draft: SpotPublishDraft, onQueued: @escaping () -> Void) {
+        lastDraft = draft
+        onQueued()
+    }
 }

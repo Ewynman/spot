@@ -73,6 +73,7 @@ enum SpotSupabaseRepository {
         let created_at: String
         let media_display_aspect_ratio: Double?
         let media_count: Int64?
+        let vibe_display_mode: String?
     }
 
     private struct SpotImageRow: Decodable {
@@ -436,7 +437,7 @@ enum SpotSupabaseRepository {
     }
 
     private static let spotRowSelectColumns =
-        "id,user_id,vibe_tag_id,caption,latitude,longitude,location_name,likes_count,author_is_private_snapshot,created_at,media_display_aspect_ratio,media_count,media_layout_version"
+        "id,user_id,vibe_tag_id,caption,latitude,longitude,location_name,likes_count,author_is_private_snapshot,created_at,media_display_aspect_ratio,media_count,media_layout_version,vibe_display_mode"
 
     private struct UserBriefRow: Decodable {
         let id: UUID
@@ -798,26 +799,12 @@ enum SpotSupabaseRepository {
 
     /// Home feed rows only include a single `vibe_name` — load full ordered junction list + author Pro for card display.
     static func enrichSpotsForCardPresentation(_ spots: [Spot]) async throws -> [Spot] {
-        let spotUUIDs = spots.compactMap { $0.id }.compactMap(UUID.init)
-        guard !spotUUIDs.isEmpty else { return spots }
-
-        async let labelTask = fetchVibeLabelListsBySpotId(spotIds: spotUUIDs)
-        let userUUIDs = Array(Set(spots.compactMap { $0.userId }.compactMap(UUID.init)))
-        async let proTask = fetchAuthorProFlags(userIds: userUUIDs)
-
-        let (labelMap, proMap) = try await (labelTask, proTask)
-
-        return spots.map { s in
-            var m = s
-            if let sid = s.id, let u = UUID(uuidString: sid), let labs = labelMap[u], !labs.isEmpty {
-                m.vibeTags = labs
-                m.vibeTag = labs.first
-            }
-            if let uid = s.userId {
-                m.authorIsPro = proMap[uid]
-            }
-            return m
-        }
+        try await SpotVibeSyncHydration.enrichSpotsForCardPresentation(
+            spots,
+            fetchLabels: { try await fetchVibeLabelListsBySpotId(spotIds: $0) },
+            fetchModes: { try await SpotVibeSyncHydration.displayModes(spotIds: $0, loadRows: SpotVibeSyncModeLoader.loadModeRows) },
+            fetchPro: { try await fetchAuthorProFlags(userIds: $0) }
+        )
     }
 
     private static func fetchAuthorProFlags(userIds: [UUID]) async throws -> [String: Bool] {
@@ -917,6 +904,7 @@ enum SpotSupabaseRepository {
         latitude: Double,
         longitude: Double,
         locationName: String,
+        vibeDisplayMode: VibeDisplayMode = .rotating,
         progress: (@MainActor @Sendable (SpotPublishProgress) -> Void)? = nil
     ) async throws -> UUID {
         guard !imageJPEGs.isEmpty else {
@@ -962,6 +950,7 @@ enum SpotSupabaseRepository {
             let p_longitude: Double
             let p_location_name: String
             let p_media_asset_ids: [UUID]
+            let p_vibe_display_mode: String
         }
 
         var approvedAssetIds: [UUID] = []
@@ -1033,7 +1022,8 @@ enum SpotSupabaseRepository {
                 p_latitude: latitude,
                 p_longitude: longitude,
                 p_location_name: trimmedPlace,
-                p_media_asset_ids: approvedAssetIds
+                p_media_asset_ids: approvedAssetIds,
+                p_vibe_display_mode: SpotVibeSyncHydration.publishDisplayModeParam(vibeDisplayMode)
             )
         )
         .execute()

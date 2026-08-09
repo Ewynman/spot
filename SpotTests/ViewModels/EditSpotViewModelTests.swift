@@ -291,6 +291,108 @@ final class EditSpotViewModelTests: XCTestCase {
         XCTAssertNotNil(vm.errorMessage)
     }
 
+    func testLoadHydratesPhotoSyncedMappings() async {
+        let spotID = UUID()
+        let photoA = UUID()
+        let photoB = UUID()
+        let store = FakeEditSpotStore(
+            images: [
+                EditableSpotImage(id: photoA, url: "A", sortIndex: 0),
+                EditableSpotImage(id: photoB, url: "B", sortIndex: 1)
+            ]
+        )
+        var spot = SpotTestHelpers.makeSpot(
+            id: spotID.uuidString,
+            vibeTags: ["A", "B"],
+            latitude: 1,
+            longitude: 2,
+            locationName: "Place"
+        )
+        spot.vibeDisplayMode = .photoSynced
+        spot.photoSyncedVibeLabels = ["A", "B"]
+        let vm = EditSpotViewModel(spot: spot, store: store)
+
+        await vm.load()
+
+        XCTAssertTrue(vm.matchVibesToPhotos)
+        XCTAssertEqual(vm.vibePhotoMappings[photoA], "A")
+        XCTAssertEqual(vm.vibePhotoMappings[photoB], "B")
+    }
+
+    func testMatchVibesToPhotosToggleAssignAndSaveMode() async {
+        let spotID = UUID()
+        let userID = UUID()
+        let photoA = UUID()
+        let photoB = UUID()
+        let store = FakeEditSpotStore(
+            images: [
+                EditableSpotImage(id: photoA, url: "A", sortIndex: 0),
+                EditableSpotImage(id: photoB, url: "B", sortIndex: 1)
+            ],
+            refreshedSpots: [
+                SpotTestHelpers.makeSpot(id: spotID.uuidString, userId: userID.uuidString)
+            ]
+        )
+        let vm = EditSpotViewModel(
+            spot: SpotTestHelpers.makeSpot(
+                id: spotID.uuidString,
+                userId: userID.uuidString,
+                vibeTags: ["A", "B"],
+                latitude: 40.7,
+                longitude: -74.0,
+                locationName: "NYC"
+            ),
+            store: store
+        )
+        await vm.load()
+        vm.setIsPro(true)
+
+        XCTAssertTrue(vm.canMatchVibesToPhotos)
+        vm.setMatchVibesToPhotos(true)
+        XCTAssertTrue(vm.matchVibesToPhotos)
+        vm.assignVibe("B", toPhotoId: photoA)
+        XCTAssertEqual(vm.vibePhotoMappings[photoA], "B")
+        XCTAssertEqual(vm.vibePhotoMappings[photoB], "A")
+
+        let saved = await vm.save(userId: userID.uuidString)
+        XCTAssertNotNil(saved)
+        XCTAssertEqual(store.updateCalls.count, 1)
+        XCTAssertEqual(store.updateCalls.first?.vibeDisplayMode, .photoSynced)
+        XCTAssertEqual(store.updateCalls.first?.vibeTags, ["B", "A"])
+
+        vm.setMatchVibesToPhotos(false)
+        XCTAssertFalse(vm.matchVibesToPhotos)
+        XCTAssertTrue(vm.vibePhotoMappings.isEmpty)
+    }
+
+    func testReconcileInvalidatesMatchWhenVibeRemoved() async {
+        let spotID = UUID()
+        let photoA = UUID()
+        let photoB = UUID()
+        let store = FakeEditSpotStore(
+            images: [
+                EditableSpotImage(id: photoA, url: "A", sortIndex: 0),
+                EditableSpotImage(id: photoB, url: "B", sortIndex: 1)
+            ]
+        )
+        let vm = EditSpotViewModel(
+            spot: SpotTestHelpers.makeSpot(
+                id: spotID.uuidString,
+                vibeTags: ["A", "B"],
+                latitude: 1,
+                longitude: 2,
+                locationName: "Place"
+            ),
+            store: store
+        )
+        await vm.load()
+        vm.setIsPro(true)
+        vm.setMatchVibesToPhotos(true)
+        XCTAssertTrue(vm.toggleVibe("B", maximum: 5))
+        XCTAssertFalse(vm.matchVibesToPhotos)
+        XCTAssertEqual(vm.vibeMappingStatusMessage, VibePhotoMappingPolicy.unequalCountsMessage)
+    }
+
     private func solidImage() -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8))
         return renderer.image { context in
@@ -306,7 +408,7 @@ private final class FakeEditSpotStore: EditSpotPersisting, @unchecked Sendable {
     var refreshedSpots: [Spot]
     var updateError: Error?
     private(set) var prepareCalls: [Data] = []
-    private(set) var updateCalls: [(vibeTags: [String], media: [EditSpotMediaReference])] = []
+    private(set) var updateCalls: [(vibeTags: [String], media: [EditSpotMediaReference], vibeDisplayMode: VibeDisplayMode)] = []
 
     init(
         images: [EditableSpotImage],
@@ -335,10 +437,11 @@ private final class FakeEditSpotStore: EditSpotPersisting, @unchecked Sendable {
         latitude: Double,
         longitude: Double,
         locationName: String,
-        media: [EditSpotMediaReference]
+        media: [EditSpotMediaReference],
+        vibeDisplayMode: VibeDisplayMode
     ) async throws {
         if let updateError { throw updateError }
-        updateCalls.append((vibeTags, media))
+        updateCalls.append((vibeTags, media, vibeDisplayMode))
     }
 
     func fetchSpotsByIds(_ ids: [UUID]) async throws -> [Spot] {

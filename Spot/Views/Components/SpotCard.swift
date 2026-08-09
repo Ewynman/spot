@@ -118,6 +118,8 @@ struct SpotCard: View {
     @State private var retryToken: UUID = UUID()
     @State private var currentSpot: Spot
     @State private var showVibeTagsSheet = false
+    @State private var committedGalleryIndex: Int = 0
+    @State private var sheetActiveVibeLabel: String?
     @State private var toastMessage: String?
     @State private var toastShowsCollectionAction = false
     @State private var collectionMembershipCount: Int?
@@ -268,28 +270,17 @@ struct SpotCard: View {
             }
                 .environmentObject(authVM)
         }
-        .sheet(isPresented: $showVibeTagsSheet) {
-            VStack(spacing: 16) {
-                Capsule()
-                    .fill(Color.gray.opacity(0.4))
-                    .frame(width: 42, height: 5)
-                    .padding(.top, 8)
-                Text("Vibe Tags")
-                    .font(FontManager.sectionHeader())
-                    .foregroundColor(Constants.Colors.primary)
-                ForEach(currentSpot.visibleVibeLabelsForCard(), id: \.self) { tag in
-                    Text(tag)
-                        .font(FontManager.primaryText())
-                        .foregroundColor(Constants.Colors.primary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Constants.Colors.accent)
-                        .cornerRadius(12)
-                }
-                Spacer()
-            }
-            .presentationDetents([.fraction(0.4)])
-            .background(Constants.Colors.background)
+        .sheet(isPresented: $showVibeTagsSheet, onDismiss: {
+            AnalyticsService.shared.logEvent(Constants.Analytics.vibeSheetClosed, parameters: [
+                "post_id": currentSpot.safeId,
+                "vibe_display_mode": currentSpot.resolvedVibeDisplayMode.rawValue
+            ])
+            sheetActiveVibeLabel = nil
+        }) {
+            VibeTagsSheet(
+                labels: currentSpot.vibeLabelsForSheet(),
+                activeLabel: sheetActiveVibeLabel
+            )
         }
         .overlay(alignment: .top) {
             if let toastMessage {
@@ -437,7 +428,28 @@ struct SpotCard: View {
                 fallback: currentSpot.imageURL,
                 spotId: currentSpot.id,
                 mediaHeight: mediaHeight,
-                galleryIdentity: currentSpot.safeId
+                galleryIdentity: currentSpot.safeId,
+                isPagingEnabled: !showVibeTagsSheet,
+                onPageCommitted: { index in
+                    let previous = committedGalleryIndex
+                    committedGalleryIndex = index
+                    if currentSpot.resolvedVibeDisplayMode == .photoSynced, previous != index {
+                        let vibe = currentSpot.cardVibeLabel(forCommittedPhotoIndex: index)
+                        AnalyticsService.shared.logEvent(Constants.Analytics.syncedPhotoChanged, parameters: [
+                            "post_id": currentSpot.safeId,
+                            "active_image_index": index,
+                            "active_vibe_id": vibe ?? "",
+                            "vibe_display_mode": "photo_synced"
+                        ])
+                        if let vibe {
+                            AnalyticsService.shared.logEvent(Constants.Analytics.syncedVibeChanged, parameters: [
+                                "post_id": currentSpot.safeId,
+                                "active_image_index": index,
+                                "active_vibe_id": vibe
+                            ])
+                        }
+                    }
+                }
             )
         } else if let thumb = currentSpot.thumbnailURL, let turl = URL(string: thumb) {
             RemoteImage(url: turl, maxPixelSize: 1200, transaction: Transaction(animation: .default)) { phase in
@@ -641,14 +653,25 @@ struct SpotCard: View {
             Spacer()
 
             let cardVibes = currentSpot.visibleVibeLabelsForCard()
-            if let firstVibe = cardVibes.first {
+            if !cardVibes.isEmpty {
+                let synced: String? = currentSpot.resolvedVibeDisplayMode == .photoSynced
+                    ? currentSpot.cardVibeLabel(forCommittedPhotoIndex: committedGalleryIndex)
+                    : nil
                 RotatingVibeTags(
                     labels: cardVibes,
-                    onTap: {
-                        FeedEventService.record(.vibeTap, spotId: currentSpot.id, metadata: ["vibe": firstVibe])
-                        if cardVibes.count > 1 {
-                            showVibeTagsSheet = true
-                        }
+                    syncedLabel: synced,
+                    isPaused: showVibeTagsSheet,
+                    onTap: { visible in
+                        FeedEventService.record(.vibeTap, spotId: currentSpot.id, metadata: ["vibe": visible])
+                        sheetActiveVibeLabel = visible
+                        showVibeTagsSheet = true
+                        AnalyticsService.shared.logEvent(Constants.Analytics.vibeSheetOpened, parameters: [
+                            "post_id": currentSpot.safeId,
+                            "image_count": currentSpot.mediaCount ?? (currentSpot.imageURLs?.count ?? 1),
+                            "vibe_count": cardVibes.count,
+                            "vibe_display_mode": currentSpot.resolvedVibeDisplayMode.rawValue,
+                            "active_vibe_id": visible
+                        ])
                     }
                 )
                 .fixedSize(horizontal: true, vertical: false)

@@ -91,6 +91,13 @@ enum Constants {
         static let imageLoadFailed = "Image.LoadFailed"
         static let authEmailInUse = "Auth.EmailInUse"
         static let authDeleteByEmail = "Auth.DeleteByEmail"
+        static let vibePhotoSyncEnabled = "vibe_photo_sync_enabled"
+        static let vibePhotoSyncDisabled = "vibe_photo_sync_disabled"
+        static let vibePhotoMappingChanged = "vibe_photo_mapping_changed"
+        static let vibeSheetOpened = "vibe_sheet_opened"
+        static let vibeSheetClosed = "vibe_sheet_closed"
+        static let syncedPhotoChanged = "synced_photo_changed"
+        static let syncedVibeChanged = "synced_vibe_changed"
     }
 
     enum VibeTags {

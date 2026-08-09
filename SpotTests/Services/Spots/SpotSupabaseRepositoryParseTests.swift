@@ -18,6 +18,7 @@ import Testing
 
 struct SpotSupabaseRepositoryParseTests {
 
+
     @Test func parsesIso8601WithFractionalSeconds() {
         let raw = "2026-04-27T16:30:00.123Z"
         let date = SpotSupabaseRepository.parseTimestamptz(raw)

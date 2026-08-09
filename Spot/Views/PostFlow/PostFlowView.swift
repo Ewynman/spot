@@ -86,7 +86,17 @@ struct PostFlowView: View {
                                             selectedVibes: $viewModel.selectedVibes,
                                             maxVibes: authVM.isPro
                                                 ? Constants.PostLimits.maxProPostVibes
-                                                : Constants.PostLimits.maxFreePostVibes
+                                                : Constants.PostLimits.maxFreePostVibes,
+                                            mappingPhotos: viewModel.selectedPhotos.map {
+                                                (id: $0.id, thumbnail: Image(uiImage: $0.image))
+                                            },
+                                            canMatchVibesToPhotos: viewModel.canMatchVibesToPhotos,
+                                            matchVibesToPhotos: $viewModel.matchVibesToPhotos,
+                                            vibePhotoMappings: viewModel.vibePhotoMappings,
+                                            vibeMappingStatusMessage: viewModel.vibeMappingStatusMessage,
+                                            onMatchToggle: { viewModel.setMatchVibesToPhotos($0) },
+                                            onAssignVibe: { id, vibe in viewModel.assignVibe(vibe, toPhotoId: id) },
+                                            onVibesChanged: { viewModel.reconcileVibePhotoMappings() }
                                         )
                                     default:
                                         EmptyView()
@@ -182,8 +192,10 @@ struct PostFlowView: View {
                     viewModel.selectedVibes = Array(viewModel.selectedVibes.prefix(Constants.PostLimits.maxFreePostVibes))
                 }
             }
+            viewModel.reconcileVibePhotoMappings()
         }
         .onChange(of: viewModel.selectedPhotos) { _, _ in
+            viewModel.reconcileVibePhotoMappings()
             viewModel.persistDraftSnapshot()
         }
         .onChange(of: viewModel.selectedLocation) { _, _ in

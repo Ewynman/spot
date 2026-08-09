@@ -32,7 +32,7 @@ User searches by place, venue, or address, or chooses from nearby MapKit points 
 
 ### Vibe tags and caption
 
-User picks from known tags and adds caption/details as the UI allows.
+User picks from known tags and adds caption/details as the UI allows. Pro creators with an equal count of 2–5 photos and vibes can optionally enable **Match Vibes to Photos**, which stores `photo_synced` mode and maps each vibe to a photo by ID (initial pairing by order; swaps when reassigning). With mapping off (default), vibes remain post-level and rotate on the card.
 
 ### Draft behavior
 

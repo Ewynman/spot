@@ -16,8 +16,14 @@ struct Spot: Identifiable, Codable, Equatable, Hashable {
     var imageURL: String?
     var thumbnailURL: String?
     var imageURLs: [String]?
+    /// Ordered `spot_images.id` values when known (edit / enrichment).
+    var imageIds: [String]?
     var vibeTag: String?
     var vibeTags: [String]?
+    /// Server `spots.vibe_display_mode`. Defaults to rotating when absent.
+    var vibeDisplayMode: VibeDisplayMode?
+    /// Vibe labels ordered by `spot_images.sort_index` when `vibeDisplayMode == .photoSynced`.
+    var photoSyncedVibeLabels: [String]?
     var latitude: Double?
     var longitude: Double?
     var locationName: String?
@@ -53,9 +59,12 @@ struct Spot: Identifiable, Codable, Equatable, Hashable {
         createdAt: Date? = nil,
         authorIsPrivate: Bool? = nil,
         imageURLs: [String]? = nil,
+        imageIds: [String]? = nil,
         mediaDisplayAspectRatio: Double? = nil,
         mediaCount: Int? = nil,
-        authorIsPro: Bool? = nil
+        authorIsPro: Bool? = nil,
+        vibeDisplayMode: VibeDisplayMode? = nil,
+        photoSyncedVibeLabels: [String]? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -64,6 +73,7 @@ struct Spot: Identifiable, Codable, Equatable, Hashable {
         self.imageURL = imageURL
         self.thumbnailURL = thumbnailURL
         self.imageURLs = imageURLs
+        self.imageIds = imageIds
         self.vibeTag = vibeTag
         self.vibeTags = vibeTags ?? (vibeTag.map { [$0] } ?? [])
         self.latitude = latitude
@@ -77,6 +87,8 @@ struct Spot: Identifiable, Codable, Equatable, Hashable {
         self.mediaDisplayAspectRatio = mediaDisplayAspectRatio
         self.mediaCount = mediaCount
         self.authorIsPro = authorIsPro
+        self.vibeDisplayMode = vibeDisplayMode
+        self.photoSyncedVibeLabels = photoSyncedVibeLabels
     }
 
     static func withResolvedLocation(_ spot: Spot) async -> Spot {
@@ -125,5 +137,32 @@ struct Spot: Identifiable, Codable, Equatable, Hashable {
         guard all.count > 1 else { return all }
         if authorIsPro == true { return all }
         return [all[0]]
+    }
+
+    var resolvedVibeDisplayMode: VibeDisplayMode {
+        vibeDisplayMode ?? .rotating
+    }
+
+    /// Labels for the vibe sheet: photo order when synced, otherwise creator vibe order.
+    func vibeLabelsForSheet() -> [String] {
+        if resolvedVibeDisplayMode == .photoSynced,
+           let synced = photoSyncedVibeLabels,
+           !synced.isEmpty {
+            return synced
+        }
+        return visibleVibeLabelsForCard()
+    }
+
+    func cardVibeLabel(forCommittedPhotoIndex index: Int) -> String? {
+        let visible = visibleVibeLabelsForCard()
+        guard !visible.isEmpty else { return nil }
+        if resolvedVibeDisplayMode == .photoSynced {
+            return VibePhotoMappingPolicy.syncedLabel(
+                photoSyncedVibeLabels: photoSyncedVibeLabels,
+                index: index,
+                fallback: visible
+            )
+        }
+        return visible.first
     }
 }
