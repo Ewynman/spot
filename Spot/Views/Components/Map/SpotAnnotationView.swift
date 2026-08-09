@@ -2,14 +2,9 @@
 //  SpotAnnotationView.swift
 //  Spot
 //
-//  Custom UIKit annotation view for spot pins. Renders a minimal branded
-//  green pin (vector-based, *no* network thumbnails) with deterministic
-//  per-pin entry animation and clean state transitions for default,
-//  filter-match, filter-non-match, selected, and pressed states.
-//
-//  v1 hard rule from the PRD:
-//    "No network images inside spot annotation views in v1."
-//  This view enforces that — image data never enters the marker.
+//  Custom UIKit annotation view for spot pins. Renders a branded teardrop
+//  pin (vector CAShapeLayer, no network thumbnails) with tip-aligned
+//  geography, MapKit clustering, and restrained selected-state animation.
 //
 
 import UIKit
@@ -18,13 +13,10 @@ import SwiftUI
 
 // MARK: - Annotation model
 
-/// Internal annotation type used by the map. Carries the spot, the
-/// resolved coordinate (after overlap resolution), and the visual state
-/// the diffing pass last assigned.
+/// Internal annotation type used by the map. Carries the spot and the
+/// visual state the diffing pass last assigned.
 final class SpotMapAnnotation: NSObject, MKAnnotation {
     let spot: Spot
-    /// `dynamic` so KVO observers (i.e. MapKit) re-render when overlap
-    /// resolution shifts the coordinate slightly.
     @objc dynamic var coordinate: CLLocationCoordinate2D
     var visualState: SpotMarkerVisualState
 
@@ -42,16 +34,15 @@ final class SpotMapAnnotation: NSObject, MKAnnotation {
 
 /// Reusable annotation view for a `SpotMapAnnotation`.
 ///
-/// Layout: an outer halo (only visible in `.selected` state) wrapping a
-/// rounded-square pin tile with a small cream center dot. All visuals are
-/// drawn in `CALayer`s — no `UIImageView`, no network images, no
-/// SwiftUI hosting. This is a deliberate memory-budget choice (v1).
+/// Layout: a classic teardrop pin with an off-white center. Shadows are
+/// native layer shadows (not baked into artwork). The geographic point is
+/// the bottom tip via `centerOffset`.
 final class SpotAnnotationView: MKAnnotationView {
 
     static let reuseIdentifier = "SpotMarkerDefault"
 
-    private let haloLayer = CAShapeLayer()
     private let bodyLayer = CAShapeLayer()
+    private let ringLayer = CAShapeLayer()
     private let dotLayer = CAShapeLayer()
 
     private(set) var renderedState: SpotMarkerVisualState = .default
@@ -68,47 +59,47 @@ final class SpotAnnotationView: MKAnnotationView {
     }
 
     private func commonInit() {
-        let pinSize = Constants.MapDesign.pinSize
-        let haloSize: CGFloat = pinSize + 14
-        let frame = CGRect(x: 0, y: 0, width: haloSize, height: haloSize)
+        let hit = Constants.MapDesign.pinHitSize
+        let pinW = Constants.MapDesign.pinWidth
+        let pinH = Constants.MapDesign.pinHeight
+        let frame = CGRect(x: 0, y: 0, width: hit, height: hit)
         self.frame = frame
         self.backgroundColor = .clear
         self.canShowCallout = false
         self.isOpaque = false
-        // Center the pin on the coordinate; lift the visual a touch so the
-        // tail of the rounded body sits on the location.
-        self.centerOffset = CGPoint(x: 0, y: -pinSize * 0.18)
+        self.clusteringIdentifier = Constants.MapDesign.spotClusteringIdentifier
+        self.displayPriority = .defaultHigh
+        self.collisionMode = .circle
+        // Tip of the pin sits on the coordinate (view center is mid-frame).
+        self.centerOffset = CGPoint(x: 0, y: -(hit / 2))
 
-        // Halo (selection ring)
-        haloLayer.frame = frame
-        haloLayer.path = UIBezierPath(ovalIn: frame.insetBy(dx: 1, dy: 1)).cgPath
-        haloLayer.fillColor = UIColor(Constants.Colors.mapSelectedGlow).cgColor
-        haloLayer.opacity = 0
-        layer.addSublayer(haloLayer)
+        let pinOrigin = CGPoint(x: (hit - pinW) / 2, y: (hit - pinH) / 2 - 2)
+        let pinRect = CGRect(origin: pinOrigin, size: CGSize(width: pinW, height: pinH))
 
-        // Body (the green pin tile)
-        let bodyFrame = CGRect(
-            x: (haloSize - pinSize) / 2,
-            y: (haloSize - pinSize) / 2,
-            width: pinSize,
-            height: pinSize
-        )
-        bodyLayer.frame = bodyFrame
-        bodyLayer.path = UIBezierPath(roundedRect: bodyLayer.bounds, cornerRadius: pinSize * 0.32).cgPath
+        bodyLayer.frame = frame
+        bodyLayer.path = Self.teardropPath(in: pinRect).cgPath
         bodyLayer.fillColor = UIColor(Constants.Colors.mapMarkerGreen).cgColor
         bodyLayer.strokeColor = UIColor(Constants.Colors.mapMarkerStroke).cgColor
-        bodyLayer.lineWidth = 0.5
+        bodyLayer.lineWidth = 1
         bodyLayer.shadowColor = UIColor.black.cgColor
-        bodyLayer.shadowOpacity = 0.18
+        bodyLayer.shadowOpacity = 0.22
         bodyLayer.shadowOffset = CGSize(width: 0, height: 1.5)
-        bodyLayer.shadowRadius = 2
+        bodyLayer.shadowRadius = 2.5
         layer.addSublayer(bodyLayer)
 
-        // Inner dot (cream readability)
-        let dotSize = pinSize * 0.30
+        ringLayer.frame = frame
+        ringLayer.path = Self.teardropPath(in: pinRect.insetBy(dx: -2, dy: -2)).cgPath
+        ringLayer.fillColor = UIColor.clear.cgColor
+        ringLayer.strokeColor = UIColor(Constants.Colors.mapSelectedGlow).cgColor
+        ringLayer.lineWidth = 2
+        ringLayer.opacity = 0
+        layer.addSublayer(ringLayer)
+
+        let dotSize = pinW * 0.34
+        let dotCenter = CGPoint(x: pinRect.midX, y: pinRect.minY + pinW * 0.42)
         dotLayer.frame = CGRect(
-            x: bodyFrame.midX - dotSize / 2,
-            y: bodyFrame.midY - dotSize / 2,
+            x: dotCenter.x - dotSize / 2,
+            y: dotCenter.y - dotSize / 2,
             width: dotSize,
             height: dotSize
         )
@@ -117,21 +108,51 @@ final class SpotAnnotationView: MKAnnotationView {
         layer.addSublayer(dotLayer)
     }
 
-    override func prepareForReuse() {
-        super.prepareForReuse()
-        // Always reset transform/opacity so reuse never inherits stale state.
-        transform = .identity
-        alpha = 1
-        haloLayer.opacity = 0
-        renderedState = .default
-        hasAnimatedIn = false
+    /// Classic simplified map-pin / teardrop silhouette.
+    static func teardropPath(in rect: CGRect) -> UIBezierPath {
+        let path = UIBezierPath()
+        let w = rect.width
+        let h = rect.height
+        let cx = rect.midX
+        let top = rect.minY
+        let tipY = rect.maxY
+        let bulbBottom = top + w * 0.92
+
+        path.move(to: CGPoint(x: cx, y: tipY))
+        path.addCurve(
+            to: CGPoint(x: rect.minX, y: top + w * 0.45),
+            controlPoint1: CGPoint(x: cx - w * 0.08, y: tipY - h * 0.18),
+            controlPoint2: CGPoint(x: rect.minX, y: bulbBottom)
+        )
+        path.addArc(
+            withCenter: CGPoint(x: cx, y: top + w * 0.45),
+            radius: w * 0.5,
+            startAngle: .pi,
+            endAngle: 0,
+            clockwise: true
+        )
+        path.addCurve(
+            to: CGPoint(x: cx, y: tipY),
+            controlPoint1: CGPoint(x: rect.maxX, y: bulbBottom),
+            controlPoint2: CGPoint(x: cx + w * 0.08, y: tipY - h * 0.18)
+        )
+        path.close()
+        return path
     }
 
-    /// Apply a visual state. Animations are restrained:
-    ///  * default  →  reset
-    ///  * selected →  scale + halo fade-in
-    ///  * pressed  →  brief shrink
-    ///  * filter   →  body color shift (filter match) / dim (non-match)
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        transform = .identity
+        alpha = 1
+        ringLayer.opacity = 0
+        bodyLayer.shadowOpacity = 0.22
+        renderedState = .default
+        hasAnimatedIn = false
+        clusteringIdentifier = Constants.MapDesign.spotClusteringIdentifier
+        displayPriority = .defaultHigh
+        zPriority = .defaultUnselected
+    }
+
     func apply(state: SpotMarkerVisualState, animated: Bool) {
         guard state != renderedState else { return }
         renderedState = state
@@ -157,15 +178,18 @@ final class SpotAnnotationView: MKAnnotationView {
             }
         }()
 
-        let haloOpacity: Float = state == .selected ? 1 : 0
+        let ringOpacity: Float = state == .selected ? 1 : 0
+        let shadowOpacity: Float = state == .selected ? 0.35 : 0.22
+        let reduceMotion = UIAccessibility.isReduceMotionEnabled
 
         let actions = {
             self.transform = CGAffineTransform(scaleX: scale, y: scale)
             self.bodyLayer.fillColor = bodyColor.cgColor
-            self.haloLayer.opacity = haloOpacity
+            self.ringLayer.opacity = ringOpacity
+            self.bodyLayer.shadowOpacity = shadowOpacity
         }
 
-        if animated {
+        if animated && !reduceMotion {
             UIView.animate(
                 withDuration: Constants.MapDesign.selectSpringResponse,
                 delay: 0,
@@ -180,17 +204,23 @@ final class SpotAnnotationView: MKAnnotationView {
             actions()
             CATransaction.commit()
         }
-        // z-priority — selected pins always sit on top.
-        self.zPriority = state == .selected
-            ? .max
-            : .defaultUnselected
+
+        if state == .selected {
+            displayPriority = .required
+            zPriority = .max
+        } else {
+            displayPriority = .defaultHigh
+            zPriority = .defaultUnselected
+        }
     }
 
-    /// Animate the pin onto the map when it first appears.
-    /// Idempotent — calling repeatedly only animates the first time.
     func animateInIfNeeded(delay: Double) {
         guard !hasAnimatedIn else { return }
         hasAnimatedIn = true
+        if UIAccessibility.isReduceMotionEnabled {
+            alpha = 1
+            return
+        }
         let endTransform = transform
         alpha = 0
         transform = endTransform.translatedBy(x: 0, y: -10).scaledBy(x: 0.6, y: 0.6)
@@ -207,8 +237,12 @@ final class SpotAnnotationView: MKAnnotationView {
         )
     }
 
-    /// Force a fade-out, e.g. when the pin is removed from the viewport.
     func animateOut(completion: @escaping () -> Void) {
+        if UIAccessibility.isReduceMotionEnabled {
+            alpha = 0
+            completion()
+            return
+        }
         UIView.animate(
             withDuration: 0.18,
             delay: 0,

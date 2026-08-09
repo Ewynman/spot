@@ -219,8 +219,8 @@ struct ProfileView: View {
                 } else {
                     // MARK: — Profile Header + Tabs
                     VStack(spacing: 16) {
-                        // Collapsed header when spot is selected on map, full header otherwise
-                        if selectedSpot == nil && !(selectedTab == "Map" && isMapExpanded) {
+                        // Map tab is map-first: no large profile header above the map.
+                        if selectedTab != "Map" && selectedSpot == nil {
                             // Full header
                             VStack(spacing: 12) {
                                 if let urlString = viewModel.profileImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
@@ -279,67 +279,11 @@ struct ProfileView: View {
                                     .foregroundColor(.gray)
                             }
                             .padding(.top, 12)
-                        } else if selectedSpot != nil && selectedTab == "Map" {
-                            // Collapsed header when spot is selected on map
-                            HStack(spacing: 12) {
-                                if let urlString = viewModel.profileImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
-                                    RemoteImage(url: url) { phase in
-                                        switch phase {
-                                        case .success(let image):
-                                            image.resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        case .failure(let failure):
-                                            Image(systemName: "person.circle.fill")
-                                                .resizable()
-                                                .foregroundColor(.gray)
-                                                .onAppear {
-                                                    SpotLogger.log(ProfileViewLogs.profileImageLoadFailed, details: [
-                                                        "url": urlString,
-                                                        "statusCode": failure.statusCode as Any,
-                                                        "error": failure.underlying.localizedDescription
-                                                    ])
-                                                }
-                                        case .empty:
-                                            Image(systemName: "person.circle.fill")
-                                                .resizable()
-                                                .foregroundColor(.gray)
-                                        @unknown default:
-                                            Image(systemName: "person.circle.fill")
-                                                .resizable()
-                                                .foregroundColor(.gray)
-                                        }
-                                    }
-                                    .frame(width: 32, height: 32)
-                                    .clipShape(Circle())
-                                } else {
-                                    Image(systemName: "person.circle.fill")
-                                        .resizable()
-                                        .frame(width: 32, height: 32)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Text(viewModel.username ?? "")
-                                    .font(FontManager.primaryText())
-                                    .foregroundColor(.black)
-                                
-                                if (userId == nil || userId == authVM.userId) ? authVM.isPro : viewModel.isProProfile {
-                                    Text("Pro")
-                                        .font(.caption2)
-                                        .foregroundColor(Constants.Colors.buttonText)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Constants.Colors.primary)
-                                        .cornerRadius(8)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
                         }
 
                         // Follow / Request actions centered under header when viewing someone else
-                        if selectedSpot == nil,
+                        if selectedTab != "Map",
+                           selectedSpot == nil,
                            let viewedUserId = userId,
                            viewedUserId != authVM.userId {
                             VStack {
@@ -404,12 +348,15 @@ struct ProfileView: View {
                             .padding(.bottom, 8)
                         }
 
-                        if selectedSpot == nil {
+                        if selectedTab != "Map", selectedSpot == nil {
                             HStack(spacing: 24) {
                                 ForEach(tabs, id: \.self) { tab in
                                     Button {
                                         withAnimation(.easeInOut(duration: 0.2)) {
                                             selectedTab = tab
+                                            if tab == "Map" {
+                                                selectedSpot = nil
+                                            }
                                         }
                                     } label: {
                                         Text(tab)
@@ -431,7 +378,6 @@ struct ProfileView: View {
                                     userId: userId,
                                     onDelete: { deleteSpot(selectedSpot) },
                                     source: "ProfileInline"
-                                    // backAction removed - now handled by ProfileView top bar
                                 )
                                 .transition(.opacity)
                                 .zIndex(1)
@@ -448,14 +394,31 @@ struct ProfileView: View {
                                 .zIndex(0)
                             }
                         } else {
-                            // Map tab
-                            ProfileMapView(spots: viewModel.spots, onSpotTap: { tapped in
-                                selectedSpot = tapped
-                            }, onDeleteSpot: { spot in
-                                deleteSpot(spot)
-                            }, onCollapseChange: { expanded in
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { isMapExpanded = expanded }
-                            })
+                            ProfileMapView(
+                                spots: viewModel.spots,
+                                username: viewModel.username ?? "",
+                                avatarURL: viewModel.profileImageURL,
+                                isPro: (userId == nil || userId == authVM.userId) ? authVM.isPro : viewModel.isProProfile,
+                                onSpotTap: { tapped in
+                                    selectedSpot = tapped
+                                },
+                                onDeleteSpot: { spot in
+                                    deleteSpot(spot)
+                                },
+                                onCollapseChange: { expanded in
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                        isMapExpanded = expanded
+                                    }
+                                },
+                                onBackToProfile: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        selectedTab = "Spots"
+                                        selectedSpot = nil
+                                        isMapExpanded = false
+                                    }
+                                }
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .zIndex(0)
                         }
                     }
