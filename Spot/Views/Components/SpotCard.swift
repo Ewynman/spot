@@ -930,7 +930,7 @@ struct SpotCard: View {
         }
 
         isLoadingSave = true
-        Task {
+        Task { @MainActor in
             do {
                 let ids = try await BookmarksCollectionsService.shared.collectionIds(containing: currentSpot.safeId)
                 collectionMembershipCount = ids.count
@@ -955,7 +955,7 @@ struct SpotCard: View {
         isLoadingSave = true
         updateBookmarkCache(spotId: spotId, isSaved: target)
 
-        Task {
+        Task { @MainActor in
             do {
                 try await UserSpotService.shared.setBookmark(spotId: spotId, isSaved: target)
                 isLoadingSave = false
@@ -998,7 +998,7 @@ struct SpotCard: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             toastMessage = message
         }
-        Task {
+        Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_500_000_000)
             withAnimation(.easeInOut(duration: 0.2)) {
                 if toastMessage == message {

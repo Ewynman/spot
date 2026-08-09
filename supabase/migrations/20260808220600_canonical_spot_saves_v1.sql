@@ -81,8 +81,35 @@ for each row execute function public.enforce_collection_spot_is_saved_v1();
 
 revoke all on function public.enforce_collection_spot_is_saved_v1() from public;
 
+-- Keep memberships consistent even if a bookmark is deleted outside remove_saved_spot_v1.
+create or replace function public.cleanup_collection_spots_on_bookmark_delete_v1()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  delete from public.bookmark_collection_spots bcs
+  using public.bookmark_collections bc
+  where bcs.collection_id = bc.id
+    and bc.user_id = old.user_id
+    and bcs.spot_id = old.spot_id;
+
+  return old;
+end;
+$$;
+
+drop trigger if exists spot_bookmarks_cleanup_collection_spots
+  on public.spot_bookmarks;
+create trigger spot_bookmarks_cleanup_collection_spots
+after delete on public.spot_bookmarks
+for each row execute function public.cleanup_collection_spots_on_bookmark_delete_v1();
+
+revoke all on function public.cleanup_collection_spots_on_bookmark_delete_v1() from public;
+
 -- Atomically remove collection metadata before removing the canonical save.
 -- This is invoker-security code, so existing RLS policies still authorize both deletes.
+-- The AFTER DELETE trigger above is a safety net for direct spot_bookmarks deletes.
 create or replace function public.remove_saved_spot_v1(p_spot_id uuid)
 returns void
 language plpgsql

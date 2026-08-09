@@ -217,6 +217,7 @@ struct CollectionManagerSheet: View {
         Spacer(minLength: Constants.Layout.Spacing.large)
     }
 
+    @MainActor
     private func load() async {
         isLoading = true
         do {
@@ -245,7 +246,7 @@ struct CollectionManagerSheet: View {
         mutatingIds.insert(collection.id)
         onMembershipChange(selectedIds.count)
 
-        Task {
+        Task { @MainActor in
             do {
                 if wasSelected {
                     try await BookmarksCollectionsService.shared.removeSpot(spotId, from: collection.id)
@@ -282,7 +283,7 @@ struct CollectionManagerSheet: View {
         guard CollectionNamePolicy.canCreate(name), !isCreating else { return }
         isCreating = true
 
-        Task {
+        Task { @MainActor in
             do {
                 let collectionId = try await BookmarksCollectionsService.shared.createCollection(name: name)
                 try await BookmarksCollectionsService.shared.addSpot(spotId, to: collectionId)
@@ -300,7 +301,7 @@ struct CollectionManagerSheet: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             errorMessage = message
         }
-        Task {
+        Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             withAnimation(.easeInOut(duration: 0.2)) {
                 if errorMessage == message {
