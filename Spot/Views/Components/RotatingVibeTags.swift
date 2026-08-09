@@ -57,9 +57,15 @@ struct RotatingVibeTags: View {
             }
         }
         .onChange(of: syncedLabel) { _, newValue in
-            guard let newValue else { return }
-            Task { @MainActor in
-                await fadeToSynced(newValue)
+            if let newValue {
+                Task { @MainActor in
+                    await fadeToSynced(newValue)
+                }
+            } else {
+                displayedSynced = nil
+                opacity = 1
+                offsetY = 0
+                startRotationIfNeeded()
             }
         }
         .onAppear {

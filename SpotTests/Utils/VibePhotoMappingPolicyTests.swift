@@ -38,6 +38,17 @@ struct VibePhotoMappingPolicyTests {
         #expect(after[p2] == "Scenic View")
     }
 
+    @Test func swapMappingNoopsWhenSameVibeOrMissingPhoto() {
+        let p1 = UUID()
+        let before: [UUID: String] = [p1: "A"]
+        #expect(VibePhotoMappingPolicy.swapMapping(mappings: before, photoId: p1, newVibe: "A") == before)
+        #expect(VibePhotoMappingPolicy.swapMapping(mappings: before, photoId: UUID(), newVibe: "B") == before)
+    }
+
+    @Test func initialMappingsRequireEqualCounts() {
+        #expect(VibePhotoMappingPolicy.initialMappings(photoIds: [UUID()], vibes: ["A", "B"]).isEmpty)
+    }
+
     @Test func reconcileInvalidatesWhenCountsDiverge() {
         let p1 = UUID()
         let p2 = UUID()
@@ -53,6 +64,51 @@ struct VibePhotoMappingPolicyTests {
         #expect(result.mappings.isEmpty)
     }
 
+    @Test func reconcileKeepsDisabledMappingsCleaned() {
+        let p1 = UUID()
+        let p2 = UUID()
+        let result = VibePhotoMappingPolicy.reconcile(
+            photoIds: [p1],
+            vibes: ["A"],
+            mappings: [p1: "A", p2: "B"],
+            matchEnabled: false,
+            isPro: true
+        )
+        #expect(result.matchEnabled == false)
+        #expect(result.didInvalidate == false)
+        #expect(result.mappings == [p1: "A"])
+    }
+
+    @Test func reconcileFillsMissingMappingsWhenEligible() {
+        let p1 = UUID()
+        let p2 = UUID()
+        let result = VibePhotoMappingPolicy.reconcile(
+            photoIds: [p1, p2],
+            vibes: ["A", "B"],
+            mappings: [p1: "A"],
+            matchEnabled: true,
+            isPro: true
+        )
+        #expect(result.matchEnabled == true)
+        #expect(result.didInvalidate == false)
+        #expect(result.mappings[p1] == "A")
+        #expect(result.mappings[p2] == "B")
+    }
+
+    @Test func reconcileInvalidatesWhenNotPro() {
+        let p1 = UUID()
+        let p2 = UUID()
+        let result = VibePhotoMappingPolicy.reconcile(
+            photoIds: [p1, p2],
+            vibes: ["A", "B"],
+            mappings: [p1: "A", p2: "B"],
+            matchEnabled: true,
+            isPro: false
+        )
+        #expect(result.matchEnabled == false)
+        #expect(result.didInvalidate == true)
+    }
+
     @Test func orderedVibesFollowPhotoOrder() {
         let p1 = UUID()
         let p2 = UUID()
@@ -61,6 +117,7 @@ struct VibePhotoMappingPolicyTests {
             mappings: [p1: "First", p2: "Second"]
         )
         #expect(ordered == ["Second", "First"])
+        #expect(VibePhotoMappingPolicy.orderedVibes(photoIds: [p1], mappings: [:]) == nil)
     }
 
     @Test func syncedLabelUsesPhotoSyncedArray() {
@@ -70,6 +127,37 @@ struct VibePhotoMappingPolicyTests {
             fallback: ["X"]
         )
         #expect(label == "B")
+        #expect(
+            VibePhotoMappingPolicy.syncedLabel(
+                photoSyncedVibeLabels: nil,
+                index: 0,
+                fallback: ["Fallback"]
+            ) == "Fallback"
+        )
+        #expect(
+            VibePhotoMappingPolicy.syncedLabel(
+                photoSyncedVibeLabels: ["A"],
+                index: 5,
+                fallback: ["X", "Y"]
+            ) == "X"
+        )
+        #expect(
+            VibePhotoMappingPolicy.syncedLabel(
+                photoSyncedVibeLabels: nil,
+                index: 3,
+                fallback: []
+            ) == nil
+        )
+    }
+
+    @Test func eligibilityRejectsOverMaxProLimits() {
+        #expect(
+            !VibePhotoMappingPolicy.isEligible(
+                photoCount: Constants.PostLimits.maxProPostImages + 1,
+                vibeCount: Constants.PostLimits.maxProPostImages + 1,
+                isPro: true
+            )
+        )
     }
 }
 

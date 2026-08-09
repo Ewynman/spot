@@ -157,29 +157,11 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
             publishProgress = .finalizing
             let signedFirstImage = try? await SpotSupabaseRepository.signFirstImageURLForSpot(spotId: spotId)
 
-            let postedSpot = Spot(
-                id: spotIdString,
-                userId: draft.userId,
-                username: draft.username,
-                userProfileImageURL: draft.userProfileImageURL,
-                imageURL: signedFirstImage,
-                thumbnailURL: signedFirstImage,
-                vibeTag: draft.vibeTags.first,
-                vibeTags: draft.vibeTags,
-                latitude: draft.latitude,
-                longitude: draft.longitude,
-                locationName: draft.placeName,
-                likes: 0,
-                isLiked: false,
-                isSaved: false,
-                createdAt: postedAt,
-                authorIsPrivate: nil,
-                imageURLs: signedFirstImage.map { [$0] } ?? nil,
-                mediaDisplayAspectRatio: Double(draft.coverMediaDisplayAspectRatio),
-                mediaCount: draft.imageJPEGs.count,
-                authorIsPro: draft.vibeDisplayMode == .photoSynced || draft.vibeTags.count > 1 || draft.imageJPEGs.count > 1,
-                vibeDisplayMode: draft.vibeDisplayMode,
-                photoSyncedVibeLabels: draft.vibeDisplayMode == .photoSynced ? draft.vibeTags : nil
+            let postedSpot = Self.makePostedSpot(
+                draft: draft,
+                spotId: spotIdString,
+                signedFirstImage: signedFirstImage,
+                postedAt: postedAt
             )
 
             SpotLogger.log(SpotPublishCoordinatorLogs.spotPublished, details: ["spotId": spotId.uuidString])
@@ -279,5 +261,40 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
             throw NSError(domain: "SpotPublishCoordinator", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid user id"])
         }
         return uid
+    }
+
+    /// Builds the optimistic feed Spot after a successful publish (unit-tested).
+    nonisolated static func makePostedSpot(
+        draft: SpotPublishDraft,
+        spotId: String,
+        signedFirstImage: String?,
+        postedAt: Date
+    ) -> Spot {
+        Spot(
+            id: spotId,
+            userId: draft.userId,
+            username: draft.username,
+            userProfileImageURL: draft.userProfileImageURL,
+            imageURL: signedFirstImage,
+            thumbnailURL: signedFirstImage,
+            vibeTag: draft.vibeTags.first,
+            vibeTags: draft.vibeTags,
+            latitude: draft.latitude,
+            longitude: draft.longitude,
+            locationName: draft.placeName,
+            likes: 0,
+            isLiked: false,
+            isSaved: false,
+            createdAt: postedAt,
+            authorIsPrivate: nil,
+            imageURLs: signedFirstImage.map { [$0] } ?? nil,
+            mediaDisplayAspectRatio: Double(draft.coverMediaDisplayAspectRatio),
+            mediaCount: draft.imageJPEGs.count,
+            authorIsPro: draft.vibeDisplayMode == .photoSynced
+                || draft.vibeTags.count > 1
+                || draft.imageJPEGs.count > 1,
+            vibeDisplayMode: draft.vibeDisplayMode,
+            photoSyncedVibeLabels: draft.vibeDisplayMode == .photoSynced ? draft.vibeTags : nil
+        )
     }
 }

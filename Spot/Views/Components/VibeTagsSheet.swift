@@ -6,7 +6,8 @@ struct VibeTagsSheet: View {
     let activeLabel: String?
 
     private let columns = [
-        GridItem(.adaptive(minimum: 120), spacing: 10, alignment: .leading)
+        GridItem(.flexible(), spacing: 10, alignment: .leading),
+        GridItem(.flexible(), spacing: 10, alignment: .leading)
     ]
 
     var body: some View {
