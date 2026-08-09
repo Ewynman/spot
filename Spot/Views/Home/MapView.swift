@@ -103,7 +103,11 @@ struct MapView: View {
                             handleMapRegionChanged(region)
                         }
                     )
-                    .ignoresSafeArea(edges: .bottom)
+                    // The map is the canvas for this tab. Let it continue behind the
+                    // status bar as well as the home indicator so no cream strip cuts
+                    // the map off at the top; MapControlsOverlay applies its own safe
+                    // area spacing for interactive controls.
+                    .ignoresSafeArea()
                     .accessibilityIdentifier("map.mapView")
                     .overlay {
                         mapOnboardingTargets

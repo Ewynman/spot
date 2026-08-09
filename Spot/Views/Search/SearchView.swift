@@ -12,12 +12,20 @@ struct SearchView: View {
         NavigationStack(path: $path) {
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass").foregroundColor(.gray)
-                    TextField("Search users, locations, vibes", text: $vm.query)
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(Constants.Colors.primary)
+                    TextField(
+                        "",
+                        text: $vm.query,
+                        prompt: Text("Search users, locations, vibes")
+                            .foregroundColor(Constants.Colors.primary.opacity(0.62))
+                    )
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focused)
+                        .font(.system(size: 16))
                         .foregroundColor(Constants.Colors.textPrimary)
+                        .tint(Constants.Colors.primary)
                         .onChange(of: focused) { _, newValue in
                             if newValue && vm.query.isEmpty {
                                 vm.loadSearchHistory()
@@ -37,7 +45,7 @@ struct SearchView: View {
                     }
                 }
                 .padding(12)
-                .background(Color.white)
+                .background(Constants.Colors.accent.opacity(0.55))
                 .cornerRadius(12)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Constants.Colors.primary, lineWidth: 1))
                 .padding(.horizontal, 16)
@@ -243,6 +251,7 @@ struct SearchView: View {
             showFilters = false
             focused = false
         }
+        .preferredColorScheme(.light)
     }
 }
 

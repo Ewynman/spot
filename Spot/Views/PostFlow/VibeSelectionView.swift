@@ -161,10 +161,17 @@ struct VibeSelectionView: View {
             .padding(.horizontal, Constants.Layout.Padding.horizontal)
 
             HStack(spacing: Constants.Layout.Spacing.small) {
-                TextField("e.g. Golden Hour", text: $customVibe)
+                TextField(
+                    "",
+                    text: $customVibe,
+                    prompt: Text("e.g. Golden Hour")
+                        .foregroundColor(Constants.Colors.primary.opacity(0.62))
+                )
                     .textInputAutocapitalization(.words)
                     .disableAutocorrection(true)
+                    .font(.system(size: 16))
                     .foregroundColor(Constants.Colors.primary)
+                    .tint(Constants.Colors.primary)
                     .padding(Constants.Layout.Padding.verticalMedium)
                     .background(Color.white)
                     .cornerRadius(Constants.Layout.CornerRadius.medium)
