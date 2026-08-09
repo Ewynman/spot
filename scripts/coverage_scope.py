@@ -6,7 +6,7 @@ whole-file / informational metrics.
 Changed-line enforcement (PR gate) excludes `Spot/Views/**`: SwiftUI `body`
 is not executed by SpotTests, so View call-site rewires cannot meet an 80%
 unit-test gate. Extract logic into Utils/ViewModels/Services for the gate;
-cover View bodies via SpotUITests / the informational combined-coverage job.
+cover View bodies via local SpotUITests when needed.
 
 Excludes log enum files under `Spot/Models/Logs/`, test targets, and
 non-Spot paths (package dependencies).

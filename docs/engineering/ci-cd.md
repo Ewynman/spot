@@ -289,15 +289,14 @@ xcodebuild -scheme SpotTests -destination "id=$SIM" \
 xcrun simctl delete "$SIM"
 ```
 
-**Combined coverage job:** CI also runs an informational `ui_coverage` job with
-`-scheme Spot -testPlan Spot` so unit + UI execution contribute to the
-production-scope trend. That job is `continue-on-error` and does not gate PRs.
+CI runs a single validation job: `SpotTests` plus the changed-line coverage gate.
+Combined unit+UI coverage via `Spot.xctestplan` is not part of PR CI (deferred);
+use local `SpotUITests` / the Spot test plan when you need UI coverage signal.
 
 **Coverage reports:**
 - Uploaded as artifacts (retained for 7 days)
 - Production-scope summary and changed-line gate result posted to the PR
 - Raw `xccov` JSON and changed-line details included in the coverage artifact
-- Combined unit+UI coverage artifact from the `ui_coverage` job
 - Full report available in GitHub Actions logs
 
 **Exemptions:**
