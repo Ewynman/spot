@@ -16,10 +16,10 @@ private struct SpotCardContentWidthKey: PreferenceKey {
     }
 }
 
-struct MenuButtonFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
+private struct MenuButtonAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
     }
 }
 
@@ -104,8 +104,8 @@ struct SpotCard: View {
     @State private var showCollectionPicker: Bool = false
     @State private var showEditSheet: Bool = false
     @State private var showCustomMenu: Bool = false
-    @State private var menuButtonFrame: CGRect = .zero
-    @State private var menuSize: CGSize = .zero
+    /// Seeded so the first open isn't placed with a zero-height estimate.
+    @State private var menuSize: CGSize = CGSize(width: 170, height: 160)
     @EnvironmentObject var authVM: AuthViewModel
     @State private var isLiked: Bool = false
     @State private var isSaved: Bool = false
@@ -187,7 +187,6 @@ struct SpotCard: View {
         .padding(.horizontal, 12)
         .background(Constants.Colors.background)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .coordinateSpace(name: "spotCard")
         .measure(target: .spotCard)
         .onChange(of: currentSpot.id) { _, _ in
             thumbnailFailed = false
@@ -222,14 +221,17 @@ struct SpotCard: View {
                 SpotLogger.log(SpotCardLogs.ownerGateMissingInputs, details: ["source": source, "spotId": currentSpot.safeId])
             }
         }
-        .overlay(
-            // Custom dropdown menu overlay
-            Group {
-                if showCustomMenu {
-                    customMenuOverlay
+        .overlayPreferenceValue(MenuButtonAnchorKey.self) { anchor in
+            GeometryReader { proxy in
+                if showCustomMenu, let anchor {
+                    let buttonFrame = proxy[anchor]
+                    customMenuOverlay(
+                        buttonFrame: buttonFrame,
+                        containerSize: proxy.size
+                    )
                 }
             }
-        )
+        }
         .fullScreenCover(isPresented: $showDeleteConfirm) {
             ZStack {
                 Color.clear
@@ -244,9 +246,6 @@ struct SpotCard: View {
                 removeSavedConfirmationOverlay
             }
             .presentationBackground(.clear)
-        }
-        .onPreferenceChange(MenuButtonFrameKey.self) { frame in
-            menuButtonFrame = frame
         }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(spot: currentSpot)
@@ -634,16 +633,9 @@ struct SpotCard: View {
                         .frame(width: 24, height: 24, alignment: .center)
                         .contentShape(Rectangle())
                         .accessibilityLabel("More actions")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: MenuButtonFrameKey.self,
-                                    value: geo.frame(in: .named("spotCard"))
-                                )
-                            }
-                        )
                 }
                 .buttonStyle(PlainButtonStyle())
+                .anchorPreference(key: MenuButtonAnchorKey.self, value: .bounds) { $0 }
             }
 
             Spacer()
@@ -745,33 +737,32 @@ struct SpotCard: View {
     }
 
     // MARK: - Custom Menu
-    private var customMenuOverlay: some View {
-        GeometryReader { proxy in
-            ZStack {
-                // Tappable background to dismiss
-                Color.black.opacity(0.001)
-                    .ignoresSafeArea()
-                    .onTapGesture { showCustomMenu = false }
+    private func customMenuOverlay(buttonFrame: CGRect, containerSize: CGSize) -> some View {
+        ZStack {
+            // Tappable background to dismiss
+            Color.black.opacity(0.001)
+                .frame(width: containerSize.width, height: containerSize.height)
+                .contentShape(Rectangle())
+                .onTapGesture { showCustomMenu = false }
 
-                customMenuContent
-                    .background {
-                        GeometryReader { menuProxy in
-                            Color.clear.preference(
-                                key: SpotMenuSizeKey.self,
-                                value: menuProxy.size
-                            )
-                        }
-                    }
-                    .position(
-                        SpotMenuPlacement.center(
-                            buttonFrame: menuButtonFrame,
-                            menuSize: menuSize,
-                            containerSize: proxy.size
+            customMenuContent
+                .background {
+                    GeometryReader { menuProxy in
+                        Color.clear.preference(
+                            key: SpotMenuSizeKey.self,
+                            value: menuProxy.size
                         )
+                    }
+                }
+                .position(
+                    SpotMenuPlacement.center(
+                        buttonFrame: buttonFrame,
+                        menuSize: menuSize,
+                        containerSize: containerSize
                     )
-            }
-            .onPreferenceChange(SpotMenuSizeKey.self) { menuSize = $0 }
+                )
         }
+        .onPreferenceChange(SpotMenuSizeKey.self) { menuSize = $0 }
     }
 
     private var customMenuContent: some View {
