@@ -22,14 +22,12 @@ struct SpotLocationDisplayTests {
 }
 
 struct MapDrawerDismissRestoreTests {
-    @Test func mapMovedDoesNotRestoreViewport() {
+    @Test func dismissNeverRestoresViewport() {
         #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .mapMoved) == false)
-    }
-
-    @Test func closeButtonRestoresViewport() {
-        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .closeButton) == true)
-        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .emptyMapTap) == true)
-        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .filterChanged) == true)
+        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .closeButton) == false)
+        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .emptyMapTap) == false)
+        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .filterChanged) == false)
+        #expect(MapDrawerDismissRestore.shouldRestoreViewport(after: .tabLeft) == false)
     }
 }
 

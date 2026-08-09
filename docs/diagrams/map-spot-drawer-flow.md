@@ -1,35 +1,23 @@
-# Diagram: Map spot drawer
-
-## Purpose
-
-State-style view of map selection and drawer.
-
-## Audience
-
-Engineering, QA.
-
-## Current status
-
-Verified against map selection and drawer-policy tests.
-
-## Details
+# Map spot preview flow
 
 ```mermaid
-stateDiagram-v2
-  [*] --> MapIdle
-  MapIdle --> SpotSelected: user taps pin
-  SpotSelected --> DrawerOpen: open drawer
-  DrawerOpen --> DrawerOpen: different pin replaces selected Spot
-  DrawerOpen --> MapIdle: user dismisses drawer
-  DrawerOpen --> MapIdle: user pans or zooms away
+flowchart TD
+  idle[Map idle]
+  preview[Compact SpotPreviewCard]
+  detail[SpotDetailSheet]
+  cluster[Cluster tap]
+  carousel[Coincident carousel]
+
+  idle -->|tap pin| preview
+  idle -->|tap cluster| cluster
+  cluster -->|members spread| idle
+  cluster -->|coincident| carousel
+  carousel --> preview
+  preview -->|Like or Save| preview
+  preview -->|tap card / swipe up| detail
+  preview -->|empty map| idle
+  preview -->|other pin| preview
+  detail -->|dismiss| preview
 ```
 
-## Related docs
-
-- [../product/map-experience.md](../product/map-experience.md)
-
-The drawer hosts `MapSpotPreviewCard` and the shared `SpotCard`; there is no separate `SpotDetailView` transition.
-
-## Open questions / TODOs
-
-- None.
+See [../product/map-experience.md](../product/map-experience.md).

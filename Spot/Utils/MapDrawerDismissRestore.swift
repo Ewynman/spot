@@ -1,13 +1,11 @@
 import Foundation
 
-/// Whether dismissing the map spot drawer should restore the pre-select viewport.
+/// Whether dismissing the map spot preview should restore the pre-select viewport.
+/// PRD: deselect does not restore the previous camera — the user deliberately
+/// navigated to the current region.
 enum MapDrawerDismissRestore {
     static func shouldRestoreViewport(after reason: MapDrawerDismissReason) -> Bool {
-        switch reason {
-        case .mapMoved:
-            return false
-        default:
-            return true
-        }
+        _ = reason
+        return false
     }
 }

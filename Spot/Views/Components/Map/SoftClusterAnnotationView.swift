@@ -2,12 +2,9 @@
 //  SoftClusterAnnotationView.swift
 //  Spot
 //
-//  Soft-cluster annotation view used at far zoom levels. Replaces MapKit's
-//  default numeric `184+` cluster bubble with an organic "stacked mini
-//  pins" cloud — calmer, more on-brand, and never dominates the screen.
-//
-//  We do NOT draw a numeric count. Eddie's call: avoid heat maps and
-//  large numeric bubbles entirely.
+//  Legacy soft-cluster annotation (pre–MapKit clustering). Kept for unit
+//  tests / `MapSoftClusterBuilder` helpers. Runtime maps use
+//  `SpotClusterAnnotationView` + `MKClusterAnnotation` instead.
 //
 
 import UIKit

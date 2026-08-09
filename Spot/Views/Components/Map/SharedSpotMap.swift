@@ -3,23 +3,15 @@
 //  Spot
 //
 //  The single, reusable `MKMapView` host that powers both the discovery
-//  map and the profile map. Replaces the two prior `UIViewRepresentable`
-//  stacks (`ClusteredSpotMap` + `InnerProfileSpotMap`) so the new marker
-//  visual language and lifecycle/memory rules live in one place.
+//  map and the profile map.
 //
-//  Memory rules enforced here:
-//   * Force light mode.
-//   * No POIs, no traffic, flat elevation.
-//   * Reuse `SpotAnnotationView`, `UserLocationAnnotationView`,
-//     `SoftClusterAnnotationView` via stable identifiers.
-//   * Diff annotations by spot id (add new, remove only ids no longer in
-//     the displayed set, never `removeAnnotations` + `addAnnotations`
-//     wholesale).
-//   * Never call `showAnnotations` reactively — camera moves are explicit
-//     and triggered by `cameraIntent`.
-//   * Cluster expansion happens through `SpotSoftClusterAnnotation` only;
-//     we set `clusteringIdentifier = nil` so MapKit's numeric cluster
-//     bubble never appears.
+//  Memory / behavior rules:
+//   * Force light mode; no POIs, no traffic, flat elevation.
+//   * Reuse `SpotAnnotationView`, `SpotClusterAnnotationView`,
+//     `UserLocationAnnotationView` via stable identifiers.
+//   * Diff annotations by spot id (never wholesale remove+add).
+//   * Camera moves are explicit via `cameraIntent`.
+//   * Density uses MapKit clustering (`clusteringIdentifier`).
 //   * `dismantleUIView` releases delegate, annotations, overlays.
 //
 
@@ -28,10 +20,6 @@ import MapKit
 
 // MARK: - Camera intent
 
-/// Explicit, intent-based camera commands. The wrapping view sends these
-/// to the map; the map only moves the camera in response. This avoids
-/// the previous `showAnnotations`-as-default fight that produced odd
-/// shifts when the spot card opened.
 enum SharedSpotMapCameraIntent: Equatable {
     case none
     case region(MKCoordinateRegion, animated: Bool)
@@ -40,6 +28,7 @@ enum SharedSpotMapCameraIntent: Equatable {
                span: MKCoordinateSpan,
                liftPoints: CGFloat,
                animated: Bool)
+    case fitAnnotations([CLLocationCoordinate2D], animated: Bool)
 
     static func == (lhs: SharedSpotMapCameraIntent, rhs: SharedSpotMapCameraIntent) -> Bool {
         switch (lhs, rhs) {
@@ -50,6 +39,11 @@ enum SharedSpotMapCameraIntent: Equatable {
             return c1.latitude == c2.latitude && c1.longitude == c2.longitude
                 && s1.latitudeDelta == s2.latitudeDelta && s1.longitudeDelta == s2.longitudeDelta
                 && l1 == l2 && a1 == a2
+        case let (.fitAnnotations(a, ax), .fitAnnotations(b, bx)):
+            guard ax == bx, a.count == b.count else { return false }
+            return zip(a, b).allSatisfy {
+                $0.0.latitude == $0.1.latitude && $0.0.longitude == $0.1.longitude
+            }
         default: return false
         }
     }
@@ -66,30 +60,25 @@ enum SharedSpotMapCameraIntent: Equatable {
 
 struct SharedSpotMap: UIViewRepresentable {
 
-    // Data
     let spots: [Spot]
     let selectedSpotId: String?
     let filter: SpotMapFilterState
     let savedSpotIds: Set<String>
     let likedSpotIds: Set<String>
     let followedUserIds: Set<String>
-    /// Discovery map can disable soft clusters to draw every visible spot
-    /// row as an individual annotation.
-    let allowSoftClusters: Bool
 
-    // User-location marker (discovery only — pass `userMarker = nil` on profile).
     let userMarker: SpotUserLocationAnnotation?
-    /// When true, even if `userMarker == nil`, MapKit's default blue dot
-    /// is suppressed. Profile map uses this.
     let suppressDefaultUserDot: Bool
 
-    // Intent
     let cameraIntent: SharedSpotMapCameraIntent
 
-    /// `MKCoordinateRegion` is `mapView.region` immediately before pin-focus camera work — used to restore on dismiss.
+    /// `MKCoordinateRegion` is `mapView.region` immediately before pin-focus.
     let onSelect: (Spot, CLLocationCoordinate2D, MKCoordinateRegion) -> Void
     let onDeselect: () -> Void
     let onRegionChanged: (MKCoordinateRegion) -> Void
+    /// Cluster members that cannot be split further — host should show carousel.
+    var onCoincidentCluster: (([Spot]) -> Void)? = nil
+    var onClusterTapped: ((Int) -> Void)? = nil
 
     // MARK: - UIViewRepresentable
 
@@ -101,8 +90,6 @@ struct SharedSpotMap: UIViewRepresentable {
         map.showsCompass = false
         map.showsScale = false
         map.showsBuildings = false
-        // Hide MapKit's default blue dot if we're rendering our own marker
-        // OR if the host explicitly suppresses it (profile map).
         map.showsUserLocation = !(suppressDefaultUserDot || userMarker != nil)
 
         if #available(iOS 13.0, *) {
@@ -114,8 +101,8 @@ struct SharedSpotMap: UIViewRepresentable {
 
         map.register(SpotAnnotationView.self,
                      forAnnotationViewWithReuseIdentifier: SpotAnnotationView.reuseIdentifier)
-        map.register(SoftClusterAnnotationView.self,
-                     forAnnotationViewWithReuseIdentifier: SoftClusterAnnotationView.reuseIdentifier)
+        map.register(SpotClusterAnnotationView.self,
+                     forAnnotationViewWithReuseIdentifier: SpotClusterAnnotationView.reuseIdentifier)
         map.register(UserLocationAnnotationView.self,
                      forAnnotationViewWithReuseIdentifier: UserLocationAnnotationView.reuseIdentifier)
 
@@ -148,32 +135,24 @@ struct SharedSpotMap: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate {
         var parent: SharedSpotMap
         private var renderedAnnotations: [String: SpotMapAnnotation] = [:]
-        private var renderedClusters: [String: SpotSoftClusterAnnotation] = [:]
         private var renderedUserAnnotation: SpotUserLocationAnnotation?
-        private var lastAppliedDensity: MapDensityMode?
         private var lastAppliedCameraIntent: SharedSpotMapCameraIntent = .none
         private var regionDebounceTask: Task<Void, Never>?
-        private let overlapResolver = MapOverlapResolver()
         private var animatedSpotIds: Set<String> = []
         private var ignoreNextRegionChange: Bool = false
-        /// Set after the SwiftUI parent applies a non-`.none` camera intent.
-        /// Until then, `regionDidChange` often reports MapKit's huge default
-        /// region while the view has zero bounds — we must not forward that
-        /// to `onRegionChanged` or the viewport fetch will zoom the whole USA.
         private var didApplyExplicitCameraFromParent = false
+        /// Suppress `onDeselect` when selection is driven by SwiftUI state.
+        private var suppressDeselectCallback = false
 
         init(_ parent: SharedSpotMap) {
             self.parent = parent
         }
 
-        func attach(map _: MKMapView) {
-            // Reserved for future — keeps API symmetric with detach.
-        }
+        func attach(map _: MKMapView) {}
 
         func detach(map _: MKMapView) {
             regionDebounceTask?.cancel()
             renderedAnnotations.removeAll()
-            renderedClusters.removeAll()
             renderedUserAnnotation = nil
             animatedSpotIds.removeAll()
             didApplyExplicitCameraFromParent = false
@@ -190,88 +169,40 @@ struct SharedSpotMap: UIViewRepresentable {
                 followedUserIds: parent.followedUserIds
             )
 
-            let rawDensity = MapDensityMode.mode(for: map.region)
-            let density: MapDensityMode = parent.allowSoftClusters ? rawDensity : .individualPinsWithSoftOverlap
-            if density != lastAppliedDensity {
-                lastAppliedDensity = density
-                SpotLogger.log(MapViewLogs.densityModeChanged, details: ["mode": density.rawValue])
-            }
+            let displayed = parent.resolved(spots: modelSpots)
 
-            let displayed: [(spot: Spot, coordinate: CLLocationCoordinate2D, isCluster: Bool, clusterMemberIds: [String])]
-            switch density {
-            case .individualPins:
-                displayed = parent
-                    .resolved(spots: modelSpots, withOverlap: false)
-                    .map { ($0.spot, $0.coordinate, false, []) }
-            case .individualPinsWithSoftOverlap:
-                let stats = overlapResolver.bucketStats(modelSpots)
-                if stats.multiBuckets > 0 {
-                    SpotLogger.log(MapMarkerLogs.overlapBucketResolved, details: [
-                        "totalBuckets": stats.totalBuckets,
-                        "multiBuckets": stats.multiBuckets,
-                        "maxMembers": stats.maxMembers
-                    ])
-                }
-                displayed = parent
-                    .resolved(spots: modelSpots, withOverlap: true)
-                    .map { ($0.spot, $0.coordinate, false, []) }
-            case .softClusters:
-                displayed = parent.softClusters(for: modelSpots)
-            }
-
-            // Diff with previously rendered set.
             var nextAnnotationKeys = Set<String>()
-            var nextClusterKeys = Set<String>()
             var toAdd: [MKAnnotation] = []
             var toRemove: [MKAnnotation] = []
 
             for entry in displayed {
-                if entry.isCluster {
-                    let key = "cluster:\(entry.coordinate.latitude),\(entry.coordinate.longitude),\(entry.clusterMemberIds.count)"
-                    nextClusterKeys.insert(key)
-                    if let existing = renderedClusters[key] {
-                        if existing.coordinate.latitude != entry.coordinate.latitude
-                            || existing.coordinate.longitude != entry.coordinate.longitude {
-                            existing.coordinate = entry.coordinate
-                        }
-                    } else {
-                        let cluster = SpotSoftClusterAnnotation(
-                            coordinate: entry.coordinate,
-                            memberCount: entry.clusterMemberIds.count,
-                            memberSpotIds: entry.clusterMemberIds
-                        )
-                        renderedClusters[key] = cluster
-                        toAdd.append(cluster)
+                guard let id = entry.spot.id else { continue }
+                nextAnnotationKeys.insert(id)
+                let resolvedState = SpotMarkerStyleResolver.state(
+                    for: entry.spot,
+                    selectedSpotId: selectedSpotId,
+                    filter: parent.filter,
+                    savedSpotIds: parent.savedSpotIds,
+                    likedSpotIds: parent.likedSpotIds,
+                    followedUserIds: parent.followedUserIds
+                )
+                if let existing = renderedAnnotations[id] {
+                    if existing.coordinate.latitude != entry.coordinate.latitude
+                        || existing.coordinate.longitude != entry.coordinate.longitude {
+                        existing.coordinate = entry.coordinate
+                    }
+                    existing.visualState = resolvedState
+                    if let view = map.view(for: existing) as? SpotAnnotationView {
+                        view.apply(state: resolvedState, animated: true)
                     }
                 } else {
-                    guard let id = entry.spot.id else { continue }
-                    nextAnnotationKeys.insert(id)
-                    let resolvedState = SpotMarkerStyleResolver.state(
-                        for: entry.spot,
-                        selectedSpotId: selectedSpotId,
-                        filter: parent.filter,
-                        savedSpotIds: parent.savedSpotIds,
-                        likedSpotIds: parent.likedSpotIds,
-                        followedUserIds: parent.followedUserIds
+                    let annotation = SpotMapAnnotation(
+                        spot: entry.spot,
+                        coordinate: entry.coordinate,
+                        visualState: resolvedState
                     )
-                    if let existing = renderedAnnotations[id] {
-                        if existing.coordinate.latitude != entry.coordinate.latitude
-                            || existing.coordinate.longitude != entry.coordinate.longitude {
-                            existing.coordinate = entry.coordinate
-                        }
-                        existing.visualState = resolvedState
-                        if let view = map.view(for: existing) as? SpotAnnotationView {
-                            view.apply(state: resolvedState, animated: true)
-                        }
-                    } else {
-                        let annotation = SpotMapAnnotation(
-                            spot: entry.spot,
-                            coordinate: entry.coordinate,
-                            visualState: resolvedState
-                        )
-                        renderedAnnotations[id] = annotation
-                        toAdd.append(annotation)
-                    }
+                    renderedAnnotations[id] = annotation
+                    toAdd.append(annotation)
                 }
             }
 
@@ -287,10 +218,6 @@ struct SharedSpotMap: UIViewRepresentable {
                     toRemove.append(ann)
                 }
             }
-            for (key, ann) in renderedClusters where !nextClusterKeys.contains(key) {
-                renderedClusters.removeValue(forKey: key)
-                toRemove.append(ann)
-            }
 
             if !toRemove.isEmpty {
                 map.removeAnnotations(toRemove)
@@ -299,6 +226,30 @@ struct SharedSpotMap: UIViewRepresentable {
             if !toAdd.isEmpty {
                 map.addAnnotations(toAdd)
                 SpotLogger.log(MapMarkerLogs.markersAdded, details: ["count": toAdd.count])
+            }
+
+            // Keep MapKit selection in sync with SwiftUI selection without
+            // firing a spurious deselect → dismiss cycle.
+            syncSelection(map: map, selectedSpotId: selectedSpotId)
+        }
+
+        private func syncSelection(map: MKMapView, selectedSpotId: String?) {
+            let currentlySelected = map.selectedAnnotations.compactMap { $0 as? SpotMapAnnotation }
+            if let id = selectedSpotId, let ann = renderedAnnotations[id] {
+                if !currentlySelected.contains(where: { $0.spotId == id }) {
+                    suppressDeselectCallback = true
+                    for sel in currentlySelected {
+                        map.deselectAnnotation(sel, animated: false)
+                    }
+                    map.selectAnnotation(ann, animated: false)
+                    suppressDeselectCallback = false
+                }
+            } else if !currentlySelected.isEmpty {
+                suppressDeselectCallback = true
+                for sel in currentlySelected {
+                    map.deselectAnnotation(sel, animated: false)
+                }
+                suppressDeselectCallback = false
             }
         }
 
@@ -368,31 +319,36 @@ struct SharedSpotMap: UIViewRepresentable {
                 map.setRegion(region, animated: animated)
             case let .fitAll(animated):
                 didApplyExplicitCameraFromParent = true
-                let spotAnnotations = map.annotations.filter { !($0 is MKUserLocation) }
+                let spotAnnotations = map.annotations.filter {
+                    $0 is SpotMapAnnotation || $0 is MKClusterAnnotation
+                }
                 guard !spotAnnotations.isEmpty else { return }
                 ignoreNextRegionChange = true
                 map.showAnnotations(spotAnnotations, animated: animated)
             case let .focus(coord, span, lift, animated):
                 didApplyExplicitCameraFromParent = true
-                let lifted = liftedCoordinate(for: coord, span: span, mapHeight: map.bounds.height, liftPoints: lift)
+                let lifted = MapCameraLift.liftedCoordinate(
+                    for: coord,
+                    span: span,
+                    mapHeight: map.bounds.height,
+                    liftPoints: lift
+                )
                 let region = MKCoordinateRegion(center: lifted, span: span)
                 ignoreNextRegionChange = true
                 map.setRegion(region, animated: animated)
+            case let .fitAnnotations(coords, animated):
+                didApplyExplicitCameraFromParent = true
+                guard !coords.isEmpty else { return }
+                ignoreNextRegionChange = true
+                var zoomRect = MKMapRect.null
+                for c in coords {
+                    let point = MKMapPoint(c)
+                    let rect = MKMapRect(x: point.x, y: point.y, width: 0.1, height: 0.1)
+                    zoomRect = zoomRect.union(rect)
+                }
+                let inset = UIEdgeInsets(top: 80, left: 60, bottom: 160, right: 60)
+                map.setVisibleMapRect(zoomRect, edgePadding: inset, animated: animated)
             }
-        }
-
-        private func liftedCoordinate(
-            for coord: CLLocationCoordinate2D,
-            span: MKCoordinateSpan,
-            mapHeight: CGFloat,
-            liftPoints: CGFloat
-        ) -> CLLocationCoordinate2D {
-            MapCameraLift.liftedCoordinate(
-                for: coord,
-                span: span,
-                mapHeight: mapHeight,
-                liftPoints: liftPoints
-            )
         }
 
         // MARK: - MKMapViewDelegate
@@ -409,23 +365,24 @@ struct SharedSpotMap: UIViewRepresentable {
                     reuseIdentifier: UserLocationAnnotationView.reuseIdentifier
                 )
                 view.configure(with: user)
-                // The viewer's location must remain visible even when a Spot
-                // shares the same coordinate.
                 view.displayPriority = .required
                 view.zPriority = .max
+                view.clusteringIdentifier = nil
                 return view
             }
 
-            if let cluster = annotation as? SpotSoftClusterAnnotation {
+            if let cluster = annotation as? MKClusterAnnotation {
                 let view = mapView.dequeueReusableAnnotationView(
-                    withIdentifier: SoftClusterAnnotationView.reuseIdentifier,
+                    withIdentifier: SpotClusterAnnotationView.reuseIdentifier,
                     for: cluster
-                ) as? SoftClusterAnnotationView ?? SoftClusterAnnotationView(
+                ) as? SpotClusterAnnotationView ?? SpotClusterAnnotationView(
                     annotation: cluster,
-                    reuseIdentifier: SoftClusterAnnotationView.reuseIdentifier
+                    reuseIdentifier: SpotClusterAnnotationView.reuseIdentifier
                 )
                 view.configure(with: cluster)
-                SpotLogger.log(MapMarkerLogs.softClusterShown, details: ["members": cluster.memberCount])
+                SpotLogger.log(MapMarkerLogs.softClusterShown, details: [
+                    "members": cluster.memberAnnotations.count
+                ])
                 return view
             }
 
@@ -437,27 +394,24 @@ struct SharedSpotMap: UIViewRepresentable {
                 annotation: spot,
                 reuseIdentifier: SpotAnnotationView.reuseIdentifier
             )
-            // No MKMapView clustering — we own density via `SpotSoftClusterAnnotation`.
-            view.clusteringIdentifier = nil
+            view.clusteringIdentifier = Constants.MapDesign.spotClusteringIdentifier
             view.apply(state: spot.visualState, animated: false)
             if let id = spot.spot.id, !animatedSpotIds.contains(id) {
                 animatedSpotIds.insert(id)
                 let delay = MapAnimationDelay.delay(forSpotId: id, fallback: spot.coordinate)
                 view.animateInIfNeeded(delay: delay)
             }
+            let username = spot.spot.username ?? "someone"
+            let place = spot.spot.locationName ?? "a spot"
+            view.accessibilityLabel = "Spot by \(username), \(place). Double-tap to preview."
+            view.accessibilityTraits = .button
             SpotLogger.log(MapMarkerLogs.markerReused, details: ["spotId": spot.spot.id ?? "nil"])
             return view
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-            if let cluster = view.annotation as? SpotSoftClusterAnnotation {
-                if let cv = view as? SoftClusterAnnotationView { cv.animatePressIn(); cv.animatePressOut() }
-                let span = MKCoordinateSpan(
-                    latitudeDelta: max(mapView.region.span.latitudeDelta * 0.35, 0.01),
-                    longitudeDelta: max(mapView.region.span.longitudeDelta * 0.35, 0.01)
-                )
-                ignoreNextRegionChange = true
-                mapView.setRegion(MKCoordinateRegion(center: cluster.coordinate, span: span), animated: true)
+            if let cluster = view.annotation as? MKClusterAnnotation {
+                handleClusterTap(mapView: mapView, cluster: cluster)
                 mapView.deselectAnnotation(cluster, animated: false)
                 return
             }
@@ -471,13 +425,47 @@ struct SharedSpotMap: UIViewRepresentable {
             parent.onSelect(ann.spot, ann.coordinate, regionSnapshot)
         }
 
+        private func handleClusterTap(mapView: MKMapView, cluster: MKClusterAnnotation) {
+            let members = cluster.memberAnnotations
+            let count = members.count
+            parent.onClusterTapped?(count)
+
+            let memberSpots = members.compactMap { ($0 as? SpotMapAnnotation)?.spot }
+            if MapClusterStyle.isCoincident(members), !memberSpots.isEmpty {
+                parent.onCoincidentCluster?(memberSpots)
+                return
+            }
+
+            ignoreNextRegionChange = true
+            didApplyExplicitCameraFromParent = true
+            mapView.showAnnotations(members, animated: true)
+        }
+
         func mapView(_ mapView: MKMapView, didDeselect view: MKAnnotationView) {
             guard let ann = view.annotation as? SpotMapAnnotation else { return }
             if let v = view as? SpotAnnotationView {
-                v.apply(state: ann.visualState == .selected ? .default : ann.visualState, animated: true)
+                let next = ann.visualState == .selected ? SpotMarkerVisualState.default : ann.visualState
+                v.apply(state: next == .selected ? .default : next, animated: true)
             }
             SpotLogger.log(MapMarkerLogs.markerDeselected, details: ["spotId": ann.spot.id ?? "nil"])
-            parent.onDeselect()
+            guard !suppressDeselectCallback else { return }
+            // Defer: pin switches fire didDeselect before didSelect; only
+            // dismiss when nothing is selected after a turn of the run loop.
+            let priorId = ann.spotId
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self else { return }
+                guard !self.suppressDeselectCallback else { return }
+                let stillSelected = mapView.selectedAnnotations.contains {
+                    ($0 as? SpotMapAnnotation)?.spotId != nil
+                }
+                guard !stillSelected else { return }
+                // If SwiftUI selection already moved to another spot, skip.
+                if let selected = self.parent.selectedSpotId, selected != priorId {
+                    return
+                }
+                self.parent.onDeselect()
+            }
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated _: Bool) {
@@ -485,7 +473,6 @@ struct SharedSpotMap: UIViewRepresentable {
                 ignoreNextRegionChange = false
                 return
             }
-            // Adaptive debounce: faster pans (large delta) wait a bit longer.
             regionDebounceTask?.cancel()
             let region = mapView.region
             let parent = self.parent
@@ -500,15 +487,8 @@ struct SharedSpotMap: UIViewRepresentable {
                     guard let coordinator = self else { return }
                     let bounds = mapView.bounds
                     let layoutReady = bounds.width >= 64 && bounds.height >= 64
-                    // Ignore only clearly invalid early layout callbacks.
-                    guard layoutReady else {
-                        return
-                    }
+                    guard layoutReady else { return }
                     let spanMax = max(region.span.latitudeDelta, region.span.longitudeDelta)
-                    // Before the parent applies a camera intent, skip obvious
-                    // world/continental default regions from MapKit startup.
-                    // But still allow user-driven/manual zoom regions through
-                    // so fetches can recover even if location fix is delayed.
                     if !coordinator.didApplyExplicitCameraFromParent, spanMax > 15 {
                         return
                     }
@@ -520,44 +500,14 @@ struct SharedSpotMap: UIViewRepresentable {
     }
 }
 
-// MARK: - Density helpers
+// MARK: - Coordinate helpers
 
 extension SharedSpotMap {
 
-    fileprivate func resolved(spots: [Spot], withOverlap: Bool) -> [(spot: Spot, coordinate: CLLocationCoordinate2D)] {
-        if withOverlap {
-            return MapOverlapResolver().resolve(spots)
-        }
-        return spots.compactMap { s in
+    fileprivate func resolved(spots: [Spot]) -> [(spot: Spot, coordinate: CLLocationCoordinate2D)] {
+        spots.compactMap { s in
             guard let lat = s.latitude, let lon = s.longitude else { return nil }
             return (s, CLLocationCoordinate2D(latitude: lat, longitude: lon))
-        }
-    }
-
-    /// Build soft clusters at far zoom: up to `farZoomPinCap` individual
-    /// pins; remaining spots collapse into a small number of clusters
-    /// keyed by a coarse grid. This is how we avoid both `184+` numeric
-    /// bubbles and unbounded annotation counts at world zoom.
-    fileprivate func softClusters(
-        for spots: [Spot]
-    ) -> [(spot: Spot, coordinate: CLLocationCoordinate2D, isCluster: Bool, clusterMemberIds: [String])] {
-        let withCoords = spots.compactMap { s -> (Spot, CLLocationCoordinate2D)? in
-            guard let lat = s.latitude, let lon = s.longitude else { return nil }
-            return (s, CLLocationCoordinate2D(latitude: lat, longitude: lon))
-        }
-        let built = MapSoftClusterBuilder.build(
-            coordinates: withCoords.map { ($0.0.id, $0.1.latitude, $0.1.longitude) },
-            pinCap: Constants.MapDesign.farZoomPinCap
-        )
-        return built.map { entry in
-            let spot = withCoords[entry.representativeIndex].0
-            let memberIds = entry.memberIndexes.compactMap { withCoords[$0].0.id }
-            return (
-                spot,
-                CLLocationCoordinate2D(latitude: entry.latitude, longitude: entry.longitude),
-                entry.isCluster,
-                memberIds
-            )
         }
     }
 }
