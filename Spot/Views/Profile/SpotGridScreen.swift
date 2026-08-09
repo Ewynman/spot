@@ -224,6 +224,14 @@ struct SpotGridScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(hex: "F5F3EF"))
         .navigationBarBackButtonHidden(true)
+        .onChange(of: authVM.bookmarkedSpots) { _, bookmarkedSpotIds in
+            guard case .bookmarks = context else { return }
+            let savedIds = Set(bookmarkedSpotIds)
+            bookmarksViewModel.spots.removeAll { !savedIds.contains($0.safeId) }
+            if let selectedSpot, !savedIds.contains(selectedSpot.safeId) {
+                self.selectedSpot = nil
+            }
+        }
         .onAppear {
             SpotLogger.log(SpotGridScreenLogs.onAppear, details: ["context": String(describing: context)])
 
