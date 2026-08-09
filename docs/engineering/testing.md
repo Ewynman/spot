@@ -46,7 +46,7 @@ Folder mirrors: [`Spot/README.md`](../../Spot/README.md), [`SpotTests/README.md`
 Defined by [`scripts/coverage_scope.py`](../../scripts/coverage_scope.py):
 
 - **Informational / whole-file metric:** all `Spot/**` production Swift, including Views
-- **Changed-line PR gate:** same, but **excludes `Spot/Views/**`** (SwiftUI `body` is not run by SpotTests). Extract logic into Utils/ViewModels/Services for the gate; cover View bodies via SpotUITests / the informational combined-coverage job.
+- **Changed-line PR gate:** same, but **excludes `Spot/Views/**`** (SwiftUI `body` is not run by SpotTests). Extract logic into Utils/ViewModels/Services for the gate; cover View bodies via local `SpotUITests` when needed.
 - **Exclude always:** `Spot/Models/Logs/`, test targets, packages
 - **Renames:** pure `R100` moves are omitted from the gate (no executable lines changed)
 
@@ -106,4 +106,4 @@ Add previews for new or heavily changed UI when practical to speed design review
 10. Pro purchase/restore and gated-feature entry points.
 11. Cold/warm Universal Link with available and unavailable Spots.
 
-CI’s PR gate runs `SpotTests`. An informational combined `Spot.xctestplan` coverage job also runs (does not gate merges).
+CI’s PR gate runs `SpotTests` only (unit tests + changed-line coverage). Combined `Spot.xctestplan` coverage is not part of PR CI.
