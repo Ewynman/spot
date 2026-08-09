@@ -929,7 +929,7 @@ private extension PhotoSelectionView {
     }
 }
 
-private struct SpotPressedButtonStyle: ButtonStyle {
+struct SpotPressedButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1)

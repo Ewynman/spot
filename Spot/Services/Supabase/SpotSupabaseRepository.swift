@@ -1085,7 +1085,7 @@ enum SpotSupabaseRepository {
         return (approved, reason, keys)
     }
 
-    private static func invokeModerateImageFunction(mediaAssetId: UUID) async throws -> (approved: Bool, reason: String?) {
+    static func invokeModerateImageFunction(mediaAssetId: UUID) async throws -> (approved: Bool, reason: String?) {
         let session = try await supabase.auth.session
         supabase.functions.setAuth(token: session.accessToken)
         let url = SupabasePlist.baseURL

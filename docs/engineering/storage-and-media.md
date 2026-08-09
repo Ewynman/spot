@@ -32,6 +32,16 @@ Verified against the moderation migration, `SpotSupabaseRepository`, `FeedAPI`, 
 4. The Edge Function analyzes the image and, on approval, promotes it to `approved_spot_images`.
 5. The client passes approved asset IDs to **`publish_spot_with_approved_media_assets_v1`**.
 
+For Edit Spot, unchanged rows remain in place. Replacement bytes repeat steps
+1–4, then `update_spot_editor_v1` atomically links approved replacements,
+removes deleted relationships, applies `sort_index`, and refreshes the cover
+layout metadata. Reorder-only edits do not upload or moderate bytes again.
+
+Authenticated clients cannot directly insert, update, or delete `spot_images`.
+Legacy authenticated write policies for the `spots` bucket are also removed;
+new Spot media must use `pending_images` and the moderation-gated RPCs. Existing
+legacy objects remain readable when attached to a visible Spot.
+
 ### Profile photos
 
 The schema supports `kind = 'profile_image'` and `approved_profile_images`, but current iOS code does not use that path. `SupabaseUserService.uploadProfileAvatarJPEG` uploads directly to the public `avatars/{userId}/profile.jpg` path and returns a public URL.

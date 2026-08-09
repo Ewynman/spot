@@ -121,4 +121,9 @@ final class MapViewModel: ObservableObject {
         visibleSpots.removeAll(keepingCapacity: false)
         lastFetchRegion = nil
     }
+
+    func locallyReplaceSpot(_ spot: Spot) {
+        guard let index = visibleSpots.firstIndex(where: { $0.id == spot.id }) else { return }
+        visibleSpots[index] = spot
+    }
 }

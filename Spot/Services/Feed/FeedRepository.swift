@@ -96,6 +96,12 @@ final class FeedRepository: ObservableObject {
         emptyStatus = nil
     }
 
+    @MainActor
+    func locallyReplaceSpot(_ spot: Spot) {
+        guard let index = spots.firstIndex(where: { $0.id == spot.id }) else { return }
+        spots[index] = spot
+    }
+
     /// Replaces the current in-memory feed wholesale. Used to roll back an
     /// optimistic delete when the server write fails.
     @MainActor

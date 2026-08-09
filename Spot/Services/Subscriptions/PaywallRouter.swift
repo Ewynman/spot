@@ -27,6 +27,8 @@ extension Notification.Name {
     static let selectMainTab = Notification.Name("SpotSelectMainTab")
     /// Remove feed rows immediately after block/report (see `SpotHomeFeedNotification`).
     static let homeFeedLocallyRemove = Notification.Name("SpotHomeFeedLocallyRemove")
+    /// Carries the refreshed `Spot` as `object` after Edit Spot succeeds.
+    static let spotDidUpdate = Notification.Name("SpotDidUpdate")
     
     /// Posted when a notification action requests navigation to the follow requests screen.
     static let navigateToFollowRequests = Notification.Name("SpotNavigateToFollowRequests")

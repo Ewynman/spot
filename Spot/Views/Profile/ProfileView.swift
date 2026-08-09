@@ -730,6 +730,13 @@ struct ProfileView: View {
             guard (output.userInfo?[SpotMainTabNotification.userInfoTabIndexKey] as? Int) == 4 else { return }
             resetProfileTabToRoot()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .spotDidUpdate)) { output in
+            guard let updatedSpot = output.object as? Spot else { return }
+            viewModel.locallyReplaceSpot(updatedSpot)
+            if selectedSpot?.id == updatedSpot.id {
+                selectedSpot = updatedSpot
+            }
+        }
     }
 
     private func deleteSpot(_ spot: Spot) {

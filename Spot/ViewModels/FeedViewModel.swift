@@ -153,6 +153,14 @@ final class FeedViewModel: ObservableObject {
         SpotLogger.log(FeedViewModelLogs.insertedNewSpotAtTop, details: ["spotId": spot.safeId])
     }
 
+    @MainActor
+    func locallyReplaceSpot(_ spot: Spot) {
+        repo.locallyReplaceSpot(spot)
+        if let index = mapSpots.firstIndex(where: { $0.id == spot.id }) {
+            mapSpots[index] = spot
+        }
+    }
+
     func loadMapSpots(forceRefresh: Bool = false) {
         SpotLogger.log(FeedViewModelLogs.mapSpotsWarmDisabled)
         Task { @MainActor in self.mapSpots = [] }
