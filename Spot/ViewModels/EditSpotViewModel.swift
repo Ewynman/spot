@@ -72,9 +72,11 @@ final class EditSpotViewModel: ObservableObject {
 
     private(set) var initialVibeCount = 0
     private var hasLoaded = false
+    private let store: EditSpotPersisting
 
-    init(spot: Spot) {
+    init(spot: Spot, store: EditSpotPersisting = SupabaseEditSpotStore()) {
         self.spot = spot
+        self.store = store
     }
 
     func load() async {
@@ -88,7 +90,7 @@ final class EditSpotViewModel: ObservableObject {
         }
 
         do {
-            let media = try await SpotSupabaseRepository.fetchEditableSpotImages(id: spotID)
+            let media = try await store.fetchEditableSpotImages(id: spotID)
             guard !media.isEmpty else {
                 throw NSError(
                     domain: "EditSpotViewModel",
@@ -198,7 +200,7 @@ final class EditSpotViewModel: ObservableObject {
                         userInfo: [NSLocalizedDescriptionKey: "A replacement photo couldn’t be prepared."]
                     )
                 }
-                photos[index].approvedAssetID = try await SpotSupabaseRepository.prepareApprovedSpotImage(
+                photos[index].approvedAssetID = try await store.prepareApprovedSpotImage(
                     userId: ownerID,
                     jpeg: jpeg
                 )
@@ -206,7 +208,7 @@ final class EditSpotViewModel: ObservableObject {
 
             let media = try EditSpotDraftOperations.mediaReferences(for: photos)
 
-            try await SpotSupabaseRepository.updateSpotFromEditor(
+            try await store.updateSpotFromEditor(
                 id: spotID,
                 vibeTags: selectedVibes,
                 latitude: location.coordinate.latitude,
@@ -215,7 +217,7 @@ final class EditSpotViewModel: ObservableObject {
                 media: media
             )
 
-            guard let refreshed = try await SpotSupabaseRepository.fetchSpotsByIds([spotID]).first else {
+            guard let refreshed = try await store.fetchSpotsByIds([spotID]).first else {
                 throw NSError(
                     domain: "EditSpotViewModel",
                     code: 500,

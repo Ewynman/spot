@@ -8,25 +8,6 @@
 import Foundation
 import Supabase
 
-struct EditableSpotImage: Identifiable, Equatable, Sendable {
-    let id: UUID
-    let url: String
-    let sortIndex: Int
-}
-
-struct EditSpotMediaReference: Encodable, Equatable, Sendable {
-    let existing_image_id: UUID?
-    let media_asset_id: UUID?
-
-    static func existing(_ id: UUID) -> Self {
-        Self(existing_image_id: id, media_asset_id: nil)
-    }
-
-    static func replacement(_ id: UUID) -> Self {
-        Self(existing_image_id: nil, media_asset_id: id)
-    }
-}
-
 enum SpotSupabaseRepository {
     /// Private bucket: `spot_images.storage_path` is the object key in the `spots` bucket (e.g. `userId/spotId_0.jpg`).
     /// `public_url` (if present) may hold the same path or a legacy full `https://` URL; signing uses `storage_path` first.
@@ -297,162 +278,25 @@ enum SpotSupabaseRepository {
         .execute()
     }
 
-    /// Complete ordered media for an editor. This intentionally does not trust
-    /// feed/map `Spot.imageURLs`, because those payloads may contain only a cover.
-    static func fetchEditableSpotImages(id: UUID) async throws -> [EditableSpotImage] {
-        struct Row: Decodable {
-            let id: UUID
-            let storage_path: String?
-            let public_url: String?
-            let sort_index: Int
-            let storage_bucket: String?
-
-            var reference: String {
-                let path = storage_path?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                return path.isEmpty
-                    ? (public_url?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
-                    : path
-            }
-        }
-
-        let rows: [Row] = try await supabase
-            .from("spot_images")
-            .select("id,storage_path,public_url,sort_index,storage_bucket")
-            .eq("spot_id", value: id)
-            .order("sort_index", ascending: true)
-            .execute()
-            .value
-
-        let references = rows.map(\.reference)
-        let buckets = rows.map { row in
-            isStoredAbsoluteURL(row.reference) ? nil : (row.storage_bucket ?? spotsStorageBucketId)
-        }
-        let resolved = try await resolveStoredImageURLs(paths: references, buckets: buckets)
-        return zip(rows, resolved).map { row, url in
-            EditableSpotImage(id: row.id, url: url, sortIndex: row.sort_index)
-        }
+    /// Edit Spot I/O seams used by `SupabaseEditSpotStore` / `EditSpotEditorSupport`.
+    static func loadEditSpotImageRows(id: UUID) async throws -> [EditSpotImageRowDTO] {
+        try await supabase.from("spot_images").select("id,storage_path,public_url,sort_index,storage_bucket").eq("spot_id", value: id).order("sort_index", ascending: true).execute().value
     }
 
-    /// Uploads and moderates one replacement without linking it to a Spot yet.
-    /// `updateSpotFromEditor` links approved assets atomically with the final draft.
-    static func prepareApprovedSpotImage(userId: UUID, jpeg: Data) async throws -> UUID {
-        struct MediaAssetInsert: Encodable {
-            let id: UUID
-            let owner_id: UUID
-            let kind: String
-            let status: String
-            let pending_bucket: String
-            let pending_path: String
-            let mime_type: String
-            let byte_size: Int
-            let width: Int?
-            let height: Int?
-        }
-
-        let assetId = UUID()
-        let path = "\(userId.uuidString.lowercased())/\(assetId.uuidString.lowercased()).jpg"
-        let pixelSize = SpotJPEGImageDimensions.pixelSize(jpeg: jpeg)
-        try await supabase
-            .from("media_assets")
-            .insert(MediaAssetInsert(
-                id: assetId,
-                owner_id: userId,
-                kind: "spot_image",
-                status: "pending",
-                pending_bucket: pendingImagesBucketId,
-                pending_path: path,
-                mime_type: "image/jpeg",
-                byte_size: jpeg.count,
-                width: pixelSize?.width,
-                height: pixelSize?.height
-            ))
-            .execute()
-
-        try await supabase.storage
-            .from(pendingImagesBucketId)
-            .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: true))
-
-        let moderation = try await invokeModerateImageFunction(mediaAssetId: assetId)
-        guard moderation.approved else {
-            if moderation.reason == "image_policy_rejected" {
-                throw NSError(
-                    domain: "SpotImageModeration",
-                    code: 422,
-                    userInfo: [NSLocalizedDescriptionKey: "This photo can’t be used. Please choose another."]
-                )
-            }
-            throw NSError(
-                domain: "SpotImageModeration",
-                code: 503,
-                userInfo: [NSLocalizedDescriptionKey: "We couldn’t check this photo. Please try again."]
-            )
-        }
-        return assetId
+    static func insertPendingMediaAsset(_ insert: EditSpotEditorSupport.PendingMediaAssetInsert) async throws {
+        try await supabase.from("media_assets").insert(insert).execute()
     }
 
-    static func updateSpotFromEditor(
-        id: UUID,
-        vibeTags: [String],
-        latitude: Double,
-        longitude: Double,
-        locationName: String,
-        media: [EditSpotMediaReference]
-    ) async throws {
-        guard !media.isEmpty else {
-            throw NSError(
-                domain: "SpotSupabaseRepository",
-                code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "A spot needs at least one photo."]
-            )
-        }
-        guard !vibeTags.isEmpty else {
-            throw NSError(
-                domain: "SpotSupabaseRepository",
-                code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "At least one vibe is required."]
-            )
-        }
-        if let coordError = InputValidation.validateCoordinates(latitude: latitude, longitude: longitude) {
-            throw NSError(
-                domain: "SpotSupabaseRepository",
-                code: 400,
-                userInfo: [NSLocalizedDescriptionKey: coordError]
-            )
-        }
-        if let locationError = InputValidation.validateLocationName(locationName) {
-            throw NSError(
-                domain: "SpotSupabaseRepository",
-                code: 400,
-                userInfo: [NSLocalizedDescriptionKey: locationError]
-            )
-        }
+    static func uploadPendingMediaAsset(path: String, jpeg: Data) async throws {
+        try await supabase.storage.from(pendingImagesBucketId).upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: true))
+    }
 
-        var vibeIds: [UUID] = []
-        for tag in vibeTags {
-            vibeIds.append(try await resolveOrCreateVibeTagId(displayName: tag))
-        }
+    static func moderatePendingImageAsset(mediaAssetId: UUID) async throws -> (approved: Bool, reason: String?) {
+        try await invokeModerateImageFunction(mediaAssetId: mediaAssetId)
+    }
 
-        struct Params: Encodable {
-            let p_spot_id: UUID
-            let p_vibe_tag_ids: [UUID]
-            let p_latitude: Double
-            let p_longitude: Double
-            let p_location_name: String
-            let p_media_items: [EditSpotMediaReference]
-        }
-
-        try await supabase.rpc(
-            "update_spot_editor_v1",
-            params: Params(
-                p_spot_id: id,
-                p_vibe_tag_ids: vibeIds,
-                p_latitude: latitude,
-                p_longitude: longitude,
-                p_location_name: locationName.trimmingCharacters(in: .whitespacesAndNewlines),
-                p_media_items: media
-            )
-        )
-        .execute()
+    static func invokeUpdateSpotEditorRPC(_ params: EditSpotEditorSupport.EditorRPCParams) async throws {
+        try await supabase.rpc("update_spot_editor_v1", params: params).execute()
     }
 
     // MARK: - Mapping
