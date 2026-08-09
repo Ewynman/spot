@@ -23,10 +23,10 @@ struct SpotSaveFlowGuardTests {
     }
 
     @Test func canonicalWritesAreConflictSafe() throws {
-        let saveService = try Self.contents("Spot/Services/Profile/UserSpotService.swift")
-        let collectionService = try Self.contents("Spot/Services/Social/BookmarksCollectionsService.swift")
-        #expect(saveService.contains("onConflict: \"user_id,spot_id\""))
-        #expect(collectionService.contains("onConflict: \"collection_id,spot_id\""))
+        let saveStore = try Self.contents("Spot/Services/Social/SupabaseSpotBookmarkStore.swift")
+        let collectionStore = try Self.contents("Spot/Services/Social/SupabaseBookmarkCollectionsStore.swift")
+        #expect(saveStore.contains("onConflict: \"user_id,spot_id\""))
+        #expect(collectionStore.contains("onConflict: \"collection_id,spot_id\""))
     }
 
     @Test func databaseEnforcesCanonicalUniqueness() throws {

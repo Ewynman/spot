@@ -3,7 +3,25 @@ import Supabase
 
 class UserSpotService {
     static let shared = UserSpotService()
-    private var userId: String? { SpotAuthBridge.currentUserId }
+
+    private let bookmarkStore: SpotBookmarkPersisting
+    private let mutationGate: SpotSaveMutationGate
+    private let userIdProvider: () -> String?
+    private let trackUserAction: SpotUserActionTracking
+
+    private var userId: String? { userIdProvider() }
+
+    init(
+        bookmarkStore: SpotBookmarkPersisting = SupabaseSpotBookmarkStore(),
+        mutationGate: SpotSaveMutationGate = .shared,
+        userIdProvider: @escaping () -> String? = { SpotAuthBridge.currentUserId },
+        trackUserAction: @escaping SpotUserActionTracking = SpotAnalyticsBridge.trackUserAction
+    ) {
+        self.bookmarkStore = bookmarkStore
+        self.mutationGate = mutationGate
+        self.userIdProvider = userIdProvider
+        self.trackUserAction = trackUserAction
+    }
 
     private struct SpotRefInsert: Encodable {
         let user_id: UUID
@@ -155,28 +173,19 @@ class UserSpotService {
             throw NSError(domain: "UserSpotService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid spot id"])
         }
 
-        try await SpotSaveMutationGate.shared.perform(spotId: spotId, isSaved: isSaved) {
+        let bookmarkStore = self.bookmarkStore
+        let trackUserAction = self.trackUserAction
+        try await mutationGate.perform(spotId: spotId, isSaved: isSaved) {
             if isSaved {
-                try await supabase
-                    .from("spot_bookmarks")
-                    .upsert(
-                        SpotRefInsert(user_id: uid, spot_id: sid),
-                        onConflict: "user_id,spot_id",
-                        ignoreDuplicates: true
-                    )
-                    .execute()
+                try await bookmarkStore.upsertBookmark(userId: uid, spotId: sid)
             } else {
-                try await supabase
-                    .rpc("remove_saved_spot_v1", params: ["p_spot_id": sid])
-                    .execute()
+                try await bookmarkStore.removeSavedSpot(spotId: sid)
             }
-            await MainActor.run {
-                AnalyticsService.shared.trackUserAction(
-                    isSaved ? "spot_saved" : "spot_unsaved",
-                    contentType: "spot",
-                    contentId: spotId
-                )
-            }
+            await trackUserAction(
+                isSaved ? "spot_saved" : "spot_unsaved",
+                "spot",
+                spotId
+            )
         }
     }
 

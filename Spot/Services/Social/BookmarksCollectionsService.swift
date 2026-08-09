@@ -10,10 +10,23 @@ struct BookmarkCollection: Identifiable, Codable, Hashable {
 
 final class BookmarksCollectionsService {
     static let shared = BookmarksCollectionsService()
-    private init() {}
+
+    private let store: BookmarkCollectionsPersisting
+    private let userIdProvider: () -> String?
+    private let trackUserAction: SpotUserActionTracking
+
+    init(
+        store: BookmarkCollectionsPersisting = SupabaseBookmarkCollectionsStore(),
+        userIdProvider: @escaping () -> String? = { SpotAuthBridge.currentUserId },
+        trackUserAction: @escaping SpotUserActionTracking = SpotAnalyticsBridge.trackUserAction
+    ) {
+        self.store = store
+        self.userIdProvider = userIdProvider
+        self.trackUserAction = trackUserAction
+    }
 
     private func uid() throws -> UUID {
-        guard let raw = SpotAuthBridge.currentUserId, let id = UUID(uuidString: raw) else {
+        guard let raw = userIdProvider(), let id = UUID(uuidString: raw) else {
             throw NSError(domain: "No user", code: 0)
         }
         return id
@@ -74,26 +87,9 @@ final class BookmarksCollectionsService {
 
     func createCollection(name: String) async throws -> String {
         let userId = try uid()
-        struct InsertRow: Encodable {
-            let user_id: UUID
-            let name: String
-            let sort_index: Int
-        }
-        let row: CollectionRow = try await supabase
-            .from("bookmark_collections")
-            .insert(InsertRow(user_id: userId, name: name, sort_index: 0))
-            .select("id,name,sort_index,created_at")
-            .single()
-            .execute()
-            .value
-        await MainActor.run {
-            AnalyticsService.shared.trackUserAction(
-                "collection_created",
-                contentType: "collection",
-                contentId: row.id.uuidString
-            )
-        }
-        return row.id.uuidString
+        let collectionId = try await store.insertCollection(userId: userId, name: name)
+        await trackUserAction("collection_created", "collection", collectionId.uuidString)
+        return collectionId.uuidString
     }
 
     func addSpot(_ spotId: String, to collectionId: String) async throws {
@@ -104,54 +100,10 @@ final class BookmarksCollectionsService {
             throw NSError(domain: "BookmarksCollectionsService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid id"])
         }
 
-        struct CollCheck: Decodable { let id: UUID }
-        let owners: [CollCheck] = try await supabase
-            .from("bookmark_collections")
-            .select("id")
-            .eq("id", value: coll)
-            .eq("user_id", value: userId)
-            .limit(1)
-            .execute()
-            .value
-        guard !owners.isEmpty else {
-            throw NSError(domain: "BookmarksCollectionsService", code: 403, userInfo: [NSLocalizedDescriptionKey: "Collection not found"])
-        }
-
-        struct LinkInsert: Encodable {
-            let collection_id: UUID
-            let spot_id: UUID
-            let sort_index: Int
-        }
-
-        let maxSort: Int = (try? await maxSortIndex(collectionId: coll)) ?? -1
-        try await supabase
-            .from("bookmark_collection_spots")
-            .upsert(
-                LinkInsert(collection_id: coll, spot_id: spot, sort_index: maxSort + 1),
-                onConflict: "collection_id,spot_id",
-                ignoreDuplicates: true
-            )
-            .execute()
-        await MainActor.run {
-            AnalyticsService.shared.trackUserAction(
-                "spot_added_to_collection",
-                contentType: "spot",
-                contentId: spotId
-            )
-        }
-    }
-
-    private func maxSortIndex(collectionId: UUID) async throws -> Int {
-        struct Row: Decodable { let sort_index: Int }
-        let rows: [Row] = try await supabase
-            .from("bookmark_collection_spots")
-            .select("sort_index")
-            .eq("collection_id", value: collectionId)
-            .order("sort_index", ascending: false)
-            .limit(1)
-            .execute()
-            .value
-        return rows.first?.sort_index ?? -1
+        try await store.assertOwnsCollection(userId: userId, collectionId: coll)
+        let sortIndex = (try? await store.nextSortIndex(collectionId: coll)) ?? 0
+        try await store.upsertSpotLink(collectionId: coll, spotId: spot, sortIndex: sortIndex)
+        await trackUserAction("spot_added_to_collection", "spot", spotId)
     }
 
     func removeSpot(_ spotId: String, from collectionId: String) async throws {
@@ -162,32 +114,9 @@ final class BookmarksCollectionsService {
             throw NSError(domain: "BookmarksCollectionsService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid id"])
         }
 
-        struct CollCheck: Decodable { let id: UUID }
-        let owners: [CollCheck] = try await supabase
-            .from("bookmark_collections")
-            .select("id")
-            .eq("id", value: coll)
-            .eq("user_id", value: userId)
-            .limit(1)
-            .execute()
-            .value
-        guard !owners.isEmpty else {
-            throw NSError(domain: "BookmarksCollectionsService", code: 403, userInfo: [NSLocalizedDescriptionKey: "Collection not found"])
-        }
-
-        try await supabase
-            .from("bookmark_collection_spots")
-            .delete()
-            .eq("collection_id", value: coll)
-            .eq("spot_id", value: spot)
-            .execute()
-        await MainActor.run {
-            AnalyticsService.shared.trackUserAction(
-                "spot_removed_from_collection",
-                contentType: "spot",
-                contentId: spotId
-            )
-        }
+        try await store.assertOwnsCollection(userId: userId, collectionId: coll)
+        try await store.deleteSpotLink(collectionId: coll, spotId: spot)
+        await trackUserAction("spot_removed_from_collection", "spot", spotId)
     }
 
     func collectionIds(containing spotId: String) async throws -> Set<String> {
@@ -200,25 +129,10 @@ final class BookmarksCollectionsService {
             )
         }
 
-        struct MembershipRow: Decodable {
-            let collection_id: UUID
-        }
-
-        let collections: [CollectionRow] = try await supabase
-            .from("bookmark_collections")
-            .select("id,name,sort_index,created_at")
-            .eq("user_id", value: userId)
-            .execute()
-            .value
+        let collections = try await store.listOwnedCollectionIds(userId: userId)
         guard !collections.isEmpty else { return [] }
 
-        let rows: [MembershipRow] = try await supabase
-            .from("bookmark_collection_spots")
-            .select("collection_id")
-            .eq("spot_id", value: spot)
-            .in("collection_id", values: collections.map(\.id))
-            .execute()
-            .value
-        return Set(rows.map { $0.collection_id.uuidString })
+        let memberships = try await store.listMemberships(spotId: spot, in: collections)
+        return Set(memberships.map(\.uuidString))
     }
 }
