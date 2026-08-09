@@ -21,7 +21,7 @@ This directory contains GitHub Actions workflows for the Spot iOS app.
 - Boots an iPhone simulator and executes tests
 - Enables code coverage collection
 - Posts validation results as PR comment
-- **Every run** uploads coverage report artifacts (`coverage-reports`, `combined-coverage`) with JSON + Markdown summaries, even when tests fail or the changed-line gate is skipped (e.g. push to `main`)
+- **Every run** uploads coverage report artifacts (`coverage-reports`) with JSON + Markdown summaries, even when tests fail or the changed-line gate is skipped (e.g. push to `main`)
 - Uploads test results (`.xcresult`) as artifacts for 7 days
 
 **Validation Scripts:**
@@ -57,11 +57,7 @@ packages—as if it represented the app's test coverage.
 - Code coverage reports are uploaded as artifacts for 7 days
 - Validation results posted as PR comment with pass/fail status
 
-**Combined coverage job (`ui_coverage`):**
-- Runs `-scheme Spot -testPlan Spot` with coverage enabled
-- Reports informational production-scope % (Views included; `Models/Logs` excluded)
-- Test step uses `continue-on-error` so UI flakes do not leave a red job; coverage is still extracted/uploaded when an xcresult exists
-- Uploads `combined-coverage` artifact (xcresult + JSON + Markdown) for 7 days on every run
+CI intentionally runs a single job (`PR Validation`): unit tests via `SpotTests` plus the changed-line coverage gate. Combined unit+UI coverage via `Spot.xctestplan` is deferred; run `SpotUITests` / the Spot test plan locally when needed.
 
 ---
 
