@@ -9,6 +9,50 @@ import Foundation
 import SwiftUI
 import UIKit
 
+enum SpotPublishProgress: Equatable, Sendable {
+    case preparing
+    case resolvingVibes
+    case uploadingPhoto(index: Int, total: Int)
+    case checkingPhoto(index: Int, total: Int)
+    case publishing
+    case finalizing
+    case complete
+
+    var fraction: Double {
+        switch self {
+        case .preparing: return 0.05
+        case .resolvingVibes: return 0.12
+        case let .uploadingPhoto(index, total):
+            return photoFraction(index: index, total: total, stage: 0)
+        case let .checkingPhoto(index, total):
+            return photoFraction(index: index, total: total, stage: 0.65)
+        case .publishing: return 0.9
+        case .finalizing: return 0.97
+        case .complete: return 1
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .preparing: return "Preparing your Spot…"
+        case .resolvingVibes: return "Adding vibe tags…"
+        case let .uploadingPhoto(index, total):
+            return "Uploading photo \(min(index + 1, total)) of \(total)…"
+        case let .checkingPhoto(index, total):
+            return "Checking photo \(min(index + 1, total)) of \(total)…"
+        case .publishing: return "Publishing your Spot…"
+        case .finalizing: return "Finishing up…"
+        case .complete: return "Spot posted"
+        }
+    }
+
+    private func photoFraction(index: Int, total: Int, stage: Double) -> Double {
+        let safeTotal = max(total, 1)
+        let completed = min(max(Double(index) + stage, 0), Double(safeTotal))
+        return 0.15 + 0.7 * completed / Double(safeTotal)
+    }
+}
+
 /// Serializable draft so the publish pipeline does not retain `UIImage` after the composer resets.
 struct SpotPublishDraft: Equatable {
     let imageJPEGs: [Data]
@@ -41,6 +85,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
     }
 
     @Published private(set) var bannerPhase: BannerPhase = .hidden
+    @Published private(set) var publishProgress: SpotPublishProgress = .preparing
     @Published private(set) var showToast = false
     @Published private(set) var toastMessage = ""
     @Published private(set) var toastIsError = false
@@ -61,6 +106,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
 
     private func runPublish(draft: SpotPublishDraft) async {
         bannerPhase = .uploading
+        publishProgress = .preparing
 
         guard UUID(uuidString: draft.userId) != nil else {
             await presentErrorToast("Error Posting Spot Try Again Later")
@@ -81,6 +127,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
             let spotId = try await publishSpotWithTimeout(draft: draft)
             let spotIdString = spotId.uuidString
             let postedAt = Date()
+            publishProgress = .finalizing
             let signedFirstImage = try? await SpotSupabaseRepository.signFirstImageURLForSpot(spotId: spotId)
 
             let postedSpot = Spot(
@@ -120,6 +167,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
                 object: nil,
                 userInfo: ["postedSpot": postedSpot]
             )
+            publishProgress = .complete
         } catch let error as PublishError {
             switch error {
             case .timedOut:
@@ -151,7 +199,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
     var bannerTitle: String {
         switch bannerPhase {
         case .hidden: return ""
-        case .uploading: return "Posting your spot…"
+        case .uploading: return publishProgress.title
         }
     }
 
@@ -170,6 +218,9 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
 
     private func publishSpotWithTimeout(draft: SpotPublishDraft) async throws -> UUID {
         let userId = try parseUserId(draft.userId)
+        let progressHandler: @MainActor @Sendable (SpotPublishProgress) -> Void = { [weak self] progress in
+            self?.publishProgress = progress
+        }
         return try await withThrowingTaskGroup(of: UUID.self) { group in
             group.addTask {
                 try await SpotSupabaseRepository.publishSpotFromDraft(
@@ -178,7 +229,8 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
                     vibeTags: draft.vibeTags,
                     latitude: draft.latitude,
                     longitude: draft.longitude,
-                    locationName: draft.placeName
+                    locationName: draft.placeName,
+                    progress: progressHandler
                 )
             }
             group.addTask { [publishTimeoutSeconds] in

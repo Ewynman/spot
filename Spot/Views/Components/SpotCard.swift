@@ -23,6 +23,36 @@ struct MenuButtonFrameKey: PreferenceKey {
     }
 }
 
+private struct SpotMenuSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
+enum SpotMenuPlacement {
+    static func center(
+        buttonFrame: CGRect,
+        menuSize: CGSize,
+        containerSize: CGSize,
+        margin: CGFloat = 8
+    ) -> CGPoint {
+        let width = max(menuSize.width, 150)
+        let height = max(menuSize.height, 44)
+        let minX = width / 2 + margin
+        let maxX = max(minX, containerSize.width - width / 2 - margin)
+        let x = min(max(buttonFrame.midX, minX), maxX)
+        let fitsBelow = buttonFrame.maxY + margin + height <= containerSize.height
+        let proposedY = fitsBelow
+            ? buttonFrame.maxY + margin + height / 2
+            : buttonFrame.minY - margin - height / 2
+        let minY = height / 2 + margin
+        let maxY = max(minY, containerSize.height - height / 2 - margin)
+        return CGPoint(x: x, y: min(max(proposedY, minY), maxY))
+    }
+}
+
 #Preview {
     let sample = Spot(
         id: "s1",
@@ -75,6 +105,7 @@ struct SpotCard: View {
     @State private var showEditSheet: Bool = false
     @State private var showCustomMenu: Bool = false
     @State private var menuButtonFrame: CGRect = .zero
+    @State private var menuSize: CGSize = .zero
     @EnvironmentObject var authVM: AuthViewModel
     @State private var isLiked: Bool = false
     @State private var isSaved: Bool = false
@@ -118,6 +149,16 @@ struct SpotCard: View {
         _isSaved = State(initialValue: spot.isSaved ?? false)
     }
 
+    private var authorDisplay: SpotAuthorDisplay {
+        SpotAuthorDisplay.resolve(
+            spotUsername: currentSpot.username,
+            spotProfileImageURL: currentSpot.userProfileImageURL,
+            isCurrentUser: currentSpot.userId == authVM.userId,
+            currentUsername: authVM.currentUserUsername,
+            currentProfileImageURL: authVM.currentUserProfileImageURL
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
@@ -146,6 +187,7 @@ struct SpotCard: View {
         .padding(.horizontal, 12)
         .background(Constants.Colors.background)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .coordinateSpace(name: "spotCard")
         .measure(target: .spotCard)
         .onChange(of: currentSpot.id) { _, _ in
             thumbnailFailed = false
@@ -293,7 +335,7 @@ struct SpotCard: View {
                 NavigationLink(value: Route.profile(userId)) {
                     HStack(spacing: 8) {
                         // (event recorded via simultaneousGesture below)
-                        if let urlString = currentSpot.userProfileImageURL,
+                        if let urlString = authorDisplay.profileImageURL,
                            let url = URL(string: urlString) {
                             AsyncImage(url: url) { img in
                                 img.resizable()
@@ -321,7 +363,7 @@ struct SpotCard: View {
                                 )
                         }
 
-                        Text(currentSpot.username ?? "")
+                        Text(authorDisplay.username)
                             .font(FontManager.primaryText())
                             .fontWeight(.semibold)
                             .foregroundColor(Constants.Colors.primary)
@@ -594,7 +636,10 @@ struct SpotCard: View {
                         .accessibilityLabel("More actions")
                         .background(
                             GeometryReader { geo in
-                                Color.clear.preference(key: MenuButtonFrameKey.self, value: geo.frame(in: .global))
+                                Color.clear.preference(
+                                    key: MenuButtonFrameKey.self,
+                                    value: geo.frame(in: .named("spotCard"))
+                                )
                             }
                         )
                 }
@@ -701,25 +746,31 @@ struct SpotCard: View {
 
     // MARK: - Custom Menu
     private var customMenuOverlay: some View {
-        GeometryReader { _ in
+        GeometryReader { proxy in
             ZStack {
                 // Tappable background to dismiss
                 Color.black.opacity(0.001)
                     .ignoresSafeArea()
                     .onTapGesture { showCustomMenu = false }
 
-                // Position menu near the three dots button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        customMenuContent
-                            .padding(.trailing, 16)
-                            .padding(.bottom, 8)
+                customMenuContent
+                    .background {
+                        GeometryReader { menuProxy in
+                            Color.clear.preference(
+                                key: SpotMenuSizeKey.self,
+                                value: menuProxy.size
+                            )
+                        }
                     }
-                }
-                .offset(x: -menuButtonFrame.width - 8, y: -menuButtonFrame.height - 8)
+                    .position(
+                        SpotMenuPlacement.center(
+                            buttonFrame: menuButtonFrame,
+                            menuSize: menuSize,
+                            containerSize: proxy.size
+                        )
+                    )
             }
+            .onPreferenceChange(SpotMenuSizeKey.self) { menuSize = $0 }
         }
     }
 
@@ -856,7 +907,7 @@ struct SpotCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Constants.Colors.primary, lineWidth: 1)
         )
-        .frame(width: 150)
+        .frame(width: 170)
     }
 
     private func handleBookmarkTap() {

@@ -20,9 +20,9 @@ User opens **Post** tab → multi-step composer (`Spot/Views/PostFlow`) → sele
 
 ### Media
 
-Photos are chosen from an image-only multi-select library picker or the still-image camera. The first ordered photo is the cover. The photo workspace supports previewing, adding, replacing, removing, accessible reordering, and making any photo the cover.
+Photos are chosen from an image-only multi-select library picker or the still-image camera. The first ordered photo is the cover. The photo workspace supports previewing, adding, replacing, removing, and making any photo the cover. Reordering is exposed with visible left/right controls on every thumbnail (with drag and drop as an additional interaction), so it does not depend on discovering a long press.
 
-Each photo has a stable ID and non-destructive edit instructions. Crop, quarter-turn rotation, straightening, horizontal/vertical flip, brightness, contrast, saturation, and warmth are rendered from an orientation-normalized original. The original is retained until publication so edits can be reset or changed without repeatedly recompressing an earlier render. Picker filtering, client decoding, JPEG upload encoding, storage MIME restrictions, and moderation provide layered video exclusion.
+Each photo has a stable ID and non-destructive edit instructions. Crop, quarter-turn rotation, straightening, horizontal/vertical flip, brightness, contrast, saturation, and warmth are rendered from an orientation-normalized original. Interactive editor updates use a smaller display-only render budget for smooth gestures; the saved result still uses the full composer render budget. The crop grid is attached to the displayed image bounds so aspect-ratio changes update the visible editing frame. The original is retained until publication so edits can be reset or changed without repeatedly recompressing an earlier render. Picker filtering, client decoding, JPEG upload encoding, storage MIME restrictions, and moderation provide layered video exclusion.
 
 Free accounts can publish one photo and one vibe tag. Pro accounts can publish up to five photos and five vibe tags. The publish RPC independently enforces entitlement limits.
 
@@ -38,7 +38,7 @@ User picks from known tags and adds caption/details as the UI allows.
 
 `PostDraftStore` persists drafts locally under Application Support, including a reserved `autosave` draft and user-saved drafts. Draft schema version 2 stores each photo's stable ID, durable original and rendered preview, source, ordered position, non-destructive edit instructions, and processing state. Version 1 drafts are migrated lazily when loaded: their known file order is retained, stable IDs are generated, and neutral edits are supplied. A missing version-2 photo file restores as an unavailable item that can be replaced or removed instead of crashing. Draft metadata is indexed locally; no server draft table is involved.
 
-Submission persists a snapshot before JPEG encoding and queueing. The composer resets as soon as `SpotPublishCoordinator` accepts the job, allowing the user to leave the Post tab while the global publish banner reports progress.
+Submission persists a snapshot before JPEG encoding and queueing. The composer resets as soon as `SpotPublishCoordinator` accepts the job, allowing the user to leave the Post tab. The global banner uses determinate progress from real pipeline stages: vibe resolution, each photo upload, each moderation check, RPC publication, and final feed preparation.
 
 ### Publish and moderation
 
