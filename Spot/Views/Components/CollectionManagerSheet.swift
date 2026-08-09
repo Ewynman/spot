@@ -156,6 +156,7 @@ struct CollectionManagerSheet: View {
         .accessibilityIdentifier("collectionManager.collection.\(collection.id)")
     }
 
+    @ViewBuilder
     private var createCollectionContent: some View {
         VStack(spacing: Constants.Layout.Spacing.large) {
             TextField("Collection name", text: $newCollectionName)
