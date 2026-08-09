@@ -675,7 +675,8 @@ struct SpotCard: View {
 
     private var deleteConfirmationOverlay: some View {
         ZStack {
-            Color.black.opacity(0.28)
+            Color.black.opacity(0.001)
+                .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { showDeleteConfirm = false }
 
