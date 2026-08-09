@@ -916,7 +916,8 @@ enum SpotSupabaseRepository {
         vibeTags: [String],
         latitude: Double,
         longitude: Double,
-        locationName: String
+        locationName: String,
+        progress: (@MainActor @Sendable (SpotPublishProgress) -> Void)? = nil
     ) async throws -> UUID {
         guard !imageJPEGs.isEmpty else {
             throw NSError(domain: "SpotSupabaseRepository", code: 0, userInfo: [NSLocalizedDescriptionKey: "No images"])
@@ -935,6 +936,7 @@ enum SpotSupabaseRepository {
         if let locationError = InputValidation.validateLocationName(locationName) {
             throw NSError(domain: "SpotSupabaseRepository", code: 400, userInfo: [NSLocalizedDescriptionKey: locationError])
         }
+        await progress?(.resolvingVibes)
         var vibeIds: [UUID] = []
         vibeIds.reserveCapacity(vibeTags.count)
         for tag in vibeTags {
@@ -963,7 +965,8 @@ enum SpotSupabaseRepository {
         }
 
         var approvedAssetIds: [UUID] = []
-        for data in imageJPEGs {
+        for (index, data) in imageJPEGs.enumerated() {
+            await progress?(.uploadingPhoto(index: index, total: imageJPEGs.count))
             let assetId = UUID()
             let path = "\(userId.uuidString.lowercased())/\(assetId.uuidString.lowercased()).jpg"
             let pixelSize = SpotJPEGImageDimensions.pixelSize(jpeg: data)
@@ -1002,6 +1005,7 @@ enum SpotSupabaseRepository {
                 .from(pendingImagesBucketId)
                 .upload(path, data: data, options: FileOptions(contentType: "image/jpeg", upsert: true))
 
+            await progress?(.checkingPhoto(index: index, total: imageJPEGs.count))
             let moderate = try await invokeModerateImageFunction(mediaAssetId: assetId)
             guard moderate.approved else {
                 if moderate.reason == "image_policy_rejected" {
@@ -1020,6 +1024,7 @@ enum SpotSupabaseRepository {
             approvedAssetIds.append(assetId)
         }
 
+        await progress?(.publishing)
         let trimmedPlace = locationName.trimmingCharacters(in: .whitespacesAndNewlines)
         let spotIdString: String = try await supabase.rpc(
             "publish_spot_with_approved_media_assets_v1",

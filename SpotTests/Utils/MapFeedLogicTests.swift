@@ -44,6 +44,30 @@ struct SpotGridLayoutTests {
     }
 }
 
+struct SpotMenuPlacementTests {
+    @Test func anchorsMenuToTappedButtonInsteadOfCardEdge() {
+        let center = SpotMenuPlacement.center(
+            buttonFrame: CGRect(x: 92, y: 520, width: 24, height: 24),
+            menuSize: CGSize(width: 170, height: 220),
+            containerSize: CGSize(width: 390, height: 600)
+        )
+
+        #expect(center.x == 104)
+        #expect(center.y < 520)
+    }
+
+    @Test func clampsMenuInsideHorizontalCardBounds() {
+        let center = SpotMenuPlacement.center(
+            buttonFrame: CGRect(x: 378, y: 40, width: 24, height: 24),
+            menuSize: CGSize(width: 170, height: 100),
+            containerSize: CGSize(width: 390, height: 600)
+        )
+
+        #expect(center.x == 297)
+        #expect(center.y > 64)
+    }
+}
+
 struct SpotMapFilterStateTransitionTests {
     @Test func togglingDimensionOnAndOff() {
         var state = SpotMapFilterState.empty

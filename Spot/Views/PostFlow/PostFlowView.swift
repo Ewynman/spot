@@ -144,6 +144,7 @@ struct PostFlowView: View {
             .background(Constants.Colors.background.ignoresSafeArea())
         }
         .ignoresSafeArea(.keyboard)
+        .preferredColorScheme(.light)
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -278,7 +279,7 @@ struct NavigationButtonsView: View {
     let onSaveDraft: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 10) {
             if currentStep > 1 {
                 Button(action: onBack) {
                     Text("Back")
@@ -309,20 +310,26 @@ struct NavigationButtonsView: View {
             .buttonStyle(PlainButtonStyle())
 
             if currentStep == totalSteps {
-                Menu {
-                    Button("Post", action: onFinish)
-                        .disabled(!canProceed || isBusy)
-                    Button("Save as Draft", action: onSaveDraft)
-                        .disabled(!canSaveDraft || isBusy)
-                } label: {
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Constants.Colors.primary)
-                        .padding(12)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Constants.Colors.primary, lineWidth: 1))
+                Button(action: onSaveDraft) {
+                    Text("Save Draft")
+                        .font(FontManager.buttonText())
+                        .foregroundColor(
+                            canSaveDraft && !isBusy
+                                ? Constants.Colors.primary
+                                : Constants.Colors.primary.opacity(0.4)
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Constants.Colors.accent.opacity(canSaveDraft ? 0.75 : 0.35))
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Constants.Colors.primary.opacity(canSaveDraft ? 1 : 0.3), lineWidth: 1)
+                        )
                 }
+                .buttonStyle(.plain)
+                .disabled(!canSaveDraft || isBusy)
+                .accessibilityHint("Saves this Spot without publishing it")
             }
         }
         .padding(.horizontal, 16)

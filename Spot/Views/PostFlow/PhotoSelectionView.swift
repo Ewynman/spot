@@ -359,9 +359,9 @@ struct PhotoSelectionView: View {
                 .padding(.horizontal, 24)
             }
 
-            Text("Hold and drag photos to reorder. The first photo is the cover.")
+            Text("Tap a photo to select it. Use the arrows to reorder; the first photo is the cover.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Constants.Colors.primary.opacity(0.72))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
@@ -413,78 +413,105 @@ struct PhotoSelectionView: View {
     }
 
     private func thumbnail(_ photo: PostComposerPhoto, index: Int) -> some View {
-        Menu {
-            Button("Edit Photo") {
+        VStack(spacing: 6) {
+            Button {
                 activePhotoID = photo.id
-                openEditor()
+            } label: {
+                ZStack(alignment: .bottomLeading) {
+                    Image(uiImage: photo.image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipped()
+                    if index == 0 {
+                        Text("Cover")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Constants.Colors.buttonText)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(Constants.Colors.primary)
+                            .clipShape(Capsule())
+                            .padding(4)
+                    }
+                    if photo.processingState == .processing {
+                        ProgressView().tint(.white).frame(width: 80, height: 80)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            photo.id == activePhotoID
+                                ? Constants.Colors.primary
+                                : Constants.Colors.primary.opacity(0.16),
+                            lineWidth: photo.id == activePhotoID ? 3 : 1
+                        )
+                )
+                .contentShape(Rectangle())
             }
-            if index > 0 {
-                Button("Make Cover") { makeCover(photo.id) }
-            }
-            Button("Move Left") { move(photo.id, by: -1) }
-                .disabled(index == 0)
-            Button("Move Right") { move(photo.id, by: 1) }
-                .disabled(index == selectedPhotos.count - 1)
-            Button("Move to Start") { move(photo.id, to: 0) }
-                .disabled(index == 0)
-            Button("Move to End") { move(photo.id, to: selectedPhotos.count - 1) }
-                .disabled(index == selectedPhotos.count - 1)
-            Button("Remove Photo", role: .destructive) {
-                activePhotoID = photo.id
-                requestDelete()
-            }
-        } label: {
-            ZStack(alignment: .bottomLeading) {
+            .buttonStyle(.plain)
+            .accessibilityLabel("Select photo \(index + 1) of \(selectedPhotos.count)\(index == 0 ? ", cover photo" : "")")
+            .draggable(photo.id.uuidString) {
                 Image(uiImage: photo.image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 80, height: 80)
-                    .clipped()
-                if index == 0 {
-                    Text("Cover")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Constants.Colors.buttonText)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3)
-                        .background(Constants.Colors.primary)
-                        .clipShape(Capsule())
-                        .padding(4)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .onAppear {
+                        draggedPhotoID = photo.id
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let raw = items.first,
+                      let sourceID = UUID(uuidString: raw),
+                      let source = selectedPhotos.firstIndex(where: { $0.id == sourceID }) else { return false }
+                move(sourceID, to: index)
+                draggedPhotoID = nil
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                return source != index
+            } isTargeted: { _ in }
+
+            HStack(spacing: 4) {
+                reorderButton(
+                    label: "Move photo \(index + 1) left",
+                    icon: "chevron.left",
+                    disabled: index == 0
+                ) {
+                    move(photo.id, by: -1)
                 }
-                if photo.processingState == .processing {
-                    ProgressView().tint(.white).frame(width: 80, height: 80)
+                reorderButton(
+                    label: "Move photo \(index + 1) right",
+                    icon: "chevron.right",
+                    disabled: index == selectedPhotos.count - 1
+                ) {
+                    move(photo.id, by: 1)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(photo.id == activePhotoID ? Constants.Colors.primary : .clear, lineWidth: 3)
-            )
-            .contentShape(Rectangle())
-        } primaryAction: {
-            activePhotoID = photo.id
         }
-        .accessibilityLabel("Photo \(index + 1) of \(selectedPhotos.count)\(index == 0 ? ", cover photo" : "")")
-        .accessibilityHint("Double tap to select. Actions include editing and reordering.")
-        .draggable(photo.id.uuidString) {
-            Image(uiImage: photo.image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .onAppear {
-                    draggedPhotoID = photo.id
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }
+    }
+
+    private func reorderButton(
+        label: String,
+        icon: String,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(
+                    disabled
+                        ? Constants.Colors.primary.opacity(0.28)
+                        : Constants.Colors.primary
+                )
+                .frame(width: 36, height: 30)
+                .background(Constants.Colors.accent.opacity(disabled ? 0.35 : 0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 9))
         }
-        .dropDestination(for: String.self) { items, _ in
-            guard let raw = items.first,
-                  let sourceID = UUID(uuidString: raw),
-                  let source = selectedPhotos.firstIndex(where: { $0.id == sourceID }) else { return false }
-            move(sourceID, to: index)
-            draggedPhotoID = nil
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            return source != index
-        } isTargeted: { _ in }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .accessibilityLabel(label)
     }
 
     @ViewBuilder
