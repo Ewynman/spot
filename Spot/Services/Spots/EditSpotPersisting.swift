@@ -9,7 +9,8 @@ protocol EditSpotPersisting: Sendable {
         latitude: Double,
         longitude: Double,
         locationName: String,
-        media: [EditSpotMediaReference]
+        media: [EditSpotMediaReference],
+        vibeDisplayMode: VibeDisplayMode
     ) async throws
     func fetchSpotsByIds(_ ids: [UUID]) async throws -> [Spot]
 }

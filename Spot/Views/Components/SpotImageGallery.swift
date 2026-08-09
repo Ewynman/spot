@@ -11,6 +11,10 @@ struct SpotImageGallery: View {
     var mediaHeight: CGFloat
     /// Stable key for resetting pager/async state when the host cell is reused for another Spot.
     var galleryIdentity: String
+    /// When false, paging gestures are disabled (e.g. while vibe sheet is open).
+    var isPagingEnabled: Bool = true
+    var onPageCommitted: ((Int) -> Void)? = nil
+
     @State private var selection: Int = 0
     @State private var failedIndices: Set<Int> = []
     @State private var lazilyLoaded: [String] = []
@@ -69,11 +73,13 @@ struct SpotImageGallery: View {
         .frame(height: mediaHeight)
         .clipped()
         .id(slotWidthKey)
+        .allowsHitTesting(isPagingEnabled)
         .onAppear {
             if selection >= all.count {
                 selection = 0
             }
             requestFullSetIfNeeded()
+            onPageCommitted?(selection)
             SpotLogger.log(SpotMediaLayoutLogs.carouselLayout, details: [
                 "galleryIdentity": galleryIdentity,
                 "photoCount": all.count,
@@ -85,24 +91,20 @@ struct SpotImageGallery: View {
             failedIndices.removeAll()
             lazilyLoaded = []
             didRequestFullSet = false
+            onPageCommitted?(0)
         }
         .onChange(of: selection) { _, newValue in
             if newValue > 0 { requestFullSetIfNeeded() }
+            onPageCommitted?(newValue)
         }
     }
 
+    /// Preserve server `sort_index` / input order (do not alphabetize URLs).
     private var orderedURLs: [String] {
         let combined = urls + lazilyLoaded
         let base = combined.isEmpty ? (fallback.map { [$0] } ?? []) : combined
         var seen = Set<String>()
-        let unique = base.filter { seen.insert($0).inserted }
-        let sorted = unique.sorted { lhs, rhs in
-            let leftBad = isLikelyPlaceholderURL(lhs)
-            let rightBad = isLikelyPlaceholderURL(rhs)
-            if leftBad == rightBad { return lhs < rhs }
-            return !leftBad && rightBad
-        }
-        return sorted
+        return base.filter { seen.insert($0).inserted }
     }
 
     /// On the v2 home feed each row carries only its primary image. The first
@@ -121,11 +123,6 @@ struct SpotImageGallery: View {
                 }
             }
         }
-    }
-
-    private func isLikelyPlaceholderURL(_ raw: String) -> Bool {
-        let s = raw.lowercased()
-        return s.contains("placeholder") || s.contains("default") || s.contains("image_placeholder")
     }
 
     private func firstRenderableIndex(excluding excluded: Set<Int>, count: Int) -> Int? {

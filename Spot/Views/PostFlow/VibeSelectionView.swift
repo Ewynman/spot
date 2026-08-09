@@ -3,6 +3,15 @@ import SwiftUI
 struct VibeSelectionView: View {
     @Binding var selectedVibes: [String]
     let maxVibes: Int
+    var mappingPhotos: [(id: UUID, thumbnail: Image)] = []
+    var canMatchVibesToPhotos: Bool = false
+    var matchVibesToPhotos: Binding<Bool> = .constant(false)
+    var vibePhotoMappings: [UUID: String] = [:]
+    var vibeMappingStatusMessage: String? = nil
+    var onMatchToggle: ((Bool) -> Void)? = nil
+    var onAssignVibe: ((UUID, String) -> Void)? = nil
+    var onVibesChanged: (() -> Void)? = nil
+
     @EnvironmentObject var authVM: AuthViewModel
     @State private var customVibe: String = ""
     @State private var validationMessage: String?
@@ -84,6 +93,17 @@ struct VibeSelectionView: View {
                             .foregroundColor(.red)
                             .padding(.horizontal, Constants.Layout.Padding.horizontal)
                     }
+
+                    VibePhotoMappingSection(
+                        photos: mappingPhotos,
+                        selectedVibes: selectedVibes,
+                        canMatch: canMatchVibesToPhotos,
+                        matchEnabled: matchVibesToPhotos,
+                        mappings: vibePhotoMappings,
+                        statusMessage: vibeMappingStatusMessage,
+                        onToggle: { onMatchToggle?($0) },
+                        onAssign: { id, vibe in onAssignVibe?(id, vibe) }
+                    )
                 }
                 .padding(.top, 4)
                 .padding(.bottom, 140)
@@ -94,6 +114,7 @@ struct VibeSelectionView: View {
         }
         .onChange(of: selectedVibes) { _, _ in
             reloadRecentAndFrequent()
+            onVibesChanged?()
         }
     }
 

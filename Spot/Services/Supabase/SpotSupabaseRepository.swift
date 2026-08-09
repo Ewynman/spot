@@ -73,6 +73,7 @@ enum SpotSupabaseRepository {
         let created_at: String
         let media_display_aspect_ratio: Double?
         let media_count: Int64?
+        let vibe_display_mode: String?
     }
 
     private struct SpotImageRow: Decodable {
@@ -88,6 +89,12 @@ enum SpotSupabaseRepository {
             if !fromStorage.isEmpty { return fromStorage }
             return public_url?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         }
+    }
+
+    private struct SpotImageVibeRow: Decodable {
+        let spot_id: UUID
+        let sort_index: Int
+        let vibe_tag_id: UUID?
     }
 
     private static func isStoredAbsoluteURL(_ s: String) -> Bool {
@@ -317,6 +324,60 @@ enum SpotSupabaseRepository {
         return bySpot
     }
 
+    /// Ordered vibe labels from `spot_images.vibe_tag_id` (photo-synced posts).
+    private static func fetchPhotoSyncedVibeLabelsBySpotId(spotIds: [UUID]) async throws -> [UUID: [String]] {
+        guard !spotIds.isEmpty else { return [:] }
+        let rows: [SpotImageVibeRow] = try await supabase
+            .from("spot_images")
+            .select("spot_id,sort_index,vibe_tag_id")
+            .in("spot_id", values: spotIds)
+            .execute()
+            .value
+
+        let vibeIds = Array(Set(rows.compactMap(\.vibe_tag_id)))
+        var idToName: [UUID: String] = [:]
+        if !vibeIds.isEmpty {
+            let vibes: [VibeRow] = try await supabase
+                .from("vibe_tags")
+                .select("id,name")
+                .in("id", values: vibeIds)
+                .execute()
+                .value
+            for v in vibes { idToName[v.id] = v.name }
+        }
+
+        var bySpot: [UUID: [String]] = [:]
+        let grouped = Dictionary(grouping: rows, by: \.spot_id)
+        for (sid, imageRows) in grouped {
+            let sorted = imageRows.sorted { $0.sort_index < $1.sort_index }
+            let names = sorted.compactMap { row -> String? in
+                guard let vid = row.vibe_tag_id else { return nil }
+                return idToName[vid]
+            }
+            if !names.isEmpty { bySpot[sid] = names }
+        }
+        return bySpot
+    }
+
+    private static func fetchVibeDisplayModesBySpotId(spotIds: [UUID]) async throws -> [UUID: VibeDisplayMode] {
+        guard !spotIds.isEmpty else { return [:] }
+        struct ModeRow: Decodable {
+            let id: UUID
+            let vibe_display_mode: String?
+        }
+        let rows: [ModeRow] = try await supabase
+            .from("spots")
+            .select("id,vibe_display_mode")
+            .in("id", values: spotIds)
+            .execute()
+            .value
+        var out: [UUID: VibeDisplayMode] = [:]
+        for row in rows {
+            out[row.id] = VibeDisplayMode(rawValueOrDefault: row.vibe_display_mode)
+        }
+        return out
+    }
+
     private static func fetchAuthorProFlag(userId: UUID) async throws -> Bool {
         struct Row: Decodable {
             let is_pro: Bool?
@@ -356,15 +417,17 @@ enum SpotSupabaseRepository {
 
         let spotIds = rows.map(\.id)
         async let labelsBySpotTask = fetchVibeLabelListsBySpotId(spotIds: spotIds)
+        async let syncedLabelsTask = fetchPhotoSyncedVibeLabelsBySpotId(spotIds: spotIds)
         async let imagesTask: [SpotImageRow] = supabase
             .from("spot_images")
             .select("spot_id,storage_path,public_url,sort_index,storage_bucket")
             .in("spot_id", values: spotIds)
             .execute()
             .value
-        let (authorIsPro, labelsBySpot, images) = try await (
+        let (authorIsPro, labelsBySpot, syncedLabelsBySpot, images) = try await (
             authorIsProTask,
             labelsBySpotTask,
+            syncedLabelsTask,
             imagesTask
         )
 
@@ -430,13 +493,15 @@ enum SpotSupabaseRepository {
                 imageURLs: urls.isEmpty ? nil : urls,
                 mediaDisplayAspectRatio: row.media_display_aspect_ratio,
                 mediaCount: row.media_count.map { Int($0) },
-                authorIsPro: authorIsPro
+                authorIsPro: authorIsPro,
+                vibeDisplayMode: VibeDisplayMode(rawValueOrDefault: row.vibe_display_mode),
+                photoSyncedVibeLabels: syncedLabelsBySpot[row.id]
             )
         }
     }
 
     private static let spotRowSelectColumns =
-        "id,user_id,vibe_tag_id,caption,latitude,longitude,location_name,likes_count,author_is_private_snapshot,created_at,media_display_aspect_ratio,media_count,media_layout_version"
+        "id,user_id,vibe_tag_id,caption,latitude,longitude,location_name,likes_count,author_is_private_snapshot,created_at,media_display_aspect_ratio,media_count,media_layout_version,vibe_display_mode"
 
     private struct UserBriefRow: Decodable {
         let id: UUID
@@ -473,13 +538,19 @@ enum SpotSupabaseRepository {
         }
 
         let spotIds = rows.map(\.id)
-        let labelsBySpot = try await fetchVibeLabelListsBySpotId(spotIds: spotIds)
-        let images: [SpotImageRow] = try await supabase
+        async let labelsBySpotTask = fetchVibeLabelListsBySpotId(spotIds: spotIds)
+        async let syncedLabelsTask = fetchPhotoSyncedVibeLabelsBySpotId(spotIds: spotIds)
+        async let imagesTask: [SpotImageRow] = supabase
             .from("spot_images")
             .select("spot_id,storage_path,public_url,sort_index,storage_bucket")
             .in("spot_id", values: spotIds)
             .execute()
             .value
+        let (labelsBySpot, syncedLabelsBySpot, images) = try await (
+            labelsBySpotTask,
+            syncedLabelsTask,
+            imagesTask
+        )
 
         var imagesBySpot: [UUID: [SpotImageRow]] = [:]
         for img in images {
@@ -545,7 +616,9 @@ enum SpotSupabaseRepository {
                 imageURLs: urls.isEmpty ? nil : urls,
                 mediaDisplayAspectRatio: row.media_display_aspect_ratio,
                 mediaCount: row.media_count.map { Int($0) },
-                authorIsPro: authorPro
+                authorIsPro: authorPro,
+                vibeDisplayMode: VibeDisplayMode(rawValueOrDefault: row.vibe_display_mode),
+                photoSyncedVibeLabels: syncedLabelsBySpot[row.id]
             )
         }
     }
@@ -733,7 +806,9 @@ enum SpotSupabaseRepository {
         }
 
         let mapSpotIds = rows.map(\.id)
-        let labelsBySpot = try await fetchVibeLabelListsBySpotId(spotIds: mapSpotIds)
+        async let labelsBySpotTask = fetchVibeLabelListsBySpotId(spotIds: mapSpotIds)
+        async let syncedLabelsTask = fetchPhotoSyncedVibeLabelsBySpotId(spotIds: mapSpotIds)
+        let (labelsBySpot, syncedLabelsBySpot) = try await (labelsBySpotTask, syncedLabelsTask)
 
         let orderedSpotIds = rows.map(\.id.uuidString)
         let previewURLs = await fetchPreviewImageURLs(spotIds: orderedSpotIds)
@@ -778,7 +853,9 @@ enum SpotSupabaseRepository {
                 imageURLs: nil,
                 mediaDisplayAspectRatio: row.media_display_aspect_ratio,
                 mediaCount: row.media_count.map { Int($0) },
-                authorIsPro: authorPro
+                authorIsPro: authorPro,
+                vibeDisplayMode: VibeDisplayMode(rawValueOrDefault: row.vibe_display_mode),
+                photoSyncedVibeLabels: syncedLabelsBySpot[row.id]
             )
         }
     }
@@ -802,16 +879,24 @@ enum SpotSupabaseRepository {
         guard !spotUUIDs.isEmpty else { return spots }
 
         async let labelTask = fetchVibeLabelListsBySpotId(spotIds: spotUUIDs)
+        async let modeTask = fetchVibeDisplayModesBySpotId(spotIds: spotUUIDs)
+        async let syncedTask = fetchPhotoSyncedVibeLabelsBySpotId(spotIds: spotUUIDs)
         let userUUIDs = Array(Set(spots.compactMap { $0.userId }.compactMap(UUID.init)))
         async let proTask = fetchAuthorProFlags(userIds: userUUIDs)
 
-        let (labelMap, proMap) = try await (labelTask, proTask)
+        let (labelMap, modeMap, syncedMap, proMap) = try await (labelTask, modeTask, syncedTask, proTask)
 
         return spots.map { s in
             var m = s
-            if let sid = s.id, let u = UUID(uuidString: sid), let labs = labelMap[u], !labs.isEmpty {
-                m.vibeTags = labs
-                m.vibeTag = labs.first
+            if let sid = s.id, let u = UUID(uuidString: sid) {
+                if let labs = labelMap[u], !labs.isEmpty {
+                    m.vibeTags = labs
+                    m.vibeTag = labs.first
+                }
+                m.vibeDisplayMode = modeMap[u] ?? .rotating
+                if let synced = syncedMap[u], !synced.isEmpty {
+                    m.photoSyncedVibeLabels = synced
+                }
             }
             if let uid = s.userId {
                 m.authorIsPro = proMap[uid]
@@ -917,6 +1002,7 @@ enum SpotSupabaseRepository {
         latitude: Double,
         longitude: Double,
         locationName: String,
+        vibeDisplayMode: VibeDisplayMode = .rotating,
         progress: (@MainActor @Sendable (SpotPublishProgress) -> Void)? = nil
     ) async throws -> UUID {
         guard !imageJPEGs.isEmpty else {
@@ -962,6 +1048,7 @@ enum SpotSupabaseRepository {
             let p_longitude: Double
             let p_location_name: String
             let p_media_asset_ids: [UUID]
+            let p_vibe_display_mode: String
         }
 
         var approvedAssetIds: [UUID] = []
@@ -1033,7 +1120,8 @@ enum SpotSupabaseRepository {
                 p_latitude: latitude,
                 p_longitude: longitude,
                 p_location_name: trimmedPlace,
-                p_media_asset_ids: approvedAssetIds
+                p_media_asset_ids: approvedAssetIds,
+                p_vibe_display_mode: vibeDisplayMode.rawValue
             )
         )
         .execute()

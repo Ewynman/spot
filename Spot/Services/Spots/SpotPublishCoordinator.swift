@@ -66,6 +66,33 @@ struct SpotPublishDraft: Equatable {
     let username: String?
     let userProfileImageURL: String?
     let sourceDraftID: String?
+    let vibeDisplayMode: VibeDisplayMode
+
+    init(
+        imageJPEGs: [Data],
+        coverMediaDisplayAspectRatio: CGFloat,
+        vibeTags: [String],
+        latitude: Double,
+        longitude: Double,
+        placeName: String,
+        userId: String,
+        username: String?,
+        userProfileImageURL: String?,
+        sourceDraftID: String?,
+        vibeDisplayMode: VibeDisplayMode = .rotating
+    ) {
+        self.imageJPEGs = imageJPEGs
+        self.coverMediaDisplayAspectRatio = coverMediaDisplayAspectRatio
+        self.vibeTags = vibeTags
+        self.latitude = latitude
+        self.longitude = longitude
+        self.placeName = placeName
+        self.userId = userId
+        self.username = username
+        self.userProfileImageURL = userProfileImageURL
+        self.sourceDraftID = sourceDraftID
+        self.vibeDisplayMode = vibeDisplayMode
+    }
 }
 
 @MainActor
@@ -149,7 +176,10 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
                 authorIsPrivate: nil,
                 imageURLs: signedFirstImage.map { [$0] } ?? nil,
                 mediaDisplayAspectRatio: Double(draft.coverMediaDisplayAspectRatio),
-                mediaCount: draft.imageJPEGs.count
+                mediaCount: draft.imageJPEGs.count,
+                authorIsPro: draft.vibeDisplayMode == .photoSynced || draft.vibeTags.count > 1 || draft.imageJPEGs.count > 1,
+                vibeDisplayMode: draft.vibeDisplayMode,
+                photoSyncedVibeLabels: draft.vibeDisplayMode == .photoSynced ? draft.vibeTags : nil
             )
 
             SpotLogger.log(SpotPublishCoordinatorLogs.spotPublished, details: ["spotId": spotId.uuidString])
@@ -230,6 +260,7 @@ final class SpotPublishCoordinator: ObservableObject, SpotPublishing {
                     latitude: draft.latitude,
                     longitude: draft.longitude,
                     locationName: draft.placeName,
+                    vibeDisplayMode: draft.vibeDisplayMode,
                     progress: progressHandler
                 )
             }

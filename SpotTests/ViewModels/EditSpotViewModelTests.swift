@@ -335,7 +335,8 @@ private final class FakeEditSpotStore: EditSpotPersisting, @unchecked Sendable {
         latitude: Double,
         longitude: Double,
         locationName: String,
-        media: [EditSpotMediaReference]
+        media: [EditSpotMediaReference],
+        vibeDisplayMode: VibeDisplayMode
     ) async throws {
         if let updateError { throw updateError }
         updateCalls.append((vibeTags, media))

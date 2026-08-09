@@ -24,6 +24,11 @@ class PostFlowViewModel: ObservableObject {
     @Published var selectedLocation: LocationData?
     @Published var selectedVibe: String = ""
     @Published var selectedVibes: [String] = []
+    /// Pro optional control: match each vibe to a photo (PHOTO_SYNCED).
+    @Published var matchVibesToPhotos = false
+    /// Local photo id → vibe name when `matchVibesToPhotos` is on.
+    @Published var vibePhotoMappings: [UUID: String] = [:]
+    @Published var vibeMappingStatusMessage: String?
     /// True only while JPEG-encoding and handing off to `SpotPublishCoordinator` (brief).
     @Published var isEncodingPost = false
     @Published var showToast = false
@@ -81,6 +86,99 @@ class PostFlowViewModel: ObservableObject {
         authViewModel?.isPro == true
             ? Constants.PostLimits.maxProPostImages
             : Constants.PostLimits.maxFreePostImages
+    }
+
+    var canMatchVibesToPhotos: Bool {
+        VibePhotoMappingPolicy.isEligible(
+            photoCount: selectedPhotos.count,
+            vibeCount: selectedVibes.count,
+            isPro: authViewModel?.isPro == true
+        )
+    }
+
+    var resolvedPublishVibeDisplayMode: VibeDisplayMode {
+        matchVibesToPhotos && canMatchVibesToPhotos ? .photoSynced : .rotating
+    }
+
+    /// Vibe order for publish: photo-mapped order when synced, else selection order.
+    var orderedVibesForPublish: [String] {
+        if matchVibesToPhotos,
+           let ordered = VibePhotoMappingPolicy.orderedVibes(
+            photoIds: selectedPhotos.map(\.id),
+            mappings: vibePhotoMappings
+           ) {
+            return ordered
+        }
+        return selectedVibes
+    }
+
+    func setMatchVibesToPhotos(_ enabled: Bool) {
+        guard enabled else {
+            if matchVibesToPhotos {
+                AnalyticsService.shared.logEvent(Constants.Analytics.vibePhotoSyncDisabled, parameters: [
+                    "image_count": selectedPhotos.count,
+                    "vibe_count": selectedVibes.count,
+                    "creator_plan": (authViewModel?.isPro == true) ? "pro" : "free"
+                ])
+            }
+            matchVibesToPhotos = false
+            vibePhotoMappings = [:]
+            vibeMappingStatusMessage = nil
+            return
+        }
+        guard canMatchVibesToPhotos else {
+            matchVibesToPhotos = false
+            vibePhotoMappings = [:]
+            return
+        }
+        matchVibesToPhotos = true
+        vibePhotoMappings = VibePhotoMappingPolicy.initialMappings(
+            photoIds: selectedPhotos.map(\.id),
+            vibes: selectedVibes
+        )
+        vibeMappingStatusMessage = nil
+        AnalyticsService.shared.logEvent(Constants.Analytics.vibePhotoSyncEnabled, parameters: [
+            "image_count": selectedPhotos.count,
+            "vibe_count": selectedVibes.count,
+            "creator_plan": "pro"
+        ])
+    }
+
+    func assignVibe(_ vibe: String, toPhotoId photoId: UUID) {
+        guard matchVibesToPhotos else { return }
+        let before = vibePhotoMappings
+        vibePhotoMappings = VibePhotoMappingPolicy.swapMapping(
+            mappings: vibePhotoMappings,
+            photoId: photoId,
+            newVibe: vibe
+        )
+        if vibePhotoMappings != before {
+            AnalyticsService.shared.logEvent(Constants.Analytics.vibePhotoMappingChanged, parameters: [
+                "image_count": selectedPhotos.count,
+                "vibe_count": selectedVibes.count,
+                "vibe_display_mode": "photo_synced"
+            ])
+        }
+    }
+
+    func reconcileVibePhotoMappings() {
+        let result = VibePhotoMappingPolicy.reconcile(
+            photoIds: selectedPhotos.map(\.id),
+            vibes: selectedVibes,
+            mappings: vibePhotoMappings,
+            matchEnabled: matchVibesToPhotos,
+            isPro: authViewModel?.isPro == true
+        )
+        matchVibesToPhotos = result.matchEnabled
+        vibePhotoMappings = result.mappings
+        if result.didInvalidate {
+            vibeMappingStatusMessage = VibePhotoMappingPolicy.unequalCountsMessage
+            AnalyticsService.shared.logEvent(Constants.Analytics.vibePhotoSyncDisabled, parameters: [
+                "image_count": selectedPhotos.count,
+                "vibe_count": selectedVibes.count,
+                "reason": "counts_unequal"
+            ])
+        }
     }
 
     func goBack() {
@@ -146,7 +244,8 @@ class PostFlowViewModel: ObservableObject {
         }
 
         isEncodingPost = true
-        let vibes = selectedVibes
+        let vibes = orderedVibesForPublish
+        let mode = resolvedPublishVibeDisplayMode
         let lat = location.coordinate.latitude
         let lon = location.coordinate.longitude
         let placeName = location.placeName
@@ -178,7 +277,8 @@ class PostFlowViewModel: ObservableObject {
                 userId: userId,
                 username: self.authViewModel?.currentUserUsername,
                 userProfileImageURL: self.authViewModel?.currentUserProfileImageURL,
-                sourceDraftID: self.activeDraftID
+                sourceDraftID: self.activeDraftID,
+                vibeDisplayMode: mode
             )
 
             self.spotPublisher.enqueue(draft: draft) { [weak self] in
@@ -195,6 +295,9 @@ class PostFlowViewModel: ObservableObject {
         selectedLocation = nil
         selectedVibe = ""
         selectedVibes = []
+        matchVibesToPhotos = false
+        vibePhotoMappings = [:]
+        vibeMappingStatusMessage = nil
         withAnimation(.easeInOut(duration: 0.25)) {
             currentStep = 1
         }
@@ -215,6 +318,8 @@ class PostFlowViewModel: ObservableObject {
             photos: selectedPhotos,
             selectedLocation: selectedLocation,
             selectedVibes: selectedVibes,
+            matchVibesToPhotos: matchVibesToPhotos,
+            vibePhotoMappings: vibePhotoMappings,
             draftID: activeDraftID,
             status: .autosaved
         ) {
@@ -225,14 +330,25 @@ class PostFlowViewModel: ObservableObject {
 
     func loadPersistedDraftIfAvailable() -> Bool {
         guard let loaded = PostDraftStore.loadAutosavedDraft() else { return false }
+        applyLoadedDraft(loaded)
+        return true
+    }
+
+    private func applyLoadedDraft(_ loaded: PostComposerDraftLoadResult) {
         selectedPhotos = loaded.photos
         selectedLocation = loaded.location
         selectedVibes = loaded.draft.vibeTags
         selectedVibe = loaded.draft.vibeTags.first ?? ""
+        matchVibesToPhotos = loaded.draft.matchVibesToPhotos ?? false
+        if let records = loaded.draft.vibePhotoMappings {
+            vibePhotoMappings = Dictionary(uniqueKeysWithValues: records.map { ($0.photoId, $0.vibe) })
+        } else {
+            vibePhotoMappings = [:]
+        }
+        reconcileVibePhotoMappings()
         currentStep = min(max(loaded.draft.step, 1), totalSteps)
         activeDraftID = loaded.draft.id
         refreshDrafts()
-        return true
     }
 
     func clearPersistedDraft() {
@@ -283,6 +399,8 @@ class PostFlowViewModel: ObservableObject {
             photos: selectedPhotos,
             selectedLocation: selectedLocation,
             selectedVibes: selectedVibes,
+            matchVibesToPhotos: matchVibesToPhotos,
+            vibePhotoMappings: vibePhotoMappings,
             draftID: activeDraftID == "autosave" ? nil : activeDraftID,
             status: .saved
         ) else {
@@ -303,13 +421,7 @@ class PostFlowViewModel: ObservableObject {
             showToastWith(message: "Could not open that draft.", isError: true)
             return
         }
-        selectedPhotos = loaded.photos
-        selectedLocation = loaded.location
-        selectedVibes = loaded.draft.vibeTags
-        selectedVibe = loaded.draft.vibeTags.first ?? ""
-        currentStep = min(max(loaded.draft.step, 1), totalSteps)
-        activeDraftID = loaded.draft.id
-        refreshDrafts()
+        applyLoadedDraft(loaded)
     }
 
     func deleteDraft(id: String) {
@@ -335,6 +447,9 @@ class PostFlowViewModel: ObservableObject {
         selectedLocation = nil
         selectedVibe = ""
         selectedVibes = []
+        matchVibesToPhotos = false
+        vibePhotoMappings = [:]
+        vibeMappingStatusMessage = nil
         currentStep = 1
         activeDraftID = nil
     }

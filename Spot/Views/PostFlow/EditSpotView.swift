@@ -44,7 +44,13 @@ struct EditSpotView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .task { await viewModel.load() }
+            .task {
+                viewModel.setIsPro(authVM.isPro)
+                await viewModel.load()
+            }
+            .onChange(of: authVM.isPro) { _, isPro in
+                viewModel.setIsPro(isPro)
+            }
             .sheet(isPresented: $showLocationPicker) {
                 locationPicker
             }
@@ -101,6 +107,7 @@ struct EditSpotView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Constants.Layout.Spacing.extraLarge) {
                 photosSection
+                vibePhotoMappingSection
                 vibesSection
                 locationSection
             }
@@ -133,6 +140,28 @@ struct EditSpotView: View {
                 .accessibilityIdentifier("editSpot.photoReorderHint")
         }
         .accessibilityIdentifier("editSpot.photosSection")
+    }
+
+    private var vibePhotoMappingSection: some View {
+        VibePhotoMappingSection(
+            photos: viewModel.photos.map { photo in
+                if let replacement = photo.replacement {
+                    return (id: photo.id, thumbnail: Image(uiImage: replacement.image))
+                }
+                return (id: photo.id, thumbnail: Image(systemName: "photo"))
+            },
+            selectedVibes: viewModel.selectedVibes,
+            canMatch: viewModel.canMatchVibesToPhotos,
+            matchEnabled: Binding(
+                get: { viewModel.matchVibesToPhotos },
+                set: { viewModel.setMatchVibesToPhotos($0) }
+            ),
+            mappings: viewModel.vibePhotoMappings,
+            statusMessage: viewModel.vibeMappingStatusMessage,
+            onToggle: { viewModel.setMatchVibesToPhotos($0) },
+            onAssign: { id, vibe in viewModel.assignVibe(vibe, toPhotoId: id) }
+        )
+        .padding(.horizontal, -Constants.Layout.Padding.horizontal)
     }
 
     private func photoTile(_ photo: EditSpotDraftPhoto, index: Int) -> some View {

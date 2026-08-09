@@ -26,6 +26,24 @@ struct SpotPublishDraftTests {
         )
         #expect(draft.username == "Eddie5")
         #expect(draft.userProfileImageURL == "https://example.com/a.jpg")
+        #expect(draft.vibeDisplayMode == .rotating)
+    }
+
+    @Test func draftCanCarryPhotoSyncedMode() {
+        let draft = SpotPublishDraft(
+            imageJPEGs: [Data([0xFF, 0xD8, 0xFF]), Data([0xFF, 0xD8, 0xFF])],
+            coverMediaDisplayAspectRatio: 1.0,
+            vibeTags: ["A", "B"],
+            latitude: 1,
+            longitude: 2,
+            placeName: "Place",
+            userId: "11111111-1111-1111-1111-111111111111",
+            username: nil,
+            userProfileImageURL: nil,
+            sourceDraftID: nil,
+            vibeDisplayMode: .photoSynced
+        )
+        #expect(draft.vibeDisplayMode == .photoSynced)
     }
 
     @Test func publishProgressMovesForwardAcrossMultiplePhotos() {

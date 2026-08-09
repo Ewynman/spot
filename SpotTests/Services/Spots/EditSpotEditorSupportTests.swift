@@ -199,6 +199,27 @@ struct EditSpotEditorSupportTests {
         #expect(rpcParams?.p_vibe_tag_ids == [vibeId, vibeId])
         #expect(rpcParams?.p_location_name == "NYC")
         #expect(rpcParams?.p_media_items == media)
+        #expect(rpcParams?.p_vibe_display_mode == VibeDisplayMode.rotating.rawValue)
+    }
+
+    @Test func updateSpotFromEditorPassesPhotoSyncedMode() async throws {
+        let spotId = UUID()
+        var rpcParams: EditSpotEditorSupport.EditorRPCParams?
+        try await EditSpotEditorSupport.updateSpotFromEditor(
+            id: spotId,
+            vibeTags: ["A", "B"],
+            latitude: 1,
+            longitude: 2,
+            locationName: "Place",
+            media: [
+                .existing(UUID()),
+                .existing(UUID())
+            ],
+            vibeDisplayMode: .photoSynced,
+            resolveVibeId: { _ in UUID() },
+            invokeRPC: { rpcParams = $0 }
+        )
+        #expect(rpcParams?.p_vibe_display_mode == "photo_synced")
     }
 
     @Test func mediaReferenceFactoriesEncodeExistingAndReplacement() {

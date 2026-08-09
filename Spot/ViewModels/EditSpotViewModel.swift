@@ -69,14 +69,31 @@ final class EditSpotViewModel: ObservableObject {
     @Published private(set) var isSaving = false
     @Published private(set) var isDirty = false
     @Published var errorMessage: String?
+    @Published var matchVibesToPhotos = false
+    @Published var vibePhotoMappings: [UUID: String] = [:]
+    @Published var vibeMappingStatusMessage: String?
 
     private(set) var initialVibeCount = 0
     private var hasLoaded = false
     private let store: EditSpotPersisting
+    private var isPro = false
 
     init(spot: Spot, store: EditSpotPersisting = SupabaseEditSpotStore()) {
         self.spot = spot
         self.store = store
+    }
+
+    var canMatchVibesToPhotos: Bool {
+        VibePhotoMappingPolicy.isEligible(
+            photoCount: photos.count,
+            vibeCount: selectedVibes.count,
+            isPro: isPro || spot.resolvedVibeDisplayMode == .photoSynced
+        )
+    }
+
+    func setIsPro(_ value: Bool) {
+        isPro = value
+        reconcileVibePhotoMappings()
     }
 
     func load() async {
@@ -101,6 +118,15 @@ final class EditSpotViewModel: ObservableObject {
             photos = EditSpotDraftOperations.hydrate(media)
             selectedVibes = spot.displayVibeTags
             initialVibeCount = selectedVibes.count
+            if spot.resolvedVibeDisplayMode == .photoSynced,
+               let synced = spot.photoSyncedVibeLabels,
+               synced.count == photos.count {
+                matchVibesToPhotos = true
+                vibePhotoMappings = Dictionary(uniqueKeysWithValues: zip(photos.map(\.id), synced))
+            } else {
+                matchVibesToPhotos = false
+                vibePhotoMappings = [:]
+            }
             if let latitude = spot.latitude, let longitude = spot.longitude {
                 selectedLocation = LocationData(
                     coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
@@ -114,6 +140,51 @@ final class EditSpotViewModel: ObservableObject {
             errorMessage = ErrorMessageSanitizer.sanitize(error)
         }
         isLoading = false
+    }
+
+    func setMatchVibesToPhotos(_ enabled: Bool) {
+        guard enabled else {
+            matchVibesToPhotos = false
+            vibePhotoMappings = [:]
+            vibeMappingStatusMessage = nil
+            isDirty = true
+            return
+        }
+        guard canMatchVibesToPhotos else { return }
+        matchVibesToPhotos = true
+        vibePhotoMappings = VibePhotoMappingPolicy.initialMappings(
+            photoIds: photos.map(\.id),
+            vibes: selectedVibes
+        )
+        vibeMappingStatusMessage = nil
+        isDirty = true
+    }
+
+    func assignVibe(_ vibe: String, toPhotoId photoId: UUID) {
+        guard matchVibesToPhotos else { return }
+        vibePhotoMappings = VibePhotoMappingPolicy.swapMapping(
+            mappings: vibePhotoMappings,
+            photoId: photoId,
+            newVibe: vibe
+        )
+        isDirty = true
+    }
+
+    func reconcileVibePhotoMappings() {
+        // Grandfathered photo-synced posts remain editable without current Pro.
+        let treatAsPro = isPro || spot.resolvedVibeDisplayMode == .photoSynced
+        let result = VibePhotoMappingPolicy.reconcile(
+            photoIds: photos.map(\.id),
+            vibes: selectedVibes,
+            mappings: vibePhotoMappings,
+            matchEnabled: matchVibesToPhotos,
+            isPro: treatAsPro
+        )
+        if result.didInvalidate {
+            vibeMappingStatusMessage = VibePhotoMappingPolicy.unequalCountsMessage
+        }
+        matchVibesToPhotos = result.matchEnabled
+        vibePhotoMappings = result.mappings
     }
 
     func replacePhoto(id: UUID, with photo: PostComposerPhoto) {
@@ -132,6 +203,7 @@ final class EditSpotViewModel: ObservableObject {
         }
         guard let index = photos.firstIndex(where: { $0.id == id }) else { return false }
         photos.remove(at: index)
+        reconcileVibePhotoMappings()
         isDirty = true
         return true
     }
@@ -150,6 +222,7 @@ final class EditSpotViewModel: ObservableObject {
         guard !isSaving else { return false }
         if let index = selectedVibes.firstIndex(of: vibe) {
             selectedVibes.remove(at: index)
+            reconcileVibePhotoMappings()
             isDirty = true
             return true
         }
@@ -158,6 +231,7 @@ final class EditSpotViewModel: ObservableObject {
             return false
         }
         selectedVibes.append(vibe)
+        reconcileVibePhotoMappings()
         isDirty = true
         return true
     }
@@ -207,14 +281,26 @@ final class EditSpotViewModel: ObservableObject {
             }
 
             let media = try EditSpotDraftOperations.mediaReferences(for: photos)
+            let mode: VibeDisplayMode = matchVibesToPhotos ? .photoSynced : .rotating
+            let vibesForSave: [String]
+            if matchVibesToPhotos,
+               let ordered = VibePhotoMappingPolicy.orderedVibes(
+                photoIds: photos.map(\.id),
+                mappings: vibePhotoMappings
+               ) {
+                vibesForSave = ordered
+            } else {
+                vibesForSave = selectedVibes
+            }
 
             try await store.updateSpotFromEditor(
                 id: spotID,
-                vibeTags: selectedVibes,
+                vibeTags: vibesForSave,
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
                 locationName: location.placeName,
-                media: media
+                media: media,
+                vibeDisplayMode: mode
             )
 
             guard let refreshed = try await store.fetchSpotsByIds([spotID]).first else {

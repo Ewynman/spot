@@ -48,7 +48,8 @@ Deployment and secret presence must be verified independently in each project. N
 | `get_home_feed_v1`, `get_home_feed_status_v1` | Ranked feed and empty/caught-up state; feed rows include `primary_storage_bucket` for signed URLs |
 | `get_map_spots_v1` | Viewport discovery; includes `primary_storage_bucket` |
 | `record_feed_event_v1`, `recompute_my_feed_profile_v1` | Feed telemetry and profile recomputation |
-| `publish_spot_with_approved_media_assets_v1` | Atomic publish from approved assets |
+| `publish_spot_with_approved_media_assets_v1` | Atomic publish from approved assets; optional `p_vibe_display_mode` (`rotating` / `photo_synced`) |
+| `update_spot_editor_v1` | Atomic owned-spot edit (media + vibes + location + optional photo-synced mode) |
 | `submit_content_report` | Authenticated UGC report |
 | `delete_my_account` | Account and relational-data deletion |
 | `sync_current_user_v1` | Authenticated profile synchronization |
