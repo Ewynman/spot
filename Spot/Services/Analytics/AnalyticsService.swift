@@ -17,6 +17,7 @@ final class AnalyticsService {
     
     /// Log a custom event with parameters
     func logEvent(_ name: String, parameters: [String: Any]? = nil) {
+        guard !SpotLaunchConfiguration.isUnitTestMode else { return }
         var cleanParams: [String: Any]?
         
         if let params = parameters {

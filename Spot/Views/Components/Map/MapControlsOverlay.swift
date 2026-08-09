@@ -82,9 +82,9 @@ struct MapControlsOverlay: View {
     private var recenterButton: some View {
         Button(action: onRecenter) {
             Image(systemName: "location.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(Constants.Colors.buttonText)
-                .frame(width: 44, height: 44)
+                .frame(width: 50, height: 50)
                 .background(
                     Circle().fill(Constants.Colors.primary)
                 )
@@ -92,9 +92,13 @@ struct MapControlsOverlay: View {
                     Circle().stroke(Constants.Colors.background, lineWidth: 2)
                 )
                 .shadow(color: .black.opacity(0.20), radius: 4, x: 0, y: 2)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .padding(.trailing, 2)
         .accessibilityLabel("Recenter map on my location")
+        .accessibilityIdentifier("map.recenter")
     }
 }
 

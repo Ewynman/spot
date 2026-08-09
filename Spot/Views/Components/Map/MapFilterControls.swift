@@ -58,23 +58,26 @@ struct MapFilterPillRow: View {
         Button(action: { toggle(dim) }) {
             HStack(spacing: 6) {
                 Image(systemName: dim.systemImage)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text(dim.label)
                     .font(FontManager.buttonText())
             }
             .foregroundColor(active ? Constants.Colors.buttonText : Constants.Colors.primary)
-            .padding(.vertical, 6)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
             .background(
                 Capsule().fill(active ? Constants.Colors.primary : Constants.Colors.background.opacity(0.95))
             )
             .overlay(
                 Capsule().stroke(Constants.Colors.primary.opacity(active ? 0 : 0.18), lineWidth: 1)
             )
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(dim.label) filter \(active ? "on" : "off")")
         .accessibilityAddTraits(active ? [.isSelected] : [])
+        .accessibilityIdentifier("map.filter.\(dim.rawValue)")
     }
 
     private func toggle(_ dim: SpotMapFilter) {
@@ -84,6 +87,7 @@ struct MapFilterPillRow: View {
         } else {
             SpotLogger.log(MapFilterLogs.filterCleared, details: ["dim": dim.rawValue])
         }
+        MapAnalytics.filterChanged(dimensions: state.dimensions.map(\.rawValue))
         if shouldOpenVibePicker {
             onOpenVibePicker()
         }
@@ -92,6 +96,7 @@ struct MapFilterPillRow: View {
     private func clear() {
         state = .empty
         SpotLogger.log(MapFilterLogs.filterCleared, details: ["dim": "all"])
+        MapAnalytics.filterChanged(dimensions: [])
     }
 }
 

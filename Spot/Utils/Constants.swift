@@ -25,12 +25,12 @@ enum Constants {
         static let mapMarkerDot = Color(hex: "#F5F3EF")
         /// Subtle stroke on the marker outline.
         static let mapMarkerStroke = Color(hex: "#0F1A14")
-        /// Soft-cluster background fill (organic dot-cloud, no numeric bubbles).
-        static let mapDensityFill = Color(hex: "#1D2C24").opacity(0.85)
+        /// Cluster / density fill (branded circular cluster markers).
+        static let mapDensityFill = Color(hex: "#1D2C24").opacity(0.92)
         /// Filter-match highlight (accent ring/badge); subtle so it doesn't clash with green.
         static let mapFilterMatch = Color(hex: "#7AA382")
-        /// Selected pin glow ring.
-        static let mapSelectedGlow = Color(hex: "#1D2C24").opacity(0.20)
+        /// Selected pin contrasting ring (not a soft glow).
+        static let mapSelectedGlow = Color(hex: "#F5F3EF")
         /// Pro gold ring for the user-location avatar marker.
         static let proGold = Color(hex: "#C9A24A")
         /// Regular green ring for the user-location avatar marker.
@@ -188,10 +188,8 @@ enum Constants {
         /// keeps the map at neighborhood zoom instead of a wide metro ring.
         static let initialNeighborhoodRadiusMeters: Double = 3_200
 
-        /// Span thresholds (degrees) used to choose a density mode. Anything
-        /// at or below `localSpan` shows individual pins; below
-        /// `citySpan` shows individuals + slight overlap offsets; above that
-        /// drops to soft clusters.
+        /// Span thresholds retained for tests / overlap helpers. Density at
+        /// far zoom is handled by MapKit clustering rather than soft blobs.
         static let localSpan: Double = 0.04
         static let citySpan: Double = 0.30
 
@@ -200,16 +198,39 @@ enum Constants {
         /// check across long pan sessions.
         static let visibleSpotsCap: Int = 250
 
-        /// Maximum pins rendered at far zooms (cluster mode) — anything over
-        /// this is reduced to soft cluster blobs.
+        /// Legacy far-zoom pin cap (unused by MapKit clustering path).
         static let farZoomPinCap: Int = 60
 
-        /// Spot pin point size on the map (the inner rounded dot, in points).
-        static let pinSize: CGFloat = 22
+        /// Spot pin visual width (teardrop body), in points.
+        static let pinWidth: CGFloat = 30
+        /// Spot pin visual height (tip to top), in points.
+        static let pinHeight: CGFloat = 38
+        /// Invisible hit target for spot pins.
+        static let pinHitSize: CGFloat = 44
+        /// Alias used by older call sites / tests.
+        static let pinSize: CGFloat = pinWidth
         /// Selected pin scale.
-        static let pinSelectedScale: CGFloat = 1.28
+        static let pinSelectedScale: CGFloat = 1.15
         /// Pressed pin scale.
         static let pinPressedScale: CGFloat = 0.92
+        /// MapKit clustering identifier shared by all spot annotations.
+        static let spotClusteringIdentifier = "spot"
+
+        /// Cluster marker discrete sizes (not proportional to count).
+        static let clusterSizeSmall: CGFloat = 36
+        static let clusterSizeMedium: CGFloat = 40
+        static let clusterSizeLarge: CGFloat = 44
+
+        /// Compact floating preview card height (standard Dynamic Type).
+        static let compactPreviewHeight: CGFloat = 132
+        /// Compact preview thumbnail edge length.
+        static let compactPreviewThumbnail: CGFloat = 84
+        /// Side inset for the floating preview card.
+        static let compactPreviewHorizontalInset: CGFloat = 16
+        /// Gap between compact preview and tab bar / home indicator.
+        static let compactPreviewBottomGap: CGFloat = 12
+        /// Corner radius for the floating preview card.
+        static let compactPreviewCornerRadius: CGFloat = 18
 
         /// User-location avatar marker diameter.
         static let avatarMarkerSize: CGFloat = 38
@@ -222,8 +243,8 @@ enum Constants {
         static let pinStaggerCap: Double = 0.25
 
         /// Selection spring response/damping.
-        static let selectSpringResponse: Double = 0.32
-        static let selectSpringDamping: Double = 0.82
+        static let selectSpringResponse: Double = 0.18
+        static let selectSpringDamping: Double = 0.86
 
         /// Region debounce range — small pans use the lower bound, fast
         /// gestures use the upper bound (see `SharedSpotMap`).
@@ -231,8 +252,8 @@ enum Constants {
         static let regionDebounceSlowNs: UInt64 = 380_000_000   // 380 ms
 
         /// Camera offset (in points) used to keep a selected pin visually
-        /// above the bottom preview panel.
-        static let selectedPinCameraLift: CGFloat = 90
+        /// above the compact preview card.
+        static let selectedPinCameraLift: CGFloat = 72
 
         /// Quantization grid (degrees) used to detect overlapping pins for
         /// radial offset. ~5e-5 ≈ 5 m at the equator, matching what users
@@ -240,18 +261,22 @@ enum Constants {
         static let overlapBucketSize: Double = 0.00005
         /// Radial offset distance (meters) applied to overlapping pins.
         static let overlapOffsetMeters: Double = 12
+        /// When a cluster's member span is at/below this (degrees), treat as
+        /// coincident and show the carousel instead of further zooming.
+        static let coincidentClusterSpan: Double = 0.00008
 
-        /// Maximum proportion of the screen the map preview panel may consume
-        /// before its inner content scrolls. Prevents the panel from pushing
-        /// controls off-screen on small devices.
-        static let panelMaxScreenFraction: CGFloat = 0.65
-        /// Minimum panel height so the SpotCard header stays usable.
+        /// Maximum proportion of the screen the expanded detail sheet may use.
+        static let panelMaxScreenFraction: CGFloat = 0.88
+        /// Minimum panel height for legacy clamp helpers / tests.
         static let panelMinHeight: CGFloat = 280
 
-        /// Top corners for the discovery map spot drawer (bottom sheet style).
+        /// Top corners for floating preview / detail chrome.
         static let mapDrawerTopCornerRadius: CGFloat = 22
-        /// Vertical gap between the bottom of the filter pill row and the top of the spot drawer.
+        /// Vertical gap between the bottom of the filter pill row and sheets.
         static let mapDrawerGapBelowFilterPills: CGFloat = 5
+
+        /// Profile map floating context capsule height.
+        static let profileMapChromeHeight: CGFloat = 48
     }
 }
 
