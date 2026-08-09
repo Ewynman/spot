@@ -1,4 +1,5 @@
 import Foundation
+import Supabase
 
 struct EditableSpotImage: Identifiable, Equatable, Sendable {
     let id: UUID
@@ -240,5 +241,23 @@ enum EditSpotEditorSupport {
                 media: media
             )
         )
+    }
+}
+
+struct SupabaseEditSpotStore: EditSpotPersisting {
+    func fetchEditableSpotImages(id: UUID) async throws -> [EditableSpotImage] {
+        try await EditSpotEditorSupport.fetchEditableSpotImages(id: id, loadRows: { try await supabase.from("spot_images").select("id,storage_path,public_url,sort_index,storage_bucket").eq("spot_id", value: $0).order("sort_index", ascending: true).execute().value }, resolveURLs: SpotSupabaseRepository.resolveStoredImageURLs)
+    }
+
+    func prepareApprovedSpotImage(userId: UUID, jpeg: Data) async throws -> UUID {
+        try await EditSpotEditorSupport.prepareApprovedSpotImage(userId: userId, jpeg: jpeg, insert: { try await supabase.from("media_assets").insert($0).execute() }, upload: { try await supabase.storage.from(EditSpotEditorSupport.pendingImagesBucketId).upload($0, data: $1, options: FileOptions(contentType: "image/jpeg", upsert: true)) }, moderate: SpotSupabaseRepository.invokeModerateImageFunction)
+    }
+
+    func updateSpotFromEditor(id: UUID, vibeTags: [String], latitude: Double, longitude: Double, locationName: String, media: [EditSpotMediaReference]) async throws {
+        try await EditSpotEditorSupport.updateSpotFromEditor(id: id, vibeTags: vibeTags, latitude: latitude, longitude: longitude, locationName: locationName, media: media, resolveVibeId: SpotSupabaseRepository.resolveOrCreateVibeTagId, invokeRPC: { try await supabase.rpc("update_spot_editor_v1", params: $0).execute() })
+    }
+
+    func fetchSpotsByIds(_ ids: [UUID]) async throws -> [Spot] {
+        try await SpotSupabaseRepository.fetchSpotsByIds(ids)
     }
 }

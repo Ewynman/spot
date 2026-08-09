@@ -278,27 +278,6 @@ enum SpotSupabaseRepository {
         .execute()
     }
 
-    /// Edit Spot I/O seams used by `SupabaseEditSpotStore` / `EditSpotEditorSupport`.
-    static func loadEditSpotImageRows(id: UUID) async throws -> [EditSpotImageRowDTO] {
-        try await supabase.from("spot_images").select("id,storage_path,public_url,sort_index,storage_bucket").eq("spot_id", value: id).order("sort_index", ascending: true).execute().value
-    }
-
-    static func insertPendingMediaAsset(_ insert: EditSpotEditorSupport.PendingMediaAssetInsert) async throws {
-        try await supabase.from("media_assets").insert(insert).execute()
-    }
-
-    static func uploadPendingMediaAsset(path: String, jpeg: Data) async throws {
-        try await supabase.storage.from(pendingImagesBucketId).upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: true))
-    }
-
-    static func moderatePendingImageAsset(mediaAssetId: UUID) async throws -> (approved: Bool, reason: String?) {
-        try await invokeModerateImageFunction(mediaAssetId: mediaAssetId)
-    }
-
-    static func invokeUpdateSpotEditorRPC(_ params: EditSpotEditorSupport.EditorRPCParams) async throws {
-        try await supabase.rpc("update_spot_editor_v1", params: params).execute()
-    }
-
     // MARK: - Mapping
 
     private struct SpotVibeJunctionRow: Decodable {
@@ -1106,7 +1085,7 @@ enum SpotSupabaseRepository {
         return (approved, reason, keys)
     }
 
-    private static func invokeModerateImageFunction(mediaAssetId: UUID) async throws -> (approved: Bool, reason: String?) {
+    static func invokeModerateImageFunction(mediaAssetId: UUID) async throws -> (approved: Bool, reason: String?) {
         let session = try await supabase.auth.session
         supabase.functions.setAuth(token: session.accessToken)
         let url = SupabasePlist.baseURL
