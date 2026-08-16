@@ -28,7 +28,7 @@ be verified before each App Review submission; source control alone cannot prove
 | Post-auth update gate | Implemented but currently disabled pending production RPC verification | `RootView` → `TermsUpdateGateView` |
 | Report a Spot | Reason picker, optional details, optional block toggle | `SpotCard` "ellipsis" menu → `ReportSheet` |
 | Report a User | Reason picker, optional details, optional block toggle | `ProfileView` "ellipsis" menu (other user) → `ProfileReportSheet` |
-| Block a User | Confirmation alert, immediate feed removal | `ProfileView` "ellipsis" menu, also reachable from `ReportSheet`/`ProfileReportSheet` toggle |
+| Block a User | Branded confirmation naming the user (`Block @username?`), then immediate feed removal | `ProfileView` ellipsis menu and `SpotCard` ellipsis menu; also reachable from `ReportSheet`/`ProfileReportSheet` toggle |
 | Blocked Users management | List + unblock | `BlockedUsersView` (Settings) |
 
 Both report flows surface a "**Submit**" alert acknowledging the report, then

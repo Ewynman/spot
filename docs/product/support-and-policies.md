@@ -24,7 +24,7 @@ Safety entry points:
 
 - **Report a Spot** — `SpotCard` menu → `ReportSheet`.
 - **Report a profile** — another user's profile menu → `ProfileReportSheet`.
-- **Block a user** — profile or report confirmation; the feed removes that author's Spots immediately.
+- **Block a user** — profile ellipsis or Spot card ellipsis, then a branded confirmation that names the user (`Block @username?`); report sheets can also block via toggle. The feed removes that author's Spots immediately.
 - **Manage blocks** — Settings → `BlockedUsersView`.
 - **Delete account** — Settings, confirmation, and password or Sign in with Apple reauthentication.
 

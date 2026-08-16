@@ -616,13 +616,13 @@ struct ProfileView: View {
                 .environmentObject(authVM)
             }
         }
-        .alert("Block this user?", isPresented: $showBlockConfirm) {
-            Button("Cancel", role: .cancel) {}
-            Button("Block User", role: .destructive) {
-                Task { await performBlockUser() }
+        .fullScreenCover(isPresented: $showBlockConfirm) {
+            ZStack {
+                Color.clear
+                    .ignoresSafeArea()
+                blockConfirmationOverlay
             }
-        } message: {
-            Text("You won't see their spots or profile content in your feed. This also notifies Spot's moderation systems for safety review.")
+            .presentationBackground(.clear)
         }
         .alert("Couldn't block user", isPresented: Binding(
             get: { blockErrorMessage != nil },
@@ -767,6 +767,7 @@ struct ProfileView: View {
             selectedTab = "Spots"
             showMenu = false
             showOtherUserMenu = false
+            showBlockConfirm = false
             showSettingsNav = false
             showLikesNav = false
             showBookmarksNav = false
@@ -774,6 +775,22 @@ struct ProfileView: View {
             showAlgorithmNav = false
             isMapExpanded = false
         }
+    }
+
+    private var blockConfirmationOverlay: some View {
+        SpotConfirmationOverlay(
+            copy: BlockUserConfirmationCopy.make(username: viewModel.username),
+            containerAccessibilityIdentifier: "profile.blockConfirmation",
+            cancelAccessibilityIdentifier: "profile.blockCancel",
+            confirmAccessibilityIdentifier: "profile.blockConfirm",
+            onConfirm: {
+                showBlockConfirm = false
+                Task { await performBlockUser() }
+            },
+            onCancel: {
+                showBlockConfirm = false
+            }
+        )
     }
 
     /// Performs the block action for the currently viewed profile and dismisses

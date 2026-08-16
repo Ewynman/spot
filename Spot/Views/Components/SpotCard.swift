@@ -132,6 +132,8 @@ struct SpotCard: View {
     var onOpenInMap: ((Spot) -> Void)?
     @State private var measuredContentWidth: CGFloat = SpotMediaAspectRatio.estimatedFeedContentWidth()
     @State private var showDeleteConfirm: Bool = false
+    @State private var showBlockConfirm: Bool = false
+    @State private var blockInFlight: Bool = false
     @State private var showShareSheet: Bool = false
     @State private var showReportSheet: Bool = false
     @State private var showCollectionPicker: Bool = false
@@ -296,6 +298,14 @@ struct SpotCard: View {
                 Color.clear
                     .ignoresSafeArea()
                 deleteConfirmationOverlay
+            }
+            .presentationBackground(.clear)
+        }
+        .fullScreenCover(isPresented: $showBlockConfirm) {
+            ZStack {
+                Color.clear
+                    .ignoresSafeArea()
+                blockConfirmationOverlay
             }
             .presentationBackground(.clear)
         }
@@ -1013,67 +1023,59 @@ struct SpotCard: View {
     }
 
     private var deleteConfirmationOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.001)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture { showDeleteConfirm = false }
-
-            VStack(spacing: 16) {
-                Text("Delete this Spot?")
-                    .font(FontManager.sectionHeader())
-                    .foregroundColor(Constants.Colors.primary)
-
-                Text("This can’t be undone.")
-                    .font(FontManager.primaryText())
-                    .foregroundColor(.gray)
-
-                HStack(spacing: 12) {
-                    Button {
-                        showDeleteConfirm = false
-                    } label: {
-                        Text("Cancel")
-                            .font(FontManager.buttonText())
-                            .foregroundColor(Constants.Colors.primary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Constants.Colors.background)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Constants.Colors.primary, lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("spot.deleteCancel")
-
-                    Button {
-                        showDeleteConfirm = false
-                        onDelete?()
-                    } label: {
-                        Text("Delete")
-                            .font(FontManager.buttonText())
-                            .foregroundColor(Constants.Colors.buttonText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Constants.Colors.primary)
-                            .cornerRadius(14)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("spot.deleteConfirm")
-                }
+        SpotConfirmationOverlay(
+            title: "Delete this Spot?",
+            message: "This can’t be undone.",
+            confirmTitle: "Delete",
+            cancelTitle: "Cancel",
+            containerAccessibilityIdentifier: "spot.deleteConfirmation",
+            cancelAccessibilityIdentifier: "spot.deleteCancel",
+            confirmAccessibilityIdentifier: "spot.deleteConfirm",
+            onConfirm: {
+                showDeleteConfirm = false
+                onDelete?()
+            },
+            onCancel: {
+                showDeleteConfirm = false
             }
-            .padding(20)
-            .background(Constants.Colors.background)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Constants.Colors.primary.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private var blockConfirmationOverlay: some View {
+        SpotConfirmationOverlay(
+            copy: BlockUserConfirmationCopy.make(username: currentSpot.username),
+            containerAccessibilityIdentifier: "spot.blockConfirmation",
+            cancelAccessibilityIdentifier: "spot.blockCancel",
+            confirmAccessibilityIdentifier: "spot.blockConfirm",
+            onConfirm: {
+                showBlockConfirm = false
+                Task { await performBlockUser() }
+            },
+            onCancel: {
+                showBlockConfirm = false
+            }
+        )
+    }
+
+    @MainActor
+    private func performBlockUser() async {
+        guard let targetUserId = currentSpot.userId, !blockInFlight else { return }
+        blockInFlight = true
+        defer { blockInFlight = false }
+        FeedEventService.record(.blockAuthor, spotId: currentSpot.id, metadata: ["targetUserId": targetUserId])
+        do {
+            try await authVM.blockUser(userId: targetUserId)
+            NotificationCenter.default.post(
+                name: .homeFeedLocallyRemove,
+                object: nil,
+                userInfo: [SpotHomeFeedNotification.authorUserIdKey: targetUserId]
             )
-            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
-            .padding(.horizontal, 20)
+            SpotLogger.log(SpotCardLogs.userBlocked, details: ["targetUserId": targetUserId])
+        } catch {
+            showError = true
+            errorMessage = "Couldn't block user. Check your connection and try again."
+            SpotLogger.log(SpotCardLogs.blockUserFailed, details: ["error": error.localizedDescription])
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("spot.deleteConfirmation")
     }
 
     // MARK: - Custom Menu
@@ -1169,24 +1171,7 @@ struct SpotCard: View {
 
                 Button {
                     showCustomMenu = false
-                    if let targetUserId = currentSpot.userId {
-                        FeedEventService.record(.blockAuthor, spotId: currentSpot.id, metadata: ["targetUserId": targetUserId])
-                        Task {
-                            do {
-                                try await authVM.blockUser(userId: targetUserId)
-                                await MainActor.run {
-                                    NotificationCenter.default.post(
-                                        name: .homeFeedLocallyRemove,
-                                        object: nil,
-                                        userInfo: [SpotHomeFeedNotification.authorUserIdKey: targetUserId]
-                                    )
-                                }
-                                SpotLogger.log(SpotCardLogs.userBlocked, details: ["targetUserId": targetUserId])
-                            } catch {
-                                SpotLogger.log(SpotCardLogs.blockUserFailed, details: ["error": error.localizedDescription])
-                            }
-                        }
-                    }
+                    showBlockConfirm = true
                 } label: {
                     HStack {
                         Image(systemName: "circle.slash")
@@ -1197,6 +1182,7 @@ struct SpotCard: View {
                     .padding(12)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("spot.blockUserAction")
             }
 
             if isOwner, onDelete != nil {
