@@ -34,6 +34,8 @@ struct MapExperience: View {
     var onBackFromProfile: (() -> Void)? = nil
     /// When set to a new token, clears the compact preview (filter sync, tab leave).
     var clearSelectionToken: Int = 0
+    /// Internal main-tab routing request. Each request token is applied once.
+    var focusRequest: MapFocusRequest? = nil
 
     @EnvironmentObject private var authVM: AuthViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -46,6 +48,7 @@ struct MapExperience: View {
     @State private var showDetail = false
     @State private var programmaticCameraSuppressUntil: Date?
     @State private var previewRegionBaseline: MKCoordinateRegion?
+    @State private var lastAppliedFocusRequestID: UUID?
 
     private var surface: MapAnalyticsSurface {
         switch mode {
@@ -129,6 +132,12 @@ struct MapExperience: View {
                 guard token != lastClearToken else { return }
                 lastClearToken = token
                 dismissPreview(reason: "external_clear", animated: true)
+            }
+            .onAppear {
+                applyFocusRequestIfNeeded(geo: geo)
+            }
+            .onChange(of: focusRequest?.id) { _, _ in
+                applyFocusRequestIfNeeded(geo: geo)
             }
         }
         .sheet(item: detailSpotBinding) { spot in
@@ -227,7 +236,8 @@ struct MapExperience: View {
         _ spot: Spot,
         coordinate: CLLocationCoordinate2D,
         regionAtTap _: MKCoordinateRegion,
-        geo: GeometryProxy
+        geo: GeometryProxy,
+        source: String = "marker_tap"
     ) {
         carouselSpots = []
         carouselIndex = 0
@@ -245,14 +255,33 @@ struct MapExperience: View {
         scheduleProgrammaticCameraSuppression()
         focusCamera(on: coordinate, geo: geo)
         onSpotSelected?(spot)
-        MapAnalytics.markerTapped(surface: surface, spotId: spot.id)
+        if source == "marker_tap" {
+            MapAnalytics.markerTapped(surface: surface, spotId: spot.id)
+            FeedEventService.record(.mapPinTap, spotId: spot.id)
+        }
         MapAnalytics.previewShown(surface: surface, spotId: spot.id)
         SpotLogger.log(MapViewLogs.homeSheetOpen, details: [
             "surface": surface.rawValue,
-            "spotId": spot.id ?? "nil"
+            "spotId": spot.id ?? "nil",
+            "source": source
         ])
-        FeedEventService.record(.mapPinTap, spotId: spot.id)
         FeedEventService.record(.detailOpen, spotId: spot.id, metadata: ["surface": "map_preview"])
+    }
+
+    private func applyFocusRequestIfNeeded(geo: GeometryProxy) {
+        guard let request = focusRequest,
+              request.id != lastAppliedFocusRequestID else { return }
+        lastAppliedFocusRequestID = request.id
+        selectSpot(
+            request.spot,
+            coordinate: request.coordinate,
+            regionAtTap: MKCoordinateRegion(
+                center: request.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0, longitudeDelta: 0)
+            ),
+            geo: geo,
+            source: request.source.rawValue
+        )
     }
 
     private func presentCarousel(_ members: [Spot], geo: GeometryProxy) {

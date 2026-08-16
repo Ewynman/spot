@@ -85,7 +85,7 @@ struct SpotFirstRunOnboardingManagerTests {
         let defaults = SpotTestHelpers.makeIsolatedDefaults()
         let manager = SpotFirstRunOnboardingManager(storage: defaults)
         let order: [SpotFirstRunOnboardingManager.Step] = [
-            .welcome, .spotCard, .spotDetails, .vibeTag, .like, .bookmark, .creator,
+            .welcome, .spotCard, .spotDetails, .vibeTag, .like, .bookmark, .mapFlip, .creator,
             .mapTab, .userLocation, .mapMarkers, .markerPreview, .finale
         ]
         for step in order {

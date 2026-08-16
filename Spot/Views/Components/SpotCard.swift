@@ -85,6 +85,37 @@ enum SpotMenuPlacement {
         .background(Color(hex: "F5F3EF"))
 }
 
+enum SpotCardPresentation: Equatable {
+    case legacy
+    case homePlaceFirst
+}
+
+/// Home owns a place-first presentation while the legacy `SpotCard` remains
+/// the shared detail presentation for Profile, Search, collections and links.
+struct HomeSpotCard: View {
+    let spot: Spot
+    let userId: String?
+    var onDelete: (() -> Void)?
+    var onImageFailure: ((Spot) -> Void)?
+    var onImageRetry: ((Spot) -> Void)?
+    var onOpenInMap: ((Spot) -> Void)?
+
+    var body: some View {
+        SpotCard(
+            spot: spot,
+            showUserInfo: true,
+            userId: userId,
+            onDelete: onDelete,
+            source: "Feed",
+            onImageFailure: onImageFailure,
+            onImageRetry: onImageRetry,
+            mediaPresentation: .feed,
+            presentation: .homePlaceFirst,
+            onOpenInMap: onOpenInMap
+        )
+    }
+}
+
 struct SpotCard: View {
     let spot: Spot
     let showUserInfo: Bool    // show profile pic + username if true
@@ -97,6 +128,8 @@ struct SpotCard: View {
     var onImageRetry: ((Spot) -> Void)?
     /// Controls min/max media height clamps for this host (feed vs detail vs map drawer).
     var mediaPresentation: SpotMediaPresentationContext = .feed
+    var presentation: SpotCardPresentation = .legacy
+    var onOpenInMap: ((Spot) -> Void)?
     @State private var measuredContentWidth: CGFloat = SpotMediaAspectRatio.estimatedFeedContentWidth()
     @State private var showDeleteConfirm: Bool = false
     @State private var showBlockConfirm: Bool = false
@@ -126,6 +159,8 @@ struct SpotCard: View {
     @State private var toastShowsCollectionAction = false
     @State private var collectionMembershipCount: Int?
     @State private var showRemoveSavedConfirmation = false
+    @State private var homeCardModel: HomeSpotCardModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         spot: Spot,
@@ -137,7 +172,9 @@ struct SpotCard: View {
         backButtonText: String = "Back to profile",
         onImageFailure: ((Spot) -> Void)? = nil,
         onImageRetry: ((Spot) -> Void)? = nil,
-        mediaPresentation: SpotMediaPresentationContext = .feed
+        mediaPresentation: SpotMediaPresentationContext = .feed,
+        presentation: SpotCardPresentation = .legacy,
+        onOpenInMap: ((Spot) -> Void)? = nil
     ) {
         self.spot = spot
         self.showUserInfo = showUserInfo
@@ -149,8 +186,11 @@ struct SpotCard: View {
         self.onImageFailure = onImageFailure
         self.onImageRetry = onImageRetry
         self.mediaPresentation = mediaPresentation
+        self.presentation = presentation
+        self.onOpenInMap = onOpenInMap
         _currentSpot = State(initialValue: spot)
         _isSaved = State(initialValue: spot.isSaved ?? false)
+        _homeCardModel = State(initialValue: HomeSpotCardModel(spotId: spot.safeId))
     }
 
     private var authorDisplay: SpotAuthorDisplay {
@@ -165,20 +205,29 @@ struct SpotCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                header
-                spotImage
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: SpotCardContentWidthKey.self, value: geo.size.width)
+            if presentation == .homePlaceFirst {
+                homeFaces
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    spotImage
                 }
-            )
-            .onPreferenceChange(SpotCardContentWidthKey.self) { w in
-                if w > 1 { measuredContentWidth = w }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: SpotCardContentWidthKey.self, value: geo.size.width)
+                    }
+                )
+                .onPreferenceChange(SpotCardContentWidthKey.self) { w in
+                    if w > 1 { measuredContentWidth = w }
+                }
+                .measure(target: .spotDetails)
             }
-            .measure(target: .spotDetails)
+            if presentation == .homePlaceFirst {
+                Divider()
+                    .overlay(Constants.Colors.primary.opacity(0.10))
+                    .padding(.horizontal, -12)
+            }
             interactionBar
             if showError {
                 Text(errorMessage)
@@ -191,14 +240,22 @@ struct SpotCard: View {
         .padding(.horizontal, 12)
         .background(Constants.Colors.background)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(
+            color: presentation == .homePlaceFirst ? Constants.Colors.primary.opacity(0.08) : .clear,
+            radius: 8,
+            y: 3
+        )
         .measure(target: .spotCard)
+        .accessibilityIdentifier(presentation == .homePlaceFirst ? "home.spotCard" : "spot.card")
         .onChange(of: currentSpot.id) { _, _ in
             thumbnailFailed = false
             reportedImageFailure = false
             retryToken = UUID()
+            homeCardModel.reset(for: currentSpot.safeId)
         }
         .onChange(of: spot.feedRowSyncToken) { _, _ in
             currentSpot = spot
+            homeCardModel.reset(for: spot.safeId)
             thumbnailFailed = false
             reportedImageFailure = false
             retryToken = UUID()
@@ -310,6 +367,172 @@ struct SpotCard: View {
     }
 
     // MARK: - Split sections to help type-checker
+
+    private var homeFaces: some View {
+        ZStack {
+            homeFrontFace
+                .opacity(homeCardModel.face == .photo ? 1 : 0)
+                .rotation3DEffect(
+                    .degrees(homeCardModel.face == .photo || reduceMotion ? 0 : 180),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.65
+                )
+                .accessibilityHidden(homeCardModel.face != .photo)
+
+            homeBackFace
+                .opacity(homeCardModel.face == .map ? 1 : 0)
+                .rotation3DEffect(
+                    .degrees(homeCardModel.face == .map || reduceMotion ? 0 : -180),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.65
+                )
+                .accessibilityHidden(homeCardModel.face != .map)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: SpotCardContentWidthKey.self, value: geo.size.width)
+            }
+        )
+        .onPreferenceChange(SpotCardContentWidthKey.self) { width in
+            if width > 1 { measuredContentWidth = width }
+        }
+        .measure(target: .spotDetails)
+    }
+
+    private var homeFrontFace: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            homePlaceHeader
+            spotImage
+            contributorRow
+                .frame(height: 44)
+        }
+    }
+
+    private var homeBackFace: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            homePlaceHeader
+            HomeSpotMapPreview(
+                spot: currentSpot,
+                width: resolvedMediaWidth,
+                height: resolvedMediaHeight,
+                onOpen: openCurrentSpotInMap
+            )
+            .frame(width: resolvedMediaWidth, height: resolvedMediaHeight)
+            .frame(maxWidth: .infinity)
+
+            Group {
+                if let context = homeLocationContext {
+                    Text(context)
+                        .font(FontManager.primaryText())
+                        .foregroundColor(Constants.Colors.primary.opacity(0.72))
+                        .lineLimit(2)
+                        .accessibilityLabel(context)
+                } else {
+                    Color.clear
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+    }
+
+    private var homePlaceHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
+                Text(homePlaceTitle)
+                    .font(FontManager.sectionHeader())
+                    .foregroundColor(Constants.Colors.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                Spacer(minLength: 8)
+                moreActionsButton
+                    .offset(y: -8)
+            }
+
+            if let locality = homeLocality {
+                Text(locality)
+                    .font(FontManager.primaryText())
+                    .foregroundColor(Constants.Colors.primary.opacity(0.68))
+                    .lineLimit(1)
+                    .measure(target: .location)
+            }
+
+            let cardVibes = currentSpot.visibleVibeLabelsForCard()
+            if !cardVibes.isEmpty {
+                RotatingVibeTags(
+                    labels: cardVibes,
+                    syncedLabel: currentSpot.resolvedVibeDisplayMode == .photoSynced
+                        ? currentSpot.cardVibeLabel(forCommittedPhotoIndex: committedGalleryIndex)
+                        : nil,
+                    isPaused: showVibeTagsSheet,
+                    onTap: openVibeSheet
+                )
+                .fixedSize(horizontal: true, vertical: false)
+                .measure(target: .vibeTag)
+            }
+        }
+    }
+
+    @ViewBuilder private var contributorRow: some View {
+        if showUserInfo, let authorId = currentSpot.userId {
+            NavigationLink(value: Route.profile(authorId)) {
+                HStack(spacing: 8) {
+                    authorAvatar
+                    Text("shared by")
+                        .font(FontManager.primaryText())
+                        .foregroundColor(Constants.Colors.primary.opacity(0.62))
+                    Text(authorDisplay.username)
+                        .font(FontManager.primaryText())
+                        .fontWeight(.semibold)
+                        .foregroundColor(Constants.Colors.primary)
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                FeedEventService.record(.profileTap, spotId: currentSpot.id, metadata: ["targetUserId": authorId])
+            })
+            .measure(target: .creator)
+        }
+    }
+
+    @ViewBuilder private var authorAvatar: some View {
+        if let value = authorDisplay.profileImageURL, let url = URL(string: value) {
+            AsyncImage(url: url) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Circle().fill(Constants.Colors.accent)
+            }
+            .frame(width: 32, height: 32)
+            .clipShape(Circle())
+        } else {
+            Circle()
+                .fill(Constants.Colors.accent)
+                .frame(width: 32, height: 32)
+                .overlay {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Constants.Colors.primary)
+                }
+        }
+    }
+
+    private var homePlaceTitle: String {
+        SpotPlaceFormatting.title(for: currentSpot)
+    }
+
+    private var homeLocality: String? {
+        SpotPlaceFormatting.locality(for: currentSpot)
+    }
+
+    private var homeLocationContext: String? {
+        SpotPlaceFormatting.geographicContext(for: currentSpot)
+    }
+
     @ViewBuilder private var header: some View {
         HStack {
             if let backAction {
@@ -612,7 +835,7 @@ struct SpotCard: View {
     private var interactionBar: some View {
         // let _ is to be userId done to supress warnings
         HStack {
-            HStack(spacing: 16) {
+            HStack(spacing: 8) {
                 Button {
                     guard !isLoadingLike, let spotId = currentSpot.id, authVM.userId != nil else { return }
                     isLiked.toggle()
@@ -626,18 +849,26 @@ struct SpotCard: View {
                     }
                 } label: {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
-                        .font(.system(size: 22))
+                        .font(.system(size: presentation == .homePlaceFirst ? 18 : 22))
                         .foregroundColor(isLiked ? .red : .gray)
+                        .frame(width: 44, height: 44)
                         .measure(target: .likeButton)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel(isLiked ? "Unlike spot" : "Like spot")
+                .accessibilityIdentifier(presentation == .homePlaceFirst ? "home.spotCard.like" : "spot.like")
+
+                if presentation == .homePlaceFirst {
+                    Spacer()
+                }
 
                 Button {
                     handleBookmarkTap()
                 } label: {
                     Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 22))
+                        .font(.system(size: presentation == .homePlaceFirst ? 18 : 22))
                         .foregroundColor(isSaved ? Constants.Colors.primary : .gray)
+                        .frame(width: 44, height: 44)
                         .measure(target: .bookmarkButton)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -645,50 +876,58 @@ struct SpotCard: View {
                 .accessibilityLabel(isSaved ? "Remove saved spot" : "Save spot")
                 .accessibilityIdentifier("spot.bookmark")
 
-                Button {
-                    SpotLogger.log(SpotCardLogs.menuTapped, details: ["spotId": currentSpot.safeId, "source": source])
-                    showCustomMenu = true
-                } label: {
-                    Text("⋮")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Constants.Colors.primary)
-                        .frame(width: 24, height: 24, alignment: .center)
-                        .contentShape(Rectangle())
-                        .accessibilityLabel("More actions")
-                }
-                .buttonStyle(PlainButtonStyle())
-                .anchorPreference(key: MenuButtonAnchorKey.self, value: .bounds) { $0 }
-            }
+                if presentation == .homePlaceFirst {
+                    Spacer()
 
-            Spacer()
-
-            let cardVibes = currentSpot.visibleVibeLabelsForCard()
-            if !cardVibes.isEmpty {
-                let synced: String? = currentSpot.resolvedVibeDisplayMode == .photoSynced
-                    ? currentSpot.cardVibeLabel(forCommittedPhotoIndex: committedGalleryIndex)
-                    : nil
-                RotatingVibeTags(
-                    labels: cardVibes,
-                    syncedLabel: synced,
-                    isPaused: showVibeTagsSheet,
-                    onTap: { visible in
-                        FeedEventService.record(.vibeTap, spotId: currentSpot.id, metadata: ["vibe": visible])
-                        sheetActiveVibeLabel = visible
-                        showVibeTagsSheet = true
-                        AnalyticsService.shared.logEvent(Constants.Analytics.vibeSheetOpened, parameters: [
-                            "post_id": currentSpot.safeId,
-                            "image_count": currentSpot.mediaCount ?? (currentSpot.imageURLs?.count ?? 1),
-                            "vibe_count": cardVibes.count,
-                            "vibe_display_mode": currentSpot.resolvedVibeDisplayMode.rawValue,
-                            "active_vibe_id": visible
-                        ])
+                    Button(action: toggleHomeFace) {
+                        Group {
+                            if homeCardModel.face == .photo {
+                                Image("green_marker")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 18, height: 18)
+                            } else {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(Constants.Colors.primary)
+                            }
+                        }
+                        .frame(width: 44, height: 44)
+                        .measure(target: .mapFlip)
                     }
-                )
-                .fixedSize(horizontal: true, vertical: false)
-                .measure(target: .vibeTag)
+                    .buttonStyle(.plain)
+                    .disabled(!hasValidMapCoordinate || homeCardModel.isTransitioning)
+                    .opacity(hasValidMapCoordinate ? 1 : 0.35)
+                    .accessibilityLabel(homeCardModel.face == .photo ? "Show spot on map" : "Return to photo")
+                    .accessibilityIdentifier("home.spotCard.flip")
+                }
+
+                if presentation == .legacy {
+                    moreActionsButton
+                }
+            }
+            .frame(maxWidth: presentation == .homePlaceFirst ? .infinity : nil)
+
+            if presentation == .legacy {
+                Spacer()
+
+                let cardVibes = currentSpot.visibleVibeLabelsForCard()
+                if !cardVibes.isEmpty {
+                    let synced: String? = currentSpot.resolvedVibeDisplayMode == .photoSynced
+                        ? currentSpot.cardVibeLabel(forCommittedPhotoIndex: committedGalleryIndex)
+                        : nil
+                    RotatingVibeTags(
+                        labels: cardVibes,
+                        syncedLabel: synced,
+                        isPaused: showVibeTagsSheet,
+                        onTap: openVibeSheet
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                    .measure(target: .vibeTag)
+                }
             }
         }
-        .padding(.leading, 16)
+        .padding(.horizontal, presentation == .homePlaceFirst ? 0 : 4)
         .frame(width: resolvedMediaWidth, alignment: .leading)
         .frame(maxWidth: .infinity)
         .padding(.bottom, 10)
@@ -704,6 +943,83 @@ struct SpotCard: View {
                 )
             }
         )
+    }
+
+    private var moreActionsButton: some View {
+        Button {
+            SpotLogger.log(SpotCardLogs.menuTapped, details: [
+                "spotId": currentSpot.safeId,
+                "source": source
+            ])
+            showCustomMenu = true
+        } label: {
+            Text("⋮")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(Constants.Colors.primary)
+                .frame(width: 44, height: 44, alignment: .center)
+                .contentShape(Rectangle())
+                .accessibilityLabel("More actions")
+        }
+        .buttonStyle(.plain)
+        .anchorPreference(key: MenuButtonAnchorKey.self, value: .bounds) { $0 }
+    }
+
+    private var hasValidMapCoordinate: Bool {
+        SpotPlaceFormatting.coordinate(for: currentSpot) != nil
+    }
+
+    private func toggleHomeFace() {
+        guard hasValidMapCoordinate else {
+            SpotLogger.log(SpotCardLogs.invalidMapCoordinate, details: [
+                "source": source,
+                "spotId": currentSpot.safeId,
+                "reason": "invalid_map_coordinate"
+            ])
+            return
+        }
+
+        var next = homeCardModel
+        guard next.beginToggle() else { return }
+        let showingMap = next.face == .map
+        let duration = reduceMotion ? 0.18 : 0.32
+        withAnimation(.easeInOut(duration: duration)) {
+            homeCardModel = next
+        }
+        AnalyticsService.shared.logEvent(
+            showingMap ? "home_spot_flip_to_map" : "home_spot_flip_to_photo",
+            parameters: [
+                "spot_id": currentSpot.safeId,
+                "source": "home",
+                "has_description": homeLocationContext != nil
+            ]
+        )
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            homeCardModel.completeToggle()
+        }
+    }
+
+    private func openCurrentSpotInMap() {
+        guard hasValidMapCoordinate else { return }
+        AnalyticsService.shared.logEvent("home_spot_open_in_map", parameters: [
+            "spot_id": currentSpot.safeId,
+            "source": "home"
+        ])
+        onOpenInMap?(currentSpot)
+    }
+
+    private func openVibeSheet(_ visible: String) {
+        let cardVibes = currentSpot.visibleVibeLabelsForCard()
+        FeedEventService.record(.vibeTap, spotId: currentSpot.id, metadata: ["vibe": visible])
+        sheetActiveVibeLabel = visible
+        showVibeTagsSheet = true
+        AnalyticsService.shared.logEvent(Constants.Analytics.vibeSheetOpened, parameters: [
+            "post_id": currentSpot.safeId,
+            "image_count": currentSpot.mediaCount ?? (currentSpot.imageURLs?.count ?? 1),
+            "vibe_count": cardVibes.count,
+            "vibe_display_mode": currentSpot.resolvedVibeDisplayMode.rawValue,
+            "active_vibe_id": visible
+        ])
     }
 
     private var deleteConfirmationOverlay: some View {
