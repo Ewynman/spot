@@ -20,6 +20,19 @@ The **home feed** is the default discovery surface after launch: a ranked, pagin
 
 After publishing, the completed Spot is inserted at the top of the current in-memory feed. The app does not immediately replace the entire feed with a new ranked page; a later user refresh remains authoritative.
 
+### Home Spot card
+
+Home uses a place-first `HomeSpotCard` rather than the shared detail-oriented `SpotCard`. The card leads with the place and its primary photo while keeping the creator, vibe tags, Like, and Save available without opening another presentation.
+
+Each card has two explicit faces:
+
+- **Photo face** — the primary place-discovery view.
+- **Map face** — a lightweight snapshot preview of the Spot's location.
+
+The card changes faces only through the identifiable flip control; tapping the card body is not an implicit flip gesture. The map face contains **Open in Map**, which stays inside Spot: it selects the Map tab and sends a focus request for that Spot so the map can center it, select it, and present its spot drawer. The control does not launch Apple Maps.
+
+The card returns to its photo face when reused for a different Spot. With Reduce Motion enabled, the face change uses a crossfade instead of a 3D flip. See [the Home Spot card flow](../diagrams/home-spot-card-flow.md).
+
 ### Ranking behavior
 
 - **Server-side candidate set and ranking** via `get_home_feed_v1` (authoritative for production feed).
@@ -58,6 +71,8 @@ The page size is 24. Pagination is not offset-based: each load-more request asks
 
 - [../engineering/architecture.md](../engineering/architecture.md)
 - [../engineering/networking-and-auth.md](../engineering/networking-and-auth.md)
+- [map-experience.md](map-experience.md)
+- [../diagrams/home-spot-card-flow.md](../diagrams/home-spot-card-flow.md)
 - [profiles-and-social.md](profiles-and-social.md)
 
 ## Open questions / TODOs

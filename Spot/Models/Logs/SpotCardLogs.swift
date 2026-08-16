@@ -21,6 +21,8 @@ enum SpotCardLogs: SpotLog {
     case userBlocked
     case blockUserFailed
     case deleteTapped
+    case invalidMapCoordinate
+    case mapPreviewFailed
 
     var tag: String { "SpotCard" }
     var level: LogLevel {
@@ -38,6 +40,7 @@ enum SpotCardLogs: SpotLog {
         case .userBlocked: return .info
         case .blockUserFailed: return .error
         case .deleteTapped: return .debug
+        case .invalidMapCoordinate, .mapPreviewFailed: return .error
         }
     }
     var message: String {
@@ -55,6 +58,8 @@ enum SpotCardLogs: SpotLog {
         case .userBlocked: return "User blocked"
         case .blockUserFailed: return "Failed to block user"
         case .deleteTapped: return "Delete tapped"
+        case .invalidMapCoordinate: return "Home card has invalid map coordinate"
+        case .mapPreviewFailed: return "Home card map preview failed"
         }
     }
 }

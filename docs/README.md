@@ -78,6 +78,7 @@ Code and workflow behavior were re-audited on **2026-08-06** (coverage scope, Se
 | [diagrams/onboarding-flow.md](diagrams/onboarding-flow.md) | Onboarding |
 | [diagrams/posting-flow.md](diagrams/posting-flow.md) | Posting and moderation |
 | [diagrams/image-moderation-flow.md](diagrams/image-moderation-flow.md) | Moderation sequence |
+| [diagrams/home-spot-card-flow.md](diagrams/home-spot-card-flow.md) | Home card flip and in-app Map focus |
 | [diagrams/map-spot-drawer-flow.md](diagrams/map-spot-drawer-flow.md) | Map drawer state |
 | [diagrams/universal-links-flow.md](diagrams/universal-links-flow.md) | Universal Links sequence |
 | [diagrams/supabase-rls-flow.md](diagrams/supabase-rls-flow.md) | RLS decision flow |

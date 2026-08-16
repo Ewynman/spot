@@ -53,6 +53,17 @@ struct SpotSaveFlowGuardTests {
         #expect(source.contains("Text(\"Manage collections\")"))
     }
 
+    @Test func homeCardReusesCanonicalLikeAndSavePaths() throws {
+        let card = try Self.contents("Spot/Views/Components/SpotCard.swift")
+        let feed = try Self.contents("Spot/Views/Components/FeedContentView.swift")
+
+        #expect(feed.contains("HomeSpotCard("))
+        #expect(card.contains("presentation: .homePlaceFirst"))
+        #expect(card.contains("authVM.likeSpot(spotId)"))
+        #expect(card.contains("authVM.unlikeSpot(spotId)"))
+        #expect(card.contains("UserSpotService.shared.setBookmark(spotId: spotId, isSaved: target)"))
+    }
+
     private static func contents(_ relativePath: String) throws -> String {
         try String(
             contentsOf: repoRoot.appendingPathComponent(relativePath),

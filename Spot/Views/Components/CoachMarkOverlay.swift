@@ -505,7 +505,7 @@ struct SpotFirstRunOnboardingOverlay: View {
     private var shouldShowFallbackSpot: Bool {
         guard targetRect == nil else { return false }
         switch manager.currentStep {
-        case .spotCard, .spotDetails, .vibeTag, .like, .bookmark, .creator:
+        case .spotCard, .spotDetails, .vibeTag, .like, .bookmark, .mapFlip, .creator:
             return true
         default:
             return false
@@ -543,7 +543,7 @@ struct SpotFirstRunOnboardingOverlay: View {
 
     private func cornerRadius(for step: SpotFirstRunOnboardingManager.Step) -> CGFloat {
         switch step {
-        case .like, .bookmark, .mapTab, .userLocation, .mapMarkers:
+        case .like, .bookmark, .mapFlip, .mapTab, .userLocation, .mapMarkers:
             return 22
         case .vibeTag:
             return 18

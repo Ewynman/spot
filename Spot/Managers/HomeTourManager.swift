@@ -70,6 +70,7 @@ final class SpotFirstRunOnboardingManager: ObservableObject {
         case vibeTag
         case like
         case bookmark
+        case mapFlip
         case creator
         case mapTab
         case userLocation
@@ -91,6 +92,8 @@ final class SpotFirstRunOnboardingManager: ObservableObject {
                 return .likeButton
             case .bookmark:
                 return .bookmarkButton
+            case .mapFlip:
+                return .mapFlip
             case .creator:
                 return .creator
             case .mapTab:
@@ -111,13 +114,15 @@ final class SpotFirstRunOnboardingManager: ObservableObject {
             case .spotCard:
                 return "This is a Spot"
             case .spotDetails:
-                return "Get the full context"
+                return "Place first"
             case .vibeTag:
                 return "Vibe Tags are the magic"
             case .like:
                 return "Like what fits your taste"
             case .bookmark:
                 return "Save places for later"
+            case .mapFlip:
+                return "Flip to see where it is"
             case .creator:
                 return "Follow people with great taste"
             case .mapTab:
@@ -140,15 +145,17 @@ final class SpotFirstRunOnboardingManager: ObservableObject {
             case .spotCard:
                 return "A saved place recommendation from someone, centered around vibe and discovery."
             case .spotDetails:
-                return "Photos, location, creator, and activity help you decide what is worth saving."
+                return "The place name, location, vibe, and photo come first so you know what this Spot is about."
             case .vibeTag:
                 return "They describe how a place feels, not just what category it fits into."
             case .like:
                 return "Likes help you react to Spots that feel right."
             case .bookmark:
                 return "Bookmark Spots you want to remember or visit."
+            case .mapFlip:
+                return "Tap the green marker to flip the card and see the location. From the map side, Open in Map takes you to the Map tab focused on this Spot."
             case .creator:
-                return "Spots come from people. Follow the ones who match your vibe."
+                return "Shared-by shows who recommended the place. Follow people whose taste matches yours."
             case .mapTab:
                 return "Tap Map to see Spots around you."
             case .userLocation:

@@ -54,7 +54,7 @@ Most services are shared singletons. Screen-owned view models use `@StateObject`
 
 | Surface | Runtime path | Pagination / cache |
 | --- | --- | --- |
-| Home | `HomepageView` → `FeedViewModel` → `FeedRepository` → `FeedAPI` → `get_home_feed_v1` | 24 rows; server impression dedupe, client dedupe; first-page `FeedDiversity` |
+| Home | `HomepageView` → `FeedViewModel` → `FeedRepository` → `FeedAPI` → `get_home_feed_v1`; rows render with `HomeSpotCard` | 24 rows; server impression dedupe, client dedupe; first-page `FeedDiversity` |
 | Map | `MapView` → `MapViewModel` → `MapViewportLoader` → `FeedAPI.get_map_spots_v1` | Viewport request; 250-pin cap; 60-second actor cache |
 | Search | `SearchView` → `SearchViewModel` → `SearchService` → `SpotSearchDataSource` / repository | 24-row offset pages for Spot grids |
 | Profile | `ProfileView` → `ProfileViewModel` → `ProfileService` / `UserSpotService` | Visibility check before loading private-author Spots |
@@ -64,14 +64,16 @@ All application data reads use Supabase. RLS and server visibility functions are
 
 ## Spot presentation
 
-There is no dedicated `SpotDetailView`. `SpotCard` is the shared detail presentation:
+There is no dedicated `SpotDetailView`. Home has its own place-first `HomeSpotCard`, with an explicit photo/map flip and an internal **Open in Map** action. `SpotCard` remains the shared detail presentation on:
 
-- inline in the home feed;
-- inside the map spot drawer through `MapSpotPreviewCard`;
-- selected from Search or profile grids;
+- selected Search, profile, bookmark, and collection grids;
 - full-screen over the tab shell for deep links.
 
+The production Map surface uses `SpotPreviewCard` and `SpotDetailSheet`, not `SpotCard`.
+
 `SpotImageGallery` lazily fetches and signs the full image set after the primary image is shown.
+
+Home's **Open in Map** action selects the Map tab and passes a one-shot focus request for the same Spot. The Map surface consumes that request to focus and select the Spot and show its drawer; this is in-app navigation, not an external map handoff. See [the Home Spot card flow](../diagrams/home-spot-card-flow.md).
 
 ## Write and safety flows
 
@@ -136,4 +138,5 @@ See the linked safety and feature docs before changing these paths.
 - [networking-and-auth.md](networking-and-auth.md)
 - [storage-and-media.md](storage-and-media.md)
 - [../product/user-flows.md](../product/user-flows.md)
+- [../diagrams/home-spot-card-flow.md](../diagrams/home-spot-card-flow.md)
 - [../diagrams/README.md](../diagrams/README.md)
