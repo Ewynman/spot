@@ -143,6 +143,8 @@ struct SharedSpotMap: UIViewRepresentable {
         private var didApplyExplicitCameraFromParent = false
         /// Suppress `onDeselect` when selection is driven by SwiftUI state.
         private var suppressDeselectCallback = false
+        /// Suppress `onSelect` when selection is driven by SwiftUI state.
+        private var suppressSelectCallback = false
 
         init(_ parent: SharedSpotMap) {
             self.parent = parent
@@ -161,13 +163,18 @@ struct SharedSpotMap: UIViewRepresentable {
         // MARK: - Data application
 
         func applyData(map: MKMapView, spots: [Spot], selectedSpotId: String?) {
-            let modelSpots = SpotMapDisplayFilter.spotsToDisplay(
+            var modelSpots = SpotMapDisplayFilter.spotsToDisplay(
                 spots,
                 filter: parent.filter,
                 savedSpotIds: parent.savedSpotIds,
                 likedSpotIds: parent.likedSpotIds,
                 followedUserIds: parent.followedUserIds
             )
+            if let selectedSpotId,
+               !modelSpots.contains(where: { $0.id == selectedSpotId }),
+               let selectedSpot = spots.first(where: { $0.id == selectedSpotId }) {
+                modelSpots.append(selectedSpot)
+            }
 
             let displayed = parent.resolved(spots: modelSpots)
 
@@ -241,7 +248,9 @@ struct SharedSpotMap: UIViewRepresentable {
                     for sel in currentlySelected {
                         map.deselectAnnotation(sel, animated: false)
                     }
+                    suppressSelectCallback = true
                     map.selectAnnotation(ann, animated: false)
+                    suppressSelectCallback = false
                     suppressDeselectCallback = false
                 }
             } else if !currentlySelected.isEmpty {
@@ -421,6 +430,7 @@ struct SharedSpotMap: UIViewRepresentable {
                 v.apply(state: .selected, animated: true)
             }
             SpotLogger.log(MapMarkerLogs.markerSelected, details: ["spotId": ann.spot.id ?? "nil"])
+            guard !suppressSelectCallback else { return }
             let regionSnapshot = mapView.region
             parent.onSelect(ann.spot, ann.coordinate, regionSnapshot)
         }

@@ -77,7 +77,7 @@ final class SpotAnnotationView: MKAnnotationView {
         let pinRect = CGRect(origin: pinOrigin, size: CGSize(width: pinW, height: pinH))
 
         bodyLayer.frame = frame
-        bodyLayer.path = Self.teardropPath(in: pinRect).cgPath
+        bodyLayer.path = SpotMarkerGeometry.path(in: pinRect)
         bodyLayer.fillColor = UIColor(Constants.Colors.mapMarkerGreen).cgColor
         bodyLayer.strokeColor = UIColor(Constants.Colors.mapMarkerStroke).cgColor
         bodyLayer.lineWidth = 1
@@ -88,7 +88,7 @@ final class SpotAnnotationView: MKAnnotationView {
         layer.addSublayer(bodyLayer)
 
         ringLayer.frame = frame
-        ringLayer.path = Self.teardropPath(in: pinRect.insetBy(dx: -2, dy: -2)).cgPath
+        ringLayer.path = SpotMarkerGeometry.path(in: pinRect.insetBy(dx: -2, dy: -2))
         ringLayer.fillColor = UIColor.clear.cgColor
         ringLayer.strokeColor = UIColor(Constants.Colors.mapSelectedGlow).cgColor
         ringLayer.lineWidth = 2
@@ -106,38 +106,6 @@ final class SpotAnnotationView: MKAnnotationView {
         dotLayer.path = UIBezierPath(ovalIn: dotLayer.bounds).cgPath
         dotLayer.fillColor = UIColor(Constants.Colors.mapMarkerDot).cgColor
         layer.addSublayer(dotLayer)
-    }
-
-    /// Classic simplified map-pin / teardrop silhouette.
-    static func teardropPath(in rect: CGRect) -> UIBezierPath {
-        let path = UIBezierPath()
-        let w = rect.width
-        let h = rect.height
-        let cx = rect.midX
-        let top = rect.minY
-        let tipY = rect.maxY
-        let bulbBottom = top + w * 0.92
-
-        path.move(to: CGPoint(x: cx, y: tipY))
-        path.addCurve(
-            to: CGPoint(x: rect.minX, y: top + w * 0.45),
-            controlPoint1: CGPoint(x: cx - w * 0.08, y: tipY - h * 0.18),
-            controlPoint2: CGPoint(x: rect.minX, y: bulbBottom)
-        )
-        path.addArc(
-            withCenter: CGPoint(x: cx, y: top + w * 0.45),
-            radius: w * 0.5,
-            startAngle: .pi,
-            endAngle: 0,
-            clockwise: true
-        )
-        path.addCurve(
-            to: CGPoint(x: cx, y: tipY),
-            controlPoint1: CGPoint(x: rect.maxX, y: bulbBottom),
-            controlPoint2: CGPoint(x: cx + w * 0.08, y: tipY - h * 0.18)
-        )
-        path.close()
-        return path
     }
 
     override func prepareForReuse() {

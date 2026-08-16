@@ -10,6 +10,7 @@ enum CoachTarget: Hashable {
     case spotDetails
     case likeButton
     case bookmarkButton
+    case mapFlip
     case creator
     case mapTab
     case mapUserLocation

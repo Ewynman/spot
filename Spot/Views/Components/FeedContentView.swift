@@ -27,11 +27,14 @@ struct FeedContentView: View {
     var emptyStatus: String? = nil
     var onCellAppear: ((Spot) -> Void)? = nil
     var onCellDisappear: ((Spot) -> Void)? = nil
+    /// Ensures a Spot exists in the feed before Open-in-Map return scroll.
+    var onEnsureSpotVisible: ((Spot) -> Void)? = nil
 
     @State private var firstItemRecorded = false
     @State private var failedImageSpotIds: Set<String> = []
     @State private var lastLoadTriggerSpotId: String?
     @State private var visibleErrorMessage: String?
+    @State private var didAttemptHomeReturnScroll = false
 
     private static let feedScrollTopId = "feedScrollTopAnchor"
 
@@ -107,21 +110,23 @@ struct FeedContentView: View {
                             if (spot.imageURL ?? "").isEmpty {
                                 SkeletonSpotCard()
                             } else {
-                                SpotCard(
+                                HomeSpotCard(
                                     spot: spot,
-                                    showUserInfo: true,
                                     userId: userId,
                                     onDelete: { onDeleteSpot(spot) },
-                                    source: "Feed",
                                     onImageFailure: { failed in
                                         if let failedId = failed.id { failedImageSpotIds.insert(failedId) }
                                     },
                                     onImageRetry: { retrySpot in
                                         if let rid = retrySpot.id { failedImageSpotIds.remove(rid) }
+                                    },
+                                    onOpenInMap: { spot in
+                                        MapFocusCoordinator.shared.requestFocus(on: spot, source: .homeSpotCard)
                                     }
                                 )
                             }
                         }
+                        .id(spot.safeId)
                         .onAppear {
                             if (spot.imageURL ?? "").isEmpty {
                                 SpotLogger.log(FeedContentViewLogs.missingImageUrl, details: ["spotId": spot.safeId])
@@ -162,9 +167,34 @@ struct FeedContentView: View {
                 if spots.isEmpty {
                     lastLoadTriggerSpotId = nil
                 }
+                attemptHomeReturnScroll(proxy: proxy)
+            }
+            .onAppear {
+                attemptHomeReturnScroll(proxy: proxy)
             }
             .onReceive(NotificationCenter.default.publisher(for: .mainTabReselectSame)) { output in
                 scrollFeedToTopIfNeeded(proxy: proxy, output: output)
+            }
+        }
+    }
+
+    private func attemptHomeReturnScroll(proxy: ScrollViewProxy) {
+        guard !didAttemptHomeReturnScroll else { return }
+        guard !spots.isEmpty else { return }
+        guard let pending = MapFocusCoordinator.shared.peekHomeReturn() else { return }
+
+        if !spots.contains(where: { $0.safeId == pending.spotID }),
+           let snapshot = pending.spot {
+            onEnsureSpotVisible?(snapshot)
+        }
+
+        guard let consumed = MapFocusCoordinator.shared.consumeHomeReturn() else { return }
+        didAttemptHomeReturnScroll = true
+        Task { @MainActor in
+            // Allow LazyVStack to materialize an inserted row before scrolling.
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(consumed.spotID, anchor: .top)
             }
         }
     }

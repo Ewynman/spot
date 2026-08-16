@@ -16,6 +16,7 @@ struct MapView: View {
 
     @StateObject private var mapVM = MapViewModel()
     @StateObject private var locationManager = LocationManager.shared
+    @ObservedObject private var mapFocusCoordinator = MapFocusCoordinator.shared
     @EnvironmentObject var authVM: AuthViewModel
     @EnvironmentObject var permissionManager: PermissionManager
 
@@ -31,6 +32,7 @@ struct MapView: View {
     @State private var selectedSpotId: String?
     @State private var previewBottomReserved: CGFloat = 0
     @State private var clearSelectionToken: Int = 0
+    @State private var activeFocusRequest: MapFocusRequest?
 
     init(spots _: [Spot] = []) {}
 
@@ -40,7 +42,7 @@ struct MapView: View {
                 ZStack(alignment: .bottom) {
                     MapExperience(
                         mode: .global,
-                        spots: mapVM.visibleSpots,
+                        spots: renderedSpots,
                         cameraIntent: $cameraIntent,
                         filter: filterState,
                         savedSpotIds: Set(authVM.bookmarkedSpots),
@@ -52,16 +54,21 @@ struct MapView: View {
                             handleMapRegionChanged(region)
                         },
                         onSpotSelected: { spot in
+                            if activeFocusRequest?.spotID != spot.id {
+                                activeFocusRequest = nil
+                            }
                             selectedSpotId = spot.id
                             previewBottomReserved = Constants.MapDesign.compactPreviewHeight
                                 + Constants.MapDesign.compactPreviewBottomGap
                                 + max(geo.safeAreaInsets.bottom, 0)
                         },
                         onSpotDeselected: {
+                            activeFocusRequest = nil
                             selectedSpotId = nil
                             previewBottomReserved = 0
                         },
-                        clearSelectionToken: clearSelectionToken
+                        clearSelectionToken: clearSelectionToken,
+                        focusRequest: activeFocusRequest
                     )
                     .ignoresSafeArea()
                     .overlay { mapOnboardingTargets }
@@ -123,10 +130,15 @@ struct MapView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .accessibilityIdentifier("map.screen")
+        .onChange(of: mapFocusCoordinator.pendingRequest?.id) { _, requestID in
+            guard let requestID else { return }
+            applyPendingMapFocus(expectedID: requestID)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mainTabReselectSame)) { output in
             guard (output.userInfo?[SpotMainTabNotification.userInfoTabIndexKey] as? Int) == 1 else { return }
             showVibePicker = false
             selectedSpotId = nil
+            activeFocusRequest = nil
             previewBottomReserved = 0
             clearSelectionToken += 1
         }
@@ -160,6 +172,16 @@ struct MapView: View {
 
     // MARK: - Lifecycle
 
+    private var renderedSpots: [Spot] {
+        guard let focusedSpot = activeFocusRequest?.spot else {
+            return mapVM.visibleSpots
+        }
+        return MapViewModel.mergeRetainingExisting(
+            current: mapVM.visibleSpots,
+            fresh: [focusedSpot]
+        )
+    }
+
     private func onAppear(geo _: GeometryProxy) {
         SpotLogger.log(MapViewLogs.mapAppeared, details: [
             "auth": authStatusLabel(permissionManager.locationStatus),
@@ -173,6 +195,9 @@ struct MapView: View {
 
         if authVM.userId != nil {
             authVM.refreshUserFlags()
+        }
+        if applyPendingMapFocus() || activeFocusRequest != nil {
+            return
         }
         performInitialFitIfNeeded()
 
@@ -214,9 +239,27 @@ struct MapView: View {
         userHasMovedMap = false
         lastCenteredCoordinate = nil
         selectedSpotId = nil
+        activeFocusRequest = nil
         previewBottomReserved = 0
         clearSelectionToken += 1
         mapVM.clearVisibleSpots()
+    }
+
+    @discardableResult
+    private func applyPendingMapFocus(expectedID: UUID? = nil) -> Bool {
+        guard let request = mapFocusCoordinator.consumePending(id: expectedID) else {
+            return false
+        }
+        activeFocusRequest = request
+        selectedSpotId = request.spotID
+        userHasMovedMap = true
+        cameraIntent = .none
+        let region = MapCameraRegion.neighborhood(
+            center: request.coordinate,
+            radiusMeters: Constants.MapDesign.initialNeighborhoodRadiusMeters
+        )
+        mapVM.loadForRegion(region)
+        return true
     }
 
     private func handleLocationAuthorizationChange(
@@ -419,6 +462,9 @@ struct MapView: View {
     }
 
     private func syncMapSelectionWithActiveFilter(_ filter: SpotMapFilterState) {
+        if activeFocusRequest?.spotID == selectedSpotId {
+            return
+        }
         guard let id = selectedSpotId,
               let sel = mapVM.visibleSpots.first(where: { $0.id == id }) else { return }
         guard filter.isActive else { return }

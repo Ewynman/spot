@@ -39,6 +39,9 @@ struct HomepageView: View {
                     },
                     onCellDisappear: { spot in
                         FeedEventService.recordCellLeftViewport(spot: spot)
+                    },
+                    onEnsureSpotVisible: { spot in
+                        feedVM.insertNewSpot(spot)
                     }
                 )
             }
@@ -115,9 +118,9 @@ struct HomepageView: View {
         .environmentObject(AuthViewModel())
 }
 
-// SpotCard Preview
+// Place-first Home card preview
 #Preview {
-    SpotCard(spot: Spot(
+    HomeSpotCard(spot: Spot(
         id: "test123",
         userId: "user123",
         username: "TestUser",
@@ -131,5 +134,6 @@ struct HomepageView: View {
         isLiked: false,
         isSaved: false,
         createdAt: Date()
-    ))
+    ), userId: "user123")
+    .environmentObject(AuthViewModel())
 }

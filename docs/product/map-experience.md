@@ -24,6 +24,8 @@ Interaction model:
 2. Tap spot → compact actionable preview
 3. Optionally open full Spot detail
 
+Home can also initiate this flow. Choosing **Open in Map** from a `HomeSpotCard` sends an in-app focus request for that Spot and selects the Map tab. The Map consumes the request, centers on and selects the requested Spot, and opens its spot drawer. This preserves the Spot context without handing off to Apple Maps.
+
 ### Pins and clusters
 
 - Individual markers are vector teardrop pins (`SpotAnnotationView`) with tip-aligned geography.
@@ -67,7 +69,13 @@ Firebase events (via `MapAnalytics`): `map_marker_tapped`, `map_cluster_tapped`,
 ```mermaid
 flowchart TD
   A[User opens map] --> B[Load visible Spots]
-  B --> C[Render pins / clusters]
+  A2[Home: Open in Map] --> A3[Select Map tab + send Spot focus request]
+  A3 --> B
+  B --> B2{Pending Home focus request?}
+  B2 -->|Yes| B3[Center and select requested Spot]
+  B3 --> E
+  B2 -->|No| C
+  C[Render pins / clusters]
   C --> D{User taps pin?}
   D -->|Yes| E[Show compact SpotPreviewCard]
   E --> F{Like / Save?}
@@ -82,6 +90,8 @@ flowchart TD
 
 ## Related docs
 
+- [home-feed.md](home-feed.md)
+- [../diagrams/home-spot-card-flow.md](../diagrams/home-spot-card-flow.md)
 - [../diagrams/map-spot-drawer-flow.md](../diagrams/map-spot-drawer-flow.md)
 - [pro-subscription.md](pro-subscription.md)
 - [../engineering/logging.md](../engineering/logging.md)
