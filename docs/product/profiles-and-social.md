@@ -20,7 +20,7 @@ A **profile** shows a user’s identity, Spots, collections/bookmarks as impleme
 
 When a profile has no visible Spots, the Spots area explains the empty state. On the current user's own profile, it also offers a **Post a Spot** action that opens the Post tab. Other users' empty profiles do not show that action, and private profiles explain that following is required to view their Spots.
 
-Opening a Spot from the profile replaces the profile grid/map controls with the Spot detail card until the user returns. The main profile view model is retained across bottom-tab switches so revisiting the profile reuses loaded data, while explicit profile mutations can still force a refresh. Spot deletion uses one branded in-card confirmation.
+Opening a Spot from the profile replaces the profile grid/map controls with the Spot detail card until the user returns. The main profile view model is retained across bottom-tab switches so revisiting the profile reuses loaded data, while explicit profile mutations can still force a refresh. Spot deletion uses one branded in-card confirmation. Blocking another user from the profile ellipsis or a Spot card ellipsis uses the same branded confirmation and names the account (`Block @username?`).
 
 ### Public vs private
 
