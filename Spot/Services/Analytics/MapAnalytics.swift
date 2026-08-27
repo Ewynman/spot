@@ -12,12 +12,64 @@ enum MapAnalyticsSurface: String {
     case profile
 }
 
+/// Identifier for the visual style of a map marker at the moment an
+/// analytics event fires. Written to Firebase as-is so both variants are
+/// visible in `map_marker_tapped` / `map_marker_impression` breakdowns
+/// during and after the Concept 3 rollout.
+enum MapMarkerAnalyticsType: String {
+    case photoPin = "photo_pin"
+    case teardrop
+}
+
 @MainActor
 enum MapAnalytics {
-    static func markerTapped(surface: MapAnalyticsSurface, spotId: String?) {
-        AnalyticsService.shared.logEvent("map_marker_tapped", parameters: [
+    static func markerTapped(
+        surface: MapAnalyticsSurface,
+        spotId: String?,
+        markerType: MapMarkerAnalyticsType = .photoPin,
+        zoomLevel: Double? = nil
+    ) {
+        var params: [String: Any] = [
             "surface": surface.rawValue,
-            "spot_id": spotId ?? "nil"
+            "spot_id": spotId ?? "nil",
+            "marker_type": markerType.rawValue
+        ]
+        if let zoomLevel {
+            params["zoom_level"] = zoomLevel
+        }
+        AnalyticsService.shared.logEvent("map_marker_tapped", parameters: params)
+    }
+
+    static func markerImpression(
+        surface: MapAnalyticsSurface,
+        spotId: String?,
+        markerType: MapMarkerAnalyticsType = .photoPin,
+        zoomLevel: Double? = nil
+    ) {
+        var params: [String: Any] = [
+            "surface": surface.rawValue,
+            "spot_id": spotId ?? "nil",
+            "marker_type": markerType.rawValue
+        ]
+        if let zoomLevel {
+            params["zoom_level"] = zoomLevel
+        }
+        AnalyticsService.shared.logEvent("map_marker_impression", parameters: params)
+    }
+
+    static func markerImageLoad(
+        surface: MapAnalyticsSurface,
+        spotId: String?,
+        source: MapMarkerImageLoadSource,
+        success: Bool,
+        loadTimeMs: Int
+    ) {
+        AnalyticsService.shared.logEvent("map_marker_image_load", parameters: [
+            "surface": surface.rawValue,
+            "spot_id": spotId ?? "nil",
+            "load_source": source.rawValue,
+            "success": success,
+            "load_time_ms": max(0, loadTimeMs)
         ])
     }
 

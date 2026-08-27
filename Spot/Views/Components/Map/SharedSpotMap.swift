@@ -72,6 +72,11 @@ struct SharedSpotMap: UIViewRepresentable {
 
     let cameraIntent: SharedSpotMapCameraIntent
 
+    /// Analytics surface for `map_marker_impression` / image-load events
+    /// emitted by this host. Defaults to `.global` so legacy call sites
+    /// (all discovery-map surfaces today) keep behaving the same.
+    var analyticsSurface: MapAnalyticsSurface = .global
+
     /// `MKCoordinateRegion` is `mapView.region` immediately before pin-focus.
     let onSelect: (Spot, CLLocationCoordinate2D, MKCoordinateRegion) -> Void
     let onDeselect: () -> Void
@@ -139,6 +144,10 @@ struct SharedSpotMap: UIViewRepresentable {
         private var lastAppliedCameraIntent: SharedSpotMapCameraIntent = .none
         private var regionDebounceTask: Task<Void, Never>?
         private var animatedSpotIds: Set<String> = []
+        /// Spot ids for which we've already emitted a `map_marker_impression`
+        /// in this attach cycle. Cleared on `detach` so the next map appear
+        /// gets a fresh set of impressions.
+        private var impressedSpotIds: Set<String> = []
         private var ignoreNextRegionChange: Bool = false
         private var didApplyExplicitCameraFromParent = false
         /// Suppress `onDeselect` when selection is driven by SwiftUI state.
@@ -157,6 +166,7 @@ struct SharedSpotMap: UIViewRepresentable {
             renderedAnnotations.removeAll()
             renderedUserAnnotation = nil
             animatedSpotIds.removeAll()
+            impressedSpotIds.removeAll()
             didApplyExplicitCameraFromParent = false
         }
 
@@ -198,9 +208,15 @@ struct SharedSpotMap: UIViewRepresentable {
                         || existing.coordinate.longitude != entry.coordinate.longitude {
                         existing.coordinate = entry.coordinate
                     }
+                    let imageURLChanged = existing.spot.thumbnailURL != entry.spot.thumbnailURL
+                        || existing.spot.imageURL != entry.spot.imageURL
+                    existing.spot = entry.spot
                     existing.visualState = resolvedState
                     if let view = map.view(for: existing) as? SpotAnnotationView {
                         view.apply(state: resolvedState, animated: true)
+                        if imageURLChanged {
+                            view.configure(with: entry.spot)
+                        }
                     }
                 } else {
                     let annotation = SpotMapAnnotation(
@@ -405,17 +421,54 @@ struct SharedSpotMap: UIViewRepresentable {
             )
             view.clusteringIdentifier = Constants.MapDesign.spotClusteringIdentifier
             view.apply(state: spot.visualState, animated: false)
+            view.configure(with: spot.spot)
+            let surface = parent.analyticsSurface
+            let region = mapView.region
+            view.onImageLoadCompleted = { event in
+                Task { @MainActor in
+                    MapAnalytics.markerImageLoad(
+                        surface: surface,
+                        spotId: event.spotId,
+                        source: event.source,
+                        success: event.success,
+                        loadTimeMs: event.loadTimeMs
+                    )
+                }
+            }
             if let id = spot.spot.id, !animatedSpotIds.contains(id) {
                 animatedSpotIds.insert(id)
                 let delay = MapAnimationDelay.delay(forSpotId: id, fallback: spot.coordinate)
                 view.animateInIfNeeded(delay: delay)
             }
-            let username = spot.spot.username ?? "someone"
-            let place = spot.spot.locationName ?? "a spot"
-            view.accessibilityLabel = "Spot by \(username), \(place). Double-tap to preview."
+            recordImpressionIfNeeded(spot: spot, region: region)
+            view.accessibilityLabel = SpotAnnotationAccessibility.label(for: spot.spot)
             view.accessibilityTraits = .button
             SpotLogger.log(MapMarkerLogs.markerReused, details: ["spotId": spot.spot.id ?? "nil"])
             return view
+        }
+
+        private func recordImpressionIfNeeded(spot: SpotMapAnnotation, region: MKCoordinateRegion) {
+            guard let id = spot.spot.id, !impressedSpotIds.contains(id) else { return }
+            impressedSpotIds.insert(id)
+            let markerType: MapMarkerAnalyticsType = SpotPhotoPinSource.imageURL(for: spot.spot) != nil
+                && MapMarkerFeatureFlags.photoPinMarkersEnabled
+                ? .photoPin
+                : .teardrop
+            let zoomLevel = SpotAnnotationZoom.approximateZoomLevel(for: region)
+            let surface = parent.analyticsSurface
+            Task { @MainActor in
+                MapAnalytics.markerImpression(
+                    surface: surface,
+                    spotId: id,
+                    markerType: markerType,
+                    zoomLevel: zoomLevel
+                )
+            }
+            SpotLogger.log(MapMarkerLogs.photoMarkerImpression, details: [
+                "spotId": id,
+                "markerType": markerType.rawValue,
+                "zoom": zoomLevel
+            ])
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
@@ -521,3 +574,47 @@ extension SharedSpotMap {
         }
     }
 }
+
+// MARK: - Photo pin accessibility
+
+/// Accessible label helper for spot annotation views. Kept as a pure
+/// function so tests can lock down the label format independently of
+/// MapKit / UIKit rendering.
+enum SpotAnnotationAccessibility {
+
+    /// Composes the accessible label for a spot annotation. Format:
+    ///
+    ///     "Spot by <username>, <place>. Double-tap to preview."
+    ///
+    /// Missing fields degrade gracefully — never crash, never expose "nil"
+    /// text to VoiceOver. The label never relies on the marker's image;
+    /// screen readers cannot introspect pixel content.
+    static func label(for spot: Spot) -> String {
+        let username = spot.username?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let place = spot.locationName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let author = (username?.isEmpty == false ? username! : "someone")
+        let where_ = (place?.isEmpty == false ? place! : "a saved spot")
+        return "Spot by \(author), \(where_). Double-tap to preview."
+    }
+}
+
+// MARK: - Zoom level
+
+/// Pure helper for computing an approximate zoom level from an
+/// `MKCoordinateRegion`. Used as an analytics property on marker
+/// impression / tap events so we can compare engagement by zoom bucket.
+enum SpotAnnotationZoom {
+
+    /// Approximate slippy-map zoom level (0 = whole world, 20 = building
+    /// scale) for `region`, rounded to one decimal for analytics stability.
+    ///
+    /// Uses the standard Web Mercator formula
+    /// `log2(360 / longitudeDelta)` — we don't need pixel accuracy, just
+    /// a stable bucket that survives rounding.
+    static func approximateZoomLevel(for region: MKCoordinateRegion) -> Double {
+        let span = max(region.span.longitudeDelta, 0.0001)
+        let raw = log2(360.0 / span)
+        return (raw * 10).rounded() / 10
+    }
+}
+

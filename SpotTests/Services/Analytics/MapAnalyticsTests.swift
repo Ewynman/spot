@@ -115,4 +115,79 @@ struct MapAnalyticsTests {
     @Test func recenterTapped() {
         MapAnalytics.recenterTapped()
     }
+
+    // MARK: - markerImpression (Concept 3 photo pin)
+
+    @Test func markerImpressionWithZoomLevel() {
+        MapAnalytics.markerImpression(
+            surface: .global,
+            spotId: "abc",
+            markerType: .photoPin,
+            zoomLevel: 13.5
+        )
+    }
+
+    @Test func markerImpressionWithNilSpotAndTeardropType() {
+        MapAnalytics.markerImpression(
+            surface: .profile,
+            spotId: nil,
+            markerType: .teardrop,
+            zoomLevel: nil
+        )
+    }
+
+    // MARK: - markerTapped (marker_type + zoom_level extensions)
+
+    @Test func markerTappedRecordsMarkerTypeAndZoom() {
+        MapAnalytics.markerTapped(
+            surface: .global,
+            spotId: "abc",
+            markerType: .photoPin,
+            zoomLevel: 12.0
+        )
+    }
+
+    // MARK: - markerImageLoad
+
+    @Test func markerImageLoadCacheHit() {
+        MapAnalytics.markerImageLoad(
+            surface: .global,
+            spotId: "abc",
+            source: .cache,
+            success: true,
+            loadTimeMs: 2
+        )
+    }
+
+    @Test func markerImageLoadNetworkFailure() {
+        MapAnalytics.markerImageLoad(
+            surface: .profile,
+            spotId: nil,
+            source: .network,
+            success: false,
+            loadTimeMs: 900
+        )
+    }
+
+    @Test func markerImageLoadClampsNegativeElapsedToZero() {
+        // The helper accepts arbitrary ints and clamps to 0 so a monotonic
+        // clock glitch never emits `-1 ms` to Firebase.
+        MapAnalytics.markerImageLoad(
+            surface: .global,
+            spotId: "abc",
+            source: .cache,
+            success: true,
+            loadTimeMs: -50
+        )
+    }
+
+    // MARK: - MapMarkerAnalyticsType raw values
+
+    @Test func photoPinRawValueMatchesSpec() {
+        #expect(MapMarkerAnalyticsType.photoPin.rawValue == "photo_pin")
+    }
+
+    @Test func teardropRawValueMatchesSpec() {
+        #expect(MapMarkerAnalyticsType.teardrop.rawValue == "teardrop")
+    }
 }

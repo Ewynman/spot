@@ -223,6 +223,24 @@ enum Constants {
         /// MapKit clustering identifier shared by all spot annotations.
         static let spotClusteringIdentifier = "spot"
 
+        // MARK: Photo preview pin (Concept 3)
+
+        /// Circular photo preview diameter in the photo pin marker, in points.
+        static let photoPinImageDiameter: CGFloat = 44
+        /// Total height of the photo pin marker (image + downward tail), in points.
+        /// Matches PRD default (~56 pt). Selected uses this frame + `pinSelectedScale`.
+        static let photoPinTotalHeight: CGFloat = 56
+        /// White border thickness surrounding the photo circle, in points.
+        static let photoPinBorderWidth: CGFloat = 2
+        /// Angle (radians, from downward vertical) at which the tail meets
+        /// the circle. Smaller angles = narrower/sharper tail.
+        static let photoPinTailHalfAngle: CGFloat = .pi / 6 // 30°
+        /// Bounded in-memory image cache size for map marker thumbnails.
+        /// Sized to comfortably cover a full viewport (250 max spots).
+        static let photoPinImageCacheCount: Int = 400
+        /// Bounded byte cost limit for map marker thumbnail cache.
+        static let photoPinImageCacheCostBytes: Int = 12 * 1024 * 1024
+
         /// Cluster marker discrete sizes (not proportional to count).
         static let clusterSizeSmall: CGFloat = 36
         static let clusterSizeMedium: CGFloat = 40
