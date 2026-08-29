@@ -2,7 +2,7 @@
 //  ProfileServiceLogs.swift
 //  Spot
 //
-//  Log definitions for ProfileService.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

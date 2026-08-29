@@ -2,7 +2,7 @@
 //  TermsAcceptanceLogs.swift
 //  Spot
 //
-//  Log definitions for TermsAcceptanceService and the Terms gate UI.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

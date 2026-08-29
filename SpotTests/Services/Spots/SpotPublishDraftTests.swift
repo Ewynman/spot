@@ -2,7 +2,7 @@
 //  SpotPublishDraftTests.swift
 //  SpotTests
 //
-//  Optimistic feed insert after publish must carry author display fields.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

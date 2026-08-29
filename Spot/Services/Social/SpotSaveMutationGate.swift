@@ -1,3 +1,10 @@
+//
+//  SpotSaveMutationGate.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Coalesces identical in-flight bookmark mutations across every visible copy of a Spot.

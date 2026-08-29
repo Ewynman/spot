@@ -2,13 +2,7 @@
 //  HomeTourManagerTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Regression tests for the legacy `HomeTourManager`. The new first-run
-//  onboarding migrates off this manager (see SpotFirstRunOnboardingManager),
-//  but several call sites still wire it through `HomeTourHost`, so the
-//  behavior must remain stable.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

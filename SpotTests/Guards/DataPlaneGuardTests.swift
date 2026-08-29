@@ -2,7 +2,7 @@
 //  DataPlaneGuardTests.swift
 //  SpotTests
 //
-//  Ensures the iOS app data plane stays on Supabase — no Firestore/Storage upload stack.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

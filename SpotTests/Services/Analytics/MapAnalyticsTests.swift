@@ -2,10 +2,7 @@
 //  MapAnalyticsTests.swift
 //  SpotTests
 //
-//  Verifies that every MapAnalytics helper builds the correct event name and
-//  that both surface values are accepted without crashing. Firebase is a
-//  no-op during unit tests (AnalyticsService guards on isUnitTestMode), so
-//  these tests measure that the routing logic is exercised.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,7 +2,7 @@
 //  BookmarksViewModelLogs.swift
 //  Spot
 //
-//  Log definitions for BookmarksViewModel.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

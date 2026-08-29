@@ -2,8 +2,7 @@
 //  MapCameraRegionTests.swift
 //  SpotTests
 //
-//  Ensures the discovery map's first user-centered region stays at
-//  neighborhood zoom (not a continental/world span).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

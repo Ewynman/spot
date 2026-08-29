@@ -2,8 +2,7 @@
 //  PostComposerPhoto.swift
 //  Spot
 //
-//  Stable identity for composer photos so SwiftUI lists / TabView pages don’t
-//  reuse the wrong view when reordering or replacing images.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

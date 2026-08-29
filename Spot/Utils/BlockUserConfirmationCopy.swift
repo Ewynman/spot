@@ -1,3 +1,10 @@
+//
+//  BlockUserConfirmationCopy.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Copy for the branded block-user confirmation used on profiles and Spot cards.

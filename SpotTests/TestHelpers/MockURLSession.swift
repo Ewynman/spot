@@ -2,7 +2,7 @@
 //  MockURLSession.swift
 //  SpotTests
 //
-//  Ephemeral URLSession backed by URLProtocol for deterministic HTTP tests.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,7 +2,7 @@
 //  SocialGraphSupabase.swift
 //  Spot
 //
-//  Follow graph + outgoing follow requests for feed / privacy.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

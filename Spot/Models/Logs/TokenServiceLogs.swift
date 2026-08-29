@@ -2,7 +2,7 @@
 //  TokenServiceLogs.swift
 //  Spot
 //
-//  Log definitions for TokenService.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

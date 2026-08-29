@@ -2,19 +2,7 @@
 //  PermissionPrePromptStringsTests.swift
 //  SpotTests
 //
-//  Regression tests for strings shown on Spot’s custom permission pre-prompts.
-//  Apple App Review (Guideline 5.1.1) explicitly flagged earlier wording
-//  ("Enable...", "Maybe Later") as inappropriate. These tests assert that
-//  every user-facing string defined in `PermissionPrePromptStrings`:
-//
-//   * Uses neutral primary actions (`Continue` / `Open iOS Settings`).
-//   * Avoids forbidden phrases like `Enable...`, `Allow Notifications`,
-//     `Maybe Later`, `Required`, `Must enable`, `Turn On Notifications`.
-//   * Keeps the secondary "Continue Without ..." escape hatch intact for
-//     each of the four optional permissions.
-//
-//  Scope is intentionally limited to `PermissionPrePromptStrings.swift` —
-//  the word `Enable` is fine in unrelated app contexts.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Testing

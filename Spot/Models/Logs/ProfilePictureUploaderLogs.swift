@@ -2,7 +2,7 @@
 //  ProfilePictureUploaderLogs.swift
 //  Spot
 //
-//  Log definitions for ProfilePictureUploader.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

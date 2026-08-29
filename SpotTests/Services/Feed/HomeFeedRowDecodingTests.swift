@@ -2,10 +2,7 @@
 //  HomeFeedRowDecodingTests.swift
 //  SpotTests
 //
-//  Locks in the JSON contract between `public.get_home_feed_v1` /
-//  `public.get_home_feed_status_v1` and the iOS DTOs in `FeedAPI.swift`. If a
-//  Postgres function rename, drop, or re-typing slips through migration
-//  review, decoding will break in CI rather than at runtime.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,11 +2,7 @@
 //  FeedProfileView.swift
 //  Spot
 //
-//  "Your Algorithm" screen. A read-only view of the signed-in user's
-//  personalization snapshot from `public.user_feed_profiles`. Designed for
-//  a pleasant moment of self-reflection ("oh, I really do save a lot of
-//  Cozy Corners") — not a debug surface. The raw JSON view lives in
-//  `AlgorithmDebugView`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

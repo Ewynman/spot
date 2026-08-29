@@ -2,11 +2,7 @@
 //  AuthInputNormalizerTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Tests the pure auth-input helpers AuthService relies on for sign-up,
-//  sign-in, password reset, and username/email resolution.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

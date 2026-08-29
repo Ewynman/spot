@@ -2,10 +2,7 @@
 //  SpotPermissionType.swift
 //  Spot
 //
-//  App-friendly permission categories used by Settings → Permissions and
-//  the Apple App Review remediation work. Decoupled from CoreLocation /
-//  Photos / AVFoundation so view models, snapshots, and tests can reason
-//  about permissions without importing the system frameworks.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import AVFoundation

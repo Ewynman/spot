@@ -2,12 +2,7 @@
 //  SpotMarkerStyleTests.swift
 //  SpotTests
 //
-//  Locks down `SpotMarkerStyleResolver` — the pure function that decides a
-//  spot pin's visual state given the active filter, the current selection,
-//  and the viewer's saved/liked/follow lists.
-//
-//  Discovery map rendering removes non-matching pins entirely; the resolver
-//  is still used for `matches(...)` and for match styling on visible pins.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

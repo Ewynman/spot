@@ -2,14 +2,7 @@
 //  PermissionsSettingsTests.swift
 //  SpotTests
 //
-//  Coverage for the Apple App Review-mandated Settings → Permissions
-//  surface. The detail view itself is SwiftUI, so these tests focus on the
-//  observable plumbing:
-//
-//   * `PermissionManager.anyPermissionNeedsAttention` correctly drives the
-//     `!` warning indicator on the Settings row.
-//   * The injected `AppSettingsOpening` dependency receives exactly one
-//     call when the user taps "Open iOS Settings" (no auto-prompts).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Testing

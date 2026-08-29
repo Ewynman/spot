@@ -2,7 +2,7 @@
 //  LoggingConfig.swift
 //  Spot
 //
-//  Root logging profile configuration.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

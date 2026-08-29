@@ -2,7 +2,7 @@
 //  NotificationService.swift
 //  Spot
 //
-//  Local notification delivery for social events (follow requests, follow accepts).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

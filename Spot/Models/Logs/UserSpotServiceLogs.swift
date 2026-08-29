@@ -2,7 +2,7 @@
 //  UserSpotServiceLogs.swift
 //  Spot
 //
-//  Log definitions for UserSpotService.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

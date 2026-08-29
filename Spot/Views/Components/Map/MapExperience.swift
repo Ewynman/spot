@@ -2,8 +2,7 @@
 //  MapExperience.swift
 //  Spot
 //
-//  Shared map interaction shell for Global and Profile maps: MKMapView host,
-//  compact SpotPreviewCard, optional coincident carousel, and detail sheet.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

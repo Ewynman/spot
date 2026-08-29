@@ -1,3 +1,10 @@
+//
+//  FeedProfileSnapshotParser.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Parses raw feed-profile RPC JSON for the algorithm debug screen.

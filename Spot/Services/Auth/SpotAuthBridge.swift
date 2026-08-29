@@ -1,3 +1,10 @@
+//
+//  SpotAuthBridge.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Holds the active Supabase user id for call sites that are not yet async/session-aware.

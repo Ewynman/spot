@@ -2,12 +2,7 @@
 //  VibeTagUsageStoreTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Coverage for the pure logic of `VibeTagUsageStore`. The store currently
-//  writes to `UserDefaults.standard`, so tests reset the relevant key in
-//  setup/teardown to remain hermetic.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

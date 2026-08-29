@@ -1,6 +1,8 @@
 //
-// Created By: Wynman, Edward
-// Date: 04/06/2026
+//  SubscriptionPriceLineFormatterTests.swift
+//  SpotTests
+//
+//  Created by Edward Wynman on 4/6/26.
 //
 
 import Foundation

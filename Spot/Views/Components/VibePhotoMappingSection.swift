@@ -1,3 +1,10 @@
+//
+//  VibePhotoMappingSection.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import SwiftUI
 
 /// Toggle + photo→vibe rows for Match Vibes to Photos.

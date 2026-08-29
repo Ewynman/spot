@@ -2,7 +2,7 @@
 //  SpotImageModerationLogs.swift
 //  Spot
 //
-//  Edge Function `moderate-image` invoke diagnostics (publish pipeline).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

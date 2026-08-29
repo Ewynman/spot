@@ -2,16 +2,7 @@
 //  ModerationService.swift
 //  Spot
 //
-//  Typed entry point for UGC moderation actions: report content, block users,
-//  and (eventually) action moderation results. Wraps Supabase RPCs created in
-//  `supabase/migrations/20260506210800_report_block_terms_rpcs_v1.sql` so the
-//  iOS client never needs to assemble the underlying SQL by hand.
-//
-//  The legacy `reports`/`user_blocks` direct inserts in `ReportSheet.swift` and
-//  `AuthViewModel` continue to work — server-side triggers populate
-//  `moderation_events` for those paths automatically. Newer call sites
-//  (profile-level reports, block confirmation dialogs) should prefer this
-//  service so we have one place that maps Swift types to RPC arguments.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

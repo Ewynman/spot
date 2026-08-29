@@ -2,10 +2,7 @@
 //  ProfileReportSheet.swift
 //  Spot
 //
-//  Sheet for reporting another user (profile-level), separate from the
-//  spot-level `ReportSheet`. Uses `ModerationService.submitProfileReport`
-//  which writes to `public.reports` with `target_type = 'profile'` and
-//  records a `moderation_events` row via the underlying trigger.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

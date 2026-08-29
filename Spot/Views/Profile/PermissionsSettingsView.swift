@@ -2,20 +2,7 @@
 //  PermissionsSettingsView.swift
 //  Spot
 //
-//  Settings → Permissions screen. Shows the status of every optional iOS
-//  permission Spot may use (Location, Notifications, Camera, Photos),
-//  explains each one in neutral copy, and offers an "Open iOS Settings"
-//  action when a permission is off/restricted/limited.
-//
-//  Apple App Review (Guideline 5.1.1 / 5.1.5 / 4.5.4) requires:
-//   * Neutral status labels (no "Required" / "Must enable").
-//   * No automatic permission prompt when the user opens this screen.
-//   * Clear path to iOS Settings for each row.
-//   * `!` warning indicator on the entry row in the parent Settings list
-//     when a permission is denied/restricted/disabled (handled in
-//     `SettingsView`).
-//
-//  See `docs/engineering/permissions.md` for the policy.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

@@ -2,10 +2,7 @@
 //  SubscriptionManagerRetryTests.swift
 //  SpotTests
 //
-//  Coverage for the retry contract introduced for App Review remediation
-//  (Guideline 2.1(b) — paywall must not stay stuck on "Loading…"):
-//  `resetProductLoadStateForRetry()` clears the cached load failure so the
-//  paywall's "Try Again" button can re-issue `Product.products(for:)`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

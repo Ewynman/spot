@@ -2,7 +2,7 @@
 //  MapSpotFilterDisplayTests.swift
 //  SpotTests
 //
-//  Pro map filters remove non-matching pins from the displayed set.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Testing

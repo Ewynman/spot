@@ -2,8 +2,7 @@
 //  ProEntitlementCheckerTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 03/24/2025
+//  Created by Edward Wynman on 3/24/25.
 //
 
 import Foundation

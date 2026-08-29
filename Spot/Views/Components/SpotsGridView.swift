@@ -1,7 +1,8 @@
-// SpotsGridView.swift
-// Spot
 //
-// Created by Edward Wynman on 8/6/25.
+//  SpotsGridView.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/6/25.
 //
 
 import SwiftUI

@@ -1,3 +1,10 @@
+//
+//  FeedProfileContentPolicy.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Whether a feed profile snapshot has anything meaningful to show.

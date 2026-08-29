@@ -2,14 +2,7 @@
 //  MapStyle.swift
 //  Spot
 //
-//  Pure value types for the redesigned map: density-mode selection, marker
-//  visual states, filter dimensions, panel-height clamping, and the stable
-//  animation-delay helper used by `SpotAnnotationView` for the "fall onto
-//  the map" entry effect.
-//
-//  Everything in this file is intentionally view-free so it can be unit
-//  tested without touching MapKit. The `SharedSpotMap` and `MapView`
-//  consume these values directly.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

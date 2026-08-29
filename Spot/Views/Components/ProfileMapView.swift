@@ -2,8 +2,7 @@
 //  ProfileMapView.swift
 //  Spot
 //
-//  Profile-scoped map. Reuses `MapExperience` for markers, clustering,
-//  compact preview, and detail — same interaction model as the Global Map.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

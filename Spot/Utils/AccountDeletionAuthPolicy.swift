@@ -2,8 +2,7 @@
 //  AccountDeletionAuthPolicy.swift
 //  Spot
 //
-//  Chooses how account deletion re-authenticates the user. Apple-only accounts
-//  must not be forced to set a password first (App Store Guideline 5.1.1(v)).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Auth

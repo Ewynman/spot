@@ -2,12 +2,7 @@
 //  AuthInputNormalizer.swift
 //  Spot
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Pure helpers for the auth pipeline so input normalization and error
-//  classification can be exercised in isolation. AuthService routes its
-//  inline string handling through these helpers to keep behavior identical.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

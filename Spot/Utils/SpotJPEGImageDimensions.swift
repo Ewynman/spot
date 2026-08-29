@@ -2,7 +2,7 @@
 //  SpotJPEGImageDimensions.swift
 //  Spot
 //
-//  Reads embedded pixel dimensions from JPEG bytes before upload (ImageIO).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreGraphics

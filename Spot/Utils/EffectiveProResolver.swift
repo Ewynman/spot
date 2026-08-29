@@ -2,7 +2,7 @@
 //  EffectiveProResolver.swift
 //  Spot
 //
-//  Mirrors ProfileSupabaseSchema.effectiveIsPro for server-backed is_pro / pro_until rows.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

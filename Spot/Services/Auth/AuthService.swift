@@ -362,17 +362,6 @@ class AuthService {
         // For now, just log the request and complete successfully
         SpotLogger.log(AuthServiceLogs.deleteAuthUserByEmailPlaceholder)
 
-        // In production, this would be:
-        // let functions = Functions.functions()
-        // let data = ["email": email]
-        // functions.httpsCallable("deleteAuthUserByEmail").call(data) { result, error in
-        //     if let error = error {
-        //         completion(.failure(error))
-        //     } else {
-        //         completion(.success(()))
-        //     }
-        // }
-
         SpotLogger.log(AuthServiceLogs.deleteByEmailSuccess)
         Task { @MainActor in
             AnalyticsService.shared.trackAuthEvent(Constants.Analytics.authDeleteByEmail, parameters: ["action": "result", "status": "ok"])

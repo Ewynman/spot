@@ -2,8 +2,7 @@
 //  MapDrawerDismissReason.swift
 //  Spot
 //
-//  Reasons the discovery map spot preview drawer can dismiss — used for
-//  logging and predictable state transitions (see map drawer PRD).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

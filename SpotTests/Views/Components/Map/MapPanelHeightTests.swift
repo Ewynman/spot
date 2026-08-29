@@ -2,12 +2,7 @@
 //  MapPanelHeightTests.swift
 //  SpotTests
 //
-//  Locks in the safe-panel-height behavior introduced to fix IMG_9741
-//  (selected-spot card overflowing the screen and shifting the map). The
-//  clamp guarantees:
-//   * a minimum readable header height,
-//   * never exceeds `panelMaxScreenFraction` of the available height,
-//   * always sits above the bottom safe-area inset.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

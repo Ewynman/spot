@@ -2,17 +2,7 @@
 //  LocationPermissionView.swift
 //  Spot
 //
-//  Custom pre-permission screen for Location. Apple App Review
-//  (Guidelines 5.1.1 / 5.1.5) requires:
-//   * Neutral primary button copy (`Continue`).
-//   * No `Maybe Later` immediately before the native iOS permission prompt.
-//   * No `Enable Location` / `Allow Location` wording.
-//   * Location must remain optional — denial routes to the rest of the app
-//     with a continental US map fallback.
-//
-//  This view used to gate onboarding. It is retained for contextual
-//  pre-prompts (first-run map tour, map recenter, etc.) but no longer
-//  blocks any post-auth flow.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

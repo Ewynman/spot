@@ -2,8 +2,7 @@
 //  MapClusterStyle.swift
 //  Spot
 //
-//  Pure helpers for MapKit cluster marker sizing and coincident-cluster
-//  detection. Kept view-free for unit testing.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

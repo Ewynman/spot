@@ -1,5 +1,5 @@
 //
-//  ProfileView.swift
+//  FollowRequestsView.swift
 //  Spot
 //
 //  Created by Edward Wynman on 8/13/25.

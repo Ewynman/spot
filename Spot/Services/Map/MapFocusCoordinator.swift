@@ -2,7 +2,7 @@
 //  MapFocusCoordinator.swift
 //  Spot
 //
-//  Internal routing bridge for opening a Spot on the main Map tab.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

@@ -2,12 +2,7 @@
 //  MapControlsOverlay.swift
 //  Spot
 //
-//  Floating overlay controls for the discovery map: a recenter button
-//  pinned to the bottom-right that fits above the preview panel/tab bar,
-//  and (when present) the Pro filter pill row anchored to the top.
-//
-//  This view does not own state — it just renders the chrome. The map
-//  view passes in callbacks and current state.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

@@ -2,12 +2,7 @@
 //  MapFilterControls.swift
 //  Spot
 //
-//  Pro-only map filter pill row + bottom sheet. Hidden for non-Pro users
-//  per Eddie's call. Pro users get a compact pill that opens a sheet to
-//  toggle filter dimensions and pick vibe tags.
-//
-//  The filter pipeline is purely client-side (applied to already-fetched
-//  visible spots). We never alter the viewport-driven Supabase RPC.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

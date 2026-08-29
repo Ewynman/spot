@@ -2,10 +2,7 @@
 //  MapDensityModeTests.swift
 //  SpotTests
 //
-//  Verifies the zoom-span thresholds that drive the discovery/profile map
-//  rendering mode (individual pins vs overlap pins vs soft clusters). The
-//  `MapView` redesign relies on these transitions to keep the screen calm
-//  at all zooms — if the thresholds drift the marker visual story breaks.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import MapKit

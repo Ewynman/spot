@@ -2,13 +2,7 @@
 //  SubscriptionManagerStaticTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Coverage for the parts of SubscriptionManager that do not depend on a
-//  live StoreKit session: published-state defaults, configured product
-//  IDs, and the `PurchaseProResult` enum the UI switches on. Live purchase
-//  / restore / entitlement flows are exercised via integration tests.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

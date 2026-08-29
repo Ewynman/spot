@@ -1,3 +1,10 @@
+//
+//  PostAuthSetupFlowView.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import SwiftUI
 import PhotosUI
 import Supabase

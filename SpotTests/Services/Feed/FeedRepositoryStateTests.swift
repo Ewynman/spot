@@ -2,12 +2,7 @@
 //  FeedRepositoryStateTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  In-memory state mutations on FeedRepository (locallyRemoveSpot,
-//  insertSpotAtTop, replaceSpots, reset). FeedRepository is a singleton, so
-//  every test calls `reset()` first to guarantee a clean published state.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

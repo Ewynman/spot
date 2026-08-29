@@ -2,7 +2,7 @@
 //  SpotLoggerTests.swift
 //  SpotTests
 //
-//  Tests for the structured SpotLog protocol and SpotLogger.log() method.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

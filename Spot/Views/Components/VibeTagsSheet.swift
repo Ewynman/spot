@@ -1,3 +1,10 @@
+//
+//  VibeTagsSheet.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import SwiftUI
 
 /// Full-width informational sheet listing all vibes on a Spot.

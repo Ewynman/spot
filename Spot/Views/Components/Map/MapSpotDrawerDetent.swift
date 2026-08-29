@@ -2,7 +2,7 @@
 //  MapSpotDrawerDetent.swift
 //  Spot
 //
-//  Peek vs expanded height for the discovery map spot preview drawer.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

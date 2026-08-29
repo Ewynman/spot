@@ -2,7 +2,7 @@
 //  ErrorMessageSanitizer.swift
 //  Spot
 //
-//  Sanitizes error messages to prevent information leakage.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,10 +2,7 @@
 //  FeedProfileViewModel.swift
 //  Spot
 //
-//  Loads the signed-in user's algorithm snapshot from
-//  `public.user_feed_profiles` (RLS owner-only) and exposes it to the
-//  "Your Algorithm" + debug screens. Also drives manual recomputes via
-//  `recompute_my_feed_profile_v1`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

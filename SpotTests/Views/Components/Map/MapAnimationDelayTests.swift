@@ -2,10 +2,7 @@
 //  MapAnimationDelayTests.swift
 //  SpotTests
 //
-//  The pin entry animation needs a *stable*, *bounded* per-pin delay so
-//  re-renders don't restart the dance and the staggered batch always
-//  finishes within `pinStaggerCap` seconds. We use FNV-1a + bucketing —
-//  Swift's stdlib `Hasher` randomizes per-process and is unsafe here.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

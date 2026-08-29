@@ -2,12 +2,7 @@
 //  SpotTestHelpers.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Shared helpers for SpotTests so each test gets isolated `UserDefaults`,
-//  consistent `Spot` fixtures, and small async wait utilities. Keep helpers
-//  small and dependency-free so any test can pull them in.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

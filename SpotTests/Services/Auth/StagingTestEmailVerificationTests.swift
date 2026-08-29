@@ -1,3 +1,10 @@
+//
+//  StagingTestEmailVerificationTests.swift
+//  SpotTests
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 import Testing
 import Supabase

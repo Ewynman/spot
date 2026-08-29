@@ -2,7 +2,7 @@
 //  SupabaseTableName.swift
 //  Spot
 //
-//  Centralizes PostgREST table/view names used with the Supabase Swift client.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

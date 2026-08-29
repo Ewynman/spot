@@ -2,10 +2,7 @@
 //  TermsAcceptanceService.swift
 //  Spot
 //
-//  Reads/writes per-user Terms of Use acceptance against the Supabase
-//  `terms_versions` and `user_terms_acceptances` tables (added in
-//  `20260506210000_terms_acceptance_v1.sql`). Used by the pre-auth Terms gate
-//  on the Welcome screen and the post-auth update gate in `RootView`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

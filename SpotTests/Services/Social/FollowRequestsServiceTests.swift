@@ -2,8 +2,7 @@
 //  FollowRequestsServiceTests.swift
 //  SpotTests
 //
-//  Comprehensive test suite for FollowRequestsService functionality.
-//  Tests follow request creation, acceptance, denial, and pagination.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

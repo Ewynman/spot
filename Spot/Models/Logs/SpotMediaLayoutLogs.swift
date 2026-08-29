@@ -2,7 +2,7 @@
 //  SpotMediaLayoutLogs.swift
 //  Spot
 //
-//  Structured logs for Spot media aspect layout and publish metadata.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

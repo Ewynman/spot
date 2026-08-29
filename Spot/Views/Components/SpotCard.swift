@@ -1,7 +1,8 @@
-// SpotCard.swift
-// Spot
 //
-// Created by Edward Wynman on 8/6/25.
+//  SpotCard.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/6/25.
 //
 
 import SwiftUI

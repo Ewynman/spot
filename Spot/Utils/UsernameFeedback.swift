@@ -1,3 +1,10 @@
+//
+//  UsernameFeedback.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Maps username validation results to signup/settings toast copy.

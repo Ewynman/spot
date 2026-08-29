@@ -3,7 +3,7 @@ alwaysApply: true
 ---
 
 Created By: Wynman, Edward  
-Date: 04/06/2026 (updated: documentation + rules refresh)
+Date: 04/06/2026 (updated: Swift file header + comment conventions)
 
 # Spot Project Rules
 
@@ -33,6 +33,27 @@ Spot is a **social place-discovery** iOS app. A **Spot** is a saved place recomm
 - Avoid broad architecture refactors unless explicitly requested.
 - **Data plane:** Supabase only for users, spots, media, and social data. Do **not** add `SpotUploader`, Firestore, or Firebase Storage upload paths. See `docs/engineering/data-plane.md` and `SpotTests/Guards/DataPlaneGuardTests.swift`.
 - **Supabase DDL**: When you add or change schema under `supabase/migrations/`, **apply it to the Spot Supabase project using the Supabase MCP** `apply_migration` (server `plugin-supabase-supabase`). Use MCP `list_projects` to resolve `project_id` if it is not already known. Do not treat “SQL committed locally” as done until the MCP migration has succeeded (or the user explicitly opts out for a non-linked database).
+
+## Swift file headers and comments
+
+Every new or substantially rewritten `.swift` file under `Spot/`, `SpotTests/`, and `SpotUITests/` must start with this Xcode-style header (nothing else before the first `import` / declaration):
+
+```
+//
+//  <FileName>.swift
+//  <Target>
+//
+//  Created by Edward Wynman on M/D/YY.
+//
+
+```
+
+- `<Target>` is `Spot`, `SpotTests`, or `SpotUITests` to match the file’s target.
+- Use today’s date in `M/D/YY` form for new files.
+- Do **not** add multi-line `//` narrative essays at the top of the file describing what the file does.
+- Prefer short comments that explain **why** (non-obvious constraints, App Review / RLS / API quirks). Avoid comments that only restate what the next line of code already says.
+- Keep `///` documentation comments on public/internal APIs when they add value, and keep `// MARK:` section markers.
+- Do not leave large blocks of commented-out dead code in the tree.
 
 ## Git workflow
 

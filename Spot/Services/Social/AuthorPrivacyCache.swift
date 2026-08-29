@@ -2,7 +2,7 @@
 //  AuthorPrivacyCache.swift
 //  Spot
 //
-//  Session-scoped, in-memory cache for author privacy and follow state (Supabase-backed).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

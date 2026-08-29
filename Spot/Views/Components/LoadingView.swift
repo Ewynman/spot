@@ -2,8 +2,7 @@
 //  LoadingView.swift
 //  Spot
 //
-//  Created By: Wynman, Edward
-//  Date: 03/02/2025
+//  Created by Edward Wynman on 3/2/25.
 //
 
 import SwiftUI

@@ -1,3 +1,10 @@
+//
+//  SpotListDeduper.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Session-local spot list dedupe used by likes/bookmarks view models.

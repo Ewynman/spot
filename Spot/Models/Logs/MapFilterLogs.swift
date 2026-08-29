@@ -2,8 +2,7 @@
 //  MapFilterLogs.swift
 //  Spot
 //
-//  Log definitions for the Pro-only map filter UI (filter sheet open,
-//  filters applied/cleared, and gated-tap upsell events for non-Pro users).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

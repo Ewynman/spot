@@ -2,7 +2,7 @@
 //  ReportSheet.swift
 //  Spot
 //
-//  Created by Wynman, Edward on 8/14/25.
+//  Created by Edward Wynman on 8/14/25.
 //
 
 import SwiftUI

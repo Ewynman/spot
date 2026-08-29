@@ -1,3 +1,10 @@
+//
+//  VerificationEmailMask.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Masks an email for verification UI (e.g. `ed****@example.com`).

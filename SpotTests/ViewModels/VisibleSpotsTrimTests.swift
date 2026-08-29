@@ -2,9 +2,7 @@
 //  VisibleSpotsTrimTests.swift
 //  SpotTests
 //
-//  Guards the PRD §8 acceptance: "panning across several regions does not
-//  grow `visibleSpots` indefinitely." `MapViewModel.trim` keeps the cap
-//  honest by retaining the spots nearest to the latest viewport center.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

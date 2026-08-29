@@ -2,8 +2,7 @@
 //  SpotPreviewCard.swift
 //  Spot
 //
-//  Compact floating map preview (~120–140 pt). Thumbnail, author, location,
-//  and Like/Save are always visible without scrolling.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

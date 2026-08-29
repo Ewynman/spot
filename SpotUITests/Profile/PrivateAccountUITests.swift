@@ -2,8 +2,7 @@
 //  PrivateAccountUITests.swift
 //  SpotUITests
 //
-//  UI tests for private account functionality.
-//  Tests user interactions with private accounts, follow requests, and privacy settings.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import XCTest

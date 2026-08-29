@@ -1,3 +1,10 @@
+//
+//  VibeTagService.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Owns the “custom vibe” list for the **signed-in** user and global `vibe_tags` registration.

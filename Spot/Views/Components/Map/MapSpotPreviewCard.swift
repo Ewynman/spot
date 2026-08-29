@@ -2,9 +2,7 @@
 //  MapSpotPreviewCard.swift
 //  Spot
 //
-//  Map-safe wrapper around `SpotCard`. Supports optional peek / expanded
-//  detents on the discovery map (drag handle + toggle); profile map uses
-//  a fixed height from the host without expansion chrome.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

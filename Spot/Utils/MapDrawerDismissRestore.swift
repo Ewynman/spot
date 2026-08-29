@@ -1,3 +1,10 @@
+//
+//  MapDrawerDismissRestore.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Whether dismissing the map spot preview should restore the pre-select viewport.

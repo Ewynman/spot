@@ -2,12 +2,7 @@
 //  MapOverlapResolverTests.swift
 //  SpotTests
 //
-//  `MapOverlapResolver` resolves two-or-more spots posted at "the same
-//  place" by quantizing their lat/lon into ~5 m buckets and pushing the
-//  extras onto a small radial ring. These tests pin down:
-//   * isolated spots are not moved,
-//   * overlapping spots get unique coordinates (no collapsed bullseye),
-//   * the resolver is deterministic on `spot.id` (same input → same output).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

@@ -1,3 +1,10 @@
+//
+//  SpotVibeSyncHydration.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Pure helpers for photo-synced vibe hydration (unit-tested; used by repository mappers).

@@ -2,11 +2,7 @@
 //  SpotPermissionTypeTests.swift
 //  SpotTests
 //
-//  Coverage for the App Review-mandated Settings → Permissions surface:
-//   * `SpotPermissionStatus.needsAttention` only fires for denied /
-//     restricted / unavailable (never for `.notDetermined` or `.limited`).
-//   * Status labels stay neutral (no "Required", "Must enable").
-//   * System status enums map deterministically into `SpotPermissionStatus`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import AVFoundation

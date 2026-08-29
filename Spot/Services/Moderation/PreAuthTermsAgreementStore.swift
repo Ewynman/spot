@@ -2,18 +2,7 @@
 //  PreAuthTermsAgreementStore.swift
 //  Spot
 //
-//  Tracks whether the user has acknowledged Spot's Terms of Use and Privacy
-//  Policy before triggering authentication on the Welcome screen.
-//
-//  This is intentionally a *pre-auth* gate: we cannot write
-//  `user_terms_acceptances` until the user is authenticated, so the Welcome
-//  screen relies on a published flag here. The flag is reset on app launch
-//  (default behavior) so each fresh app session shows the unchecked Terms
-//  checkbox to App Review reviewers as required by Apple Guideline 1.2.
-//
-//  Once the user has authenticated successfully, `RootView` calls
-//  `TermsAcceptanceService.recordAcceptance()` to persist the agreement to
-//  Supabase.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

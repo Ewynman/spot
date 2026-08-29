@@ -2,11 +2,7 @@
 //  FeedEventService.swift
 //  Spot
 //
-//  Records user engagement events to `public.user_feed_events` via the
-//  `record_feed_event_v1` RPC. The same RPC also updates `feed_impressions`
-//  (last_seen_at, view_count, dwell_ms) and `user_vibe_affinities` /
-//  `user_creator_affinities`, so this is the single client-side hook for both
-//  durable seen-state and personalization signal collection.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

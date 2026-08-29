@@ -2,12 +2,7 @@
 //  PostPurchaseProOnboardingManagerTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Behavior contract for the post-purchase Pro onboarding tour. These tests
-//  intentionally do NOT change Pro onboarding behavior or constants — they
-//  exist so future refactors of the manager have regression coverage.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

@@ -2,10 +2,7 @@
 //  MapLocationRefreshTests.swift
 //  SpotTests
 //
-//  Tests that verify the map requests and applies fresh location updates
-//  every time it appears, ensuring users see spots around their current
-//  location rather than stale cached coordinates from onboarding or
-//  previous sessions.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation
