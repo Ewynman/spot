@@ -62,6 +62,46 @@ enum SpotPhotoPinSource {
     }
 }
 
+// MARK: - Photo pin content cropping
+
+/// Chooses a `CALayer.contentsRect` (unit image coordinates) that biases the
+/// square crop of a portrait thumbnail toward the bottom of the source
+/// image. Outdoor Spot photos routinely have sky in the upper third, so a
+/// pure center crop can leave the marker showing sky while the subject
+/// sits below the visible circle. Landscape and square photos keep the
+/// full frame (`(0, 0, 1, 1)`) so no fill artifacts appear on wide sources.
+enum SpotPhotoPinContentsRect {
+    /// - Parameters:
+    ///   - size: The intrinsic size of the loaded image (any positive
+    ///     width/height — only the aspect ratio is used).
+    ///   - biasShift: Downward shift applied to the crop window as a
+    ///     fraction of the layer height. Clamped so the crop window never
+    ///     leaves the image.
+    /// - Returns: A unit `CGRect` suitable for `CALayer.contentsRect`.
+    static func contentsRect(
+        forImageSize size: CGSize,
+        biasShift: CGFloat = Constants.MapDesign.photoPinPortraitBottomBias
+    ) -> CGRect {
+        guard size.width > 0, size.height > 0 else {
+            return CGRect(x: 0, y: 0, width: 1, height: 1)
+        }
+        let aspect = size.width / size.height
+        // Landscape / square: no crop, `.resizeAspectFill` will center on
+        // the horizontal middle and the full vertical range shows.
+        guard aspect < 1 else {
+            return CGRect(x: 0, y: 0, width: 1, height: 1)
+        }
+        // Portrait: pick a square subregion of the image. Height (in unit
+        // image coords) equals the aspect ratio; centered would place the
+        // window at yStart = (1 - aspect) / 2. Bias down by `biasShift`,
+        // clamped so we never overshoot the bottom.
+        let squareHeight = aspect
+        let clampedShift = max(0, min(biasShift, (1 - squareHeight) / 2))
+        let yStart = (1 - squareHeight) / 2 + clampedShift
+        return CGRect(x: 0, y: yStart, width: 1, height: squareHeight)
+    }
+}
+
 // MARK: - View
 
 /// Reusable annotation view for a `SpotMapAnnotation`.
@@ -261,6 +301,9 @@ final class SpotAnnotationView: MKAnnotationView {
         currentImageURL = nil
         photoImageLayer.contents = nil
         photoImageLayer.opacity = 0
+        // Reset any per-image crop bias so the next spot's aspect ratio
+        // recomputes from a clean baseline.
+        photoImageLayer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
         photoRingLayer.opacity = 0
         teardropRingLayer.opacity = 0
         photoShellLayer.shadowOpacity = 0.22
@@ -339,6 +382,10 @@ final class SpotAnnotationView: MKAnnotationView {
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
                 self.photoImageLayer.contents = image.cgImage
+                // Bias portrait crops downward so outdoor spots don't
+                // waste the top of the marker on sky.
+                self.photoImageLayer.contentsRect = SpotPhotoPinContentsRect
+                    .contentsRect(forImageSize: image.size)
                 CATransaction.commit()
                 if !UIAccessibility.isReduceMotionEnabled {
                     let fade = CABasicAnimation(keyPath: "opacity")

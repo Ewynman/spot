@@ -28,9 +28,10 @@ Home can also initiate this flow. Choosing **Open in Map** from a `HomeSpotCard`
 
 ### Pins and clusters
 
-- Individual markers are **photo preview pins** (`SpotAnnotationView`) — a circular thumbnail of the spot's primary image inside a pin silhouette with a white border, subtle shadow, and tip-aligned geography. The tip is the exact geographic coordinate and never shifts between loading, loaded, and selected states.
+- Individual markers are **photo preview pins** (`SpotAnnotationView`) — a 52 pt circular thumbnail of the spot's primary image inside a brand-green pin silhouette with a subtle shadow and a crisp point at the geographic anchor. The tip is the exact coordinate and never shifts between loading, loaded, and selected states.
+- Portrait thumbnails are cropped with a 10% downward bias (`SpotPhotoPinContentsRect`) so outdoor spots don't waste the top of the pin on sky. Landscape and square photos keep the full frame.
 - Spots that have no image URL (or when `MapMarkerFeatureFlags.photoPinMarkersEnabled` is off) fall back to the branded teardrop pin, so no spot is ever left without a marker.
-- Marker thumbnails go through `MapMarkerImageCache`, a bounded `NSCache` (400 items / 12 MB by default) with `ImageIO` downsampling and in-flight request de-duplication. Pan/zoom bursts cannot fan out into repeat network requests for the same URL.
+- Marker thumbnails go through `MapMarkerImageCache`, a bounded `NSCache` (400 items / 16 MB by default) with `ImageIO` downsampling and in-flight request de-duplication. Pan/zoom bursts cannot fan out into repeat network requests for the same URL.
 - Dense regions use MapKit `MKClusterAnnotation` with branded count badges (`SpotClusterAnnotationView`). Photo pins share the same `clusteringIdentifier`, so clustering behavior is unchanged.
 - Tapping a cluster zooms toward its members. Coincident spots at max zoom open a horizontal carousel in the preview slot.
 - Selected markers scale by `Constants.MapDesign.pinSelectedScale` and are promoted to `zPriority = .max`, so a selected photo pin always renders above surrounding pins.
