@@ -23,6 +23,10 @@ enum MapMarkerLogs: SpotLog, CaseIterable {
     case userMarkerCustomFailed
     case softClusterShown
     case overlapBucketResolved
+    case photoMarkerImageLoaded
+    case photoMarkerImageFailed
+    case photoMarkerFallbackToTeardrop
+    case photoMarkerImpression
 
     var tag: String { "MapMarker" }
     var level: LogLevel {
@@ -41,6 +45,10 @@ enum MapMarkerLogs: SpotLog, CaseIterable {
         case .userMarkerCustomFailed: return .error
         case .softClusterShown: return .debug
         case .overlapBucketResolved: return .debug
+        case .photoMarkerImageLoaded: return .debug
+        case .photoMarkerImageFailed: return .debug
+        case .photoMarkerFallbackToTeardrop: return .debug
+        case .photoMarkerImpression: return .debug
         }
     }
     var message: String {
@@ -59,6 +67,10 @@ enum MapMarkerLogs: SpotLog, CaseIterable {
         case .userMarkerCustomFailed: return "Custom user-location marker failed; using system fallback"
         case .softClusterShown: return "Soft cluster shown at far zoom"
         case .overlapBucketResolved: return "Overlap bucket resolved with radial offsets"
+        case .photoMarkerImageLoaded: return "Photo pin thumbnail loaded"
+        case .photoMarkerImageFailed: return "Photo pin thumbnail failed"
+        case .photoMarkerFallbackToTeardrop: return "Photo pin fell back to teardrop"
+        case .photoMarkerImpression: return "Photo pin impression"
         }
     }
 }

@@ -82,6 +82,7 @@ struct MapExperience: View {
                     userMarker: userMarker,
                     suppressDefaultUserDot: suppressDefaultUserDot,
                     cameraIntent: cameraIntent,
+                    analyticsSurface: surface,
                     onSelect: { spot, coord, region in
                         selectSpot(spot, coordinate: coord, regionAtTap: region, geo: geo)
                     },
@@ -235,7 +236,7 @@ struct MapExperience: View {
     private func selectSpot(
         _ spot: Spot,
         coordinate: CLLocationCoordinate2D,
-        regionAtTap _: MKCoordinateRegion,
+        regionAtTap: MKCoordinateRegion,
         geo: GeometryProxy,
         source: String = "marker_tap"
     ) {
@@ -256,7 +257,16 @@ struct MapExperience: View {
         focusCamera(on: coordinate, geo: geo)
         onSpotSelected?(spot)
         if source == "marker_tap" {
-            MapAnalytics.markerTapped(surface: surface, spotId: spot.id)
+            let markerType: MapMarkerAnalyticsType = SpotPhotoPinSource.imageURL(for: spot) != nil
+                && MapMarkerFeatureFlags.photoPinMarkersEnabled
+                ? .photoPin
+                : .teardrop
+            MapAnalytics.markerTapped(
+                surface: surface,
+                spotId: spot.id,
+                markerType: markerType,
+                zoomLevel: SpotAnnotationZoom.approximateZoomLevel(for: regionAtTap)
+            )
             FeedEventService.record(.mapPinTap, spotId: spot.id)
         }
         MapAnalytics.previewShown(surface: surface, spotId: spot.id)
