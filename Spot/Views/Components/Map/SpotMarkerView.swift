@@ -87,6 +87,13 @@ extension SpotMarkerGeometry {
     /// Returns the outer shell path (circle + downward tail) for a photo
     /// preview pin sized by `layout`. Used as both the fill/stroke shape
     /// for the pin body and (inset) as the selected-state ring.
+    ///
+    /// The tail is drawn with cubic Béziers whose control points are
+    /// chosen so that:
+    ///   * the tangent at the tip is nearly vertical — the pin drops to a
+    ///     crisp point at the geographic anchor instead of a rounded "U",
+    ///   * the tangent at each bulb anchor matches the circle's own
+    ///     tangent — the tail flows into the bulb with no visible corner.
     static func photoPinPath(_ layout: PhotoPinLayout) -> CGPath {
         let path = UIBezierPath()
         let center = layout.bubbleCenter
@@ -105,19 +112,44 @@ extension SpotMarkerGeometry {
             x: center.x - sinA * radius,
             y: center.y + cosA * radius
         )
+        let tailHeight = max(1, tip.y - rightAnchor.y)
 
-        // Move to the tip and sweep clockwise around the bubble to build
-        // a closed shell shape:
-        //   tip → curve → rightAnchor → arc over top → leftAnchor → curve → tip
-        path.move(to: tip)
-        path.addQuadCurve(
-            to: rightAnchor,
-            controlPoint: CGPoint(x: rightAnchor.x + sinA * radius * 0.20, y: tip.y)
+        // Tip-side control handles: mostly straight up with a whisker of
+        // outward flare. Ratios were tuned on-device against the PRD
+        // wireframe — steeper values look spike-y, shallower values bring
+        // back the U shape.
+        let tipHandleUp = tailHeight * 0.55
+        let tipHandleOut = radius * 0.05
+        // Anchor-side control handles along the circle's tangent
+        // direction, so the tail meets the bulb tangentially.
+        //   * right anchor: (-sinA, +cosA)
+        //   * left  anchor: (+sinA, +cosA)
+        let anchorHandleLen = radius * 0.30
+
+        let tipHandleRight = CGPoint(x: tip.x + tipHandleOut, y: tip.y - tipHandleUp)
+        let anchorHandleRight = CGPoint(
+            x: rightAnchor.x - sinA * anchorHandleLen,
+            y: rightAnchor.y + cosA * anchorHandleLen
         )
-        // Angles measured from +X in the y-down space. The right anchor sits
-        // in the lower-right (angle > 0, < π/2); the left anchor in the
-        // lower-left. `clockwise: false` here (increasing angle counter to
-        // screen-clockwise) walks over the TOP of the bubble.
+        let tipHandleLeft = CGPoint(x: tip.x - tipHandleOut, y: tip.y - tipHandleUp)
+        let anchorHandleLeft = CGPoint(
+            x: leftAnchor.x + sinA * anchorHandleLen,
+            y: leftAnchor.y + cosA * anchorHandleLen
+        )
+
+        // Move to the tip and sweep counter-clockwise (visually) around
+        // the bulb to build a closed shell shape:
+        //   tip → cubic → rightAnchor → arc over top → leftAnchor → cubic → tip
+        path.move(to: tip)
+        path.addCurve(
+            to: rightAnchor,
+            controlPoint1: tipHandleRight,
+            controlPoint2: anchorHandleRight
+        )
+        // Angles measured from +X in the y-down space. The right anchor
+        // sits in the lower-right (angle > 0, < π/2); the left anchor in
+        // the lower-left. `clockwise: false` (increasing angle counter to
+        // screen-clockwise) walks over the TOP of the bulb.
         let startAngle = atan2(rightAnchor.y - center.y, rightAnchor.x - center.x)
         let endAngle = atan2(leftAnchor.y - center.y, leftAnchor.x - center.x)
         path.addArc(
@@ -127,9 +159,10 @@ extension SpotMarkerGeometry {
             endAngle: endAngle,
             clockwise: false
         )
-        path.addQuadCurve(
+        path.addCurve(
             to: tip,
-            controlPoint: CGPoint(x: leftAnchor.x - sinA * radius * 0.20, y: tip.y)
+            controlPoint1: anchorHandleLeft,
+            controlPoint2: tipHandleLeft
         )
         path.close()
         return path.cgPath

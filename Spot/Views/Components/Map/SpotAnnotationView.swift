@@ -177,10 +177,12 @@ final class SpotAnnotationView: MKAnnotationView {
 
         photoShellLayer.frame = bounds
         photoShellLayer.path = shellPath
-        photoShellLayer.fillColor = UIColor(Constants.Colors.mapMarkerDot).cgColor
-        photoShellLayer.strokeColor = UIColor(Constants.Colors.mapMarkerStroke)
-            .withAlphaComponent(0.10).cgColor
-        photoShellLayer.lineWidth = 0.5
+        // Brand-green shell so the ring around the photo + the tail match
+        // the legacy teardrop pin. Reads as an on-brand map marker rather
+        // than a floating polaroid.
+        photoShellLayer.fillColor = UIColor(Constants.Colors.mapMarkerGreen).cgColor
+        photoShellLayer.strokeColor = UIColor(Constants.Colors.mapMarkerStroke).cgColor
+        photoShellLayer.lineWidth = 1
         photoShellLayer.shadowColor = UIColor.black.cgColor
         photoShellLayer.shadowOpacity = 0.22
         photoShellLayer.shadowOffset = CGSize(width: 0, height: 1.5)
