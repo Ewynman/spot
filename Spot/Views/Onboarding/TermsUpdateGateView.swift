@@ -2,11 +2,7 @@
 //  TermsUpdateGateView.swift
 //  Spot
 //
-//  Post-authentication blocking gate that appears when the signed-in user has
-//  not yet accepted the active terms version (e.g., a returning user opening
-//  the app after a Terms update). Required by the PRD for Apple Guideline 1.2
-//  (UGC moderation) so users always re-acknowledge updated Terms before
-//  accessing app content.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

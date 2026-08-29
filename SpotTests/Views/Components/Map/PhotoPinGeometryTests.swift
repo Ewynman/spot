@@ -2,19 +2,7 @@
 //  PhotoPinGeometryTests.swift
 //  SpotTests
 //
-//  Locks down the pure geometry helpers backing the Concept 3 photo
-//  preview marker. These are the guarantees the rest of the UI depends on:
-//
-//   * The pin's geographic tip sits at `rect.maxY` — the annotation view's
-//     `centerOffset` uses this fact to anchor the coordinate to the tail.
-//   * The bubble center sits at `(rect.midX, rect.minY + radius)` so the
-//     image content (masked circle) can be laid out relative to the
-//     precomputed `PhotoPinLayout` without recomputing angles per render.
-//   * The shell path is closed and contains the bubble center; the pin
-//     silhouette therefore fills correctly with no gaps.
-//
-//  All assertions are pure math on `CGRect` / `CGPath` so they run without
-//  MapKit, UIKit windows, or Firebase.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

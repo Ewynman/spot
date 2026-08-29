@@ -2,8 +2,7 @@
 //  MapViewModelLogs.swift
 //  Spot
 //
-//  Log definitions for MapViewModel: viewport fetch lifecycle and
-//  visibleSpots merge/trim semantics.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

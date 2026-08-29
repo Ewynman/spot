@@ -2,9 +2,7 @@
 //  AlgorithmDebugView.swift
 //  Spot
 //
-//  Settings → Debug → "Algorithm snapshot". Renders the raw
-//  `public.user_feed_profiles` row for the signed-in user, plus a
-//  one-tap recompute. RLS guarantees the row belongs to the caller.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

@@ -1,3 +1,10 @@
+//
+//  SpotVibeSyncModeLoader.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Supabase fetch for `spots.vibe_display_mode` (thin I/O; mapping covered in `SpotVibeSyncHydration`).

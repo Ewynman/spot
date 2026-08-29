@@ -2,8 +2,7 @@
 //  SpotLaunchConfiguration.swift
 //  Spot
 //
-//  Reads launch arguments / environment for UI tests. All flags are inert
-//  outside DEBUG builds so TestFlight / App Store behavior is unchanged.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

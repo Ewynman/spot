@@ -2,14 +2,7 @@
 //  UserLocationAnnotationView.swift
 //  Spot
 //
-//  Branded user-location avatar marker. Replaces Apple's default blue dot
-//  on the discovery map. Renders the viewer's profile picture in a clean
-//  circle with a green ring (regular) or gold ring (Pro). Falls back to
-//  initials, then to a branded dot, when the avatar isn't available.
-//
-//  Important memory rule: the avatar image is fetched **once** per session
-//  via the shared `MapAvatarImageCache` (defined below) and held as a
-//  small UIImage. We never re-decode it on every map update.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import UIKit

@@ -4,7 +4,7 @@
 //
 //  Created by Edward Wynman on 7/10/25.
 //
-    
+
 import SwiftUI
 
 enum Constants {

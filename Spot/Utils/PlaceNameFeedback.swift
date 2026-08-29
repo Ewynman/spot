@@ -1,3 +1,10 @@
+//
+//  PlaceNameFeedback.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Maps place-name validation results to user-facing rename alert copy.

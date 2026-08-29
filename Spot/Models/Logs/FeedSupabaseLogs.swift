@@ -2,7 +2,7 @@
 //  FeedSupabaseLogs.swift
 //  Spot
 //
-//  Log definitions for the Supabase-backed home feed pipeline (v2).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

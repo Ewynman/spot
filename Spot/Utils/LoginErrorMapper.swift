@@ -1,3 +1,10 @@
+//
+//  LoginErrorMapper.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Maps login failures to user-facing copy without leaking provider noise.

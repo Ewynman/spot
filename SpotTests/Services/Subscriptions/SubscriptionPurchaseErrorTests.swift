@@ -2,8 +2,7 @@
 //  SubscriptionPurchaseErrorTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 03/24/2026
+//  Created by Edward Wynman on 3/24/26.
 //
 
 import Foundation

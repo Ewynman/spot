@@ -2,16 +2,7 @@
 //  MemoryDebugLogger.swift
 //  Spot
 //
-//  Debug-only memory snapshots for the map redesign acceptance criteria.
-//  Production builds compile out everything except a no-op `snapshot(_:)`
-//  call site, so we never ship noisy memory logs to end users.
-//
-//  Usage:
-//
-//      MemoryDebugLogger.snapshot("map_appear")
-//      MemoryDebugLogger.snapshot("after_first_load", extra: [
-//          "annotations": map.annotations.count
-//      ])
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,7 +2,7 @@
 //  AuthViewModelLogs.swift
 //  Spot
 //
-//  Log definitions for AuthViewModel.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

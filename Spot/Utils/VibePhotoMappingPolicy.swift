@@ -1,3 +1,10 @@
+//
+//  VibePhotoMappingPolicy.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// How vibe tags are shown on a Spot card.

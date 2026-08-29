@@ -2,13 +2,7 @@
 //  MapViewModelStateTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Pure-state coverage for MapViewModel that does not require Supabase /
-//  MapKit IO. The geo trim/merge functions are exercised in
-//  `VisibleSpotsTrimTests`; this suite focuses on the lifecycle
-//  expectations BottomTabNavigationView and MapView depend on.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import CoreLocation

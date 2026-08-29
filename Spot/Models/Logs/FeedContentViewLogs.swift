@@ -2,7 +2,7 @@
 //  FeedContentViewLogs.swift
 //  Spot
 //
-//  Log definitions for FeedContentView.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

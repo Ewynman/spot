@@ -2,20 +2,7 @@
 //  SpotPhotoPinContentsRectTests.swift
 //  SpotTests
 //
-//  Locks down the pure crop-window math used by the photo pin. Outdoor
-//  Spot photos often frame the subject in the lower two-thirds and reserve
-//  the top for sky, so the marker biases portrait crops downward instead
-//  of centering. The rules under test:
-//
-//   * Landscape / square images keep the full frame — `.resizeAspectFill`
-//     already centers on the horizontal axis and the full vertical range
-//     is visible, so any bias would just crop the subject.
-//   * Portrait images use a square subregion (height == aspect ratio) so
-//     the source scales into the circular mask without side-crop.
-//   * The subregion is shifted downward by `biasShift` but clamped so the
-//     window never leaves the image, no matter how tall the source.
-//   * Zero / negative sizes fail closed to the identity rect — better a
-//     center crop than a NaN contentsRect.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

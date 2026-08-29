@@ -2,13 +2,7 @@
 //  MapDefaults.swift
 //  Spot
 //
-//  Centralised, deterministic map fallback regions used when CoreLocation
-//  cannot give us a real fix (denied / restricted / Location Services off /
-//  unavailable / one-shot timeout). The continental United States span is
-//  the App Review-mandated fallback so the discovery map always opens with
-//  a useful viewport — even with location permission denied.
-//
-//  See `docs/engineering/permissions.md` for the policy.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

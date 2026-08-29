@@ -2,10 +2,7 @@
 //  FeedDiversity.swift
 //  Spot
 //
-//  Client-side pass on the home feed page to cap single-tag / single-creator
-//  repetition in the first window, especially for low-signal users. Server
-//  ranking from `get_home_feed_v1` stays authoritative for candidates; this
-//  layer only reorders the hydrated page.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

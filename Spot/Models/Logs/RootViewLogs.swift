@@ -2,7 +2,7 @@
 //  RootViewLogs.swift
 //  Spot
 //
-//  Log definitions for RootView.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

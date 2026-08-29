@@ -2,7 +2,7 @@
 //  SpotServiceLogs.swift
 //  Spot
 //
-//  Log definitions for SpotService.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

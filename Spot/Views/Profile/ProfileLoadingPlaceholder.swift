@@ -1,3 +1,10 @@
+//
+//  ProfileLoadingPlaceholder.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import SwiftUI
 
 /// Skeleton layout while profile data loads (header + Spots/Map tabs + grid), aligned with `SpotsGridView` metrics.

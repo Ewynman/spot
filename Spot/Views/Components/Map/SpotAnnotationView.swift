@@ -2,22 +2,7 @@
 //  SpotAnnotationView.swift
 //  Spot
 //
-//  Custom UIKit annotation view for spot pins. Concept 3 photo preview
-//  marker: a circular thumbnail of the spot's primary image inside a
-//  pin-shaped silhouette with a white border and subtle shadow. Falls back
-//  to the branded teardrop when there is no image URL or the thumbnail
-//  fails to load, so no spot is ever left without a marker.
-//
-//  Geometry:
-//   * Frame is `pinFrameSize` (44 × 56) so both photo and teardrop modes
-//     share the same layout envelope and the pin's tip always sits at the
-//     annotation's coordinate via `centerOffset`.
-//   * `SpotMarkerGeometry.photoPinPath(_:)` produces a compound shell path
-//     (bubble + tail); the image content is drawn in a masked `CALayer`
-//     centered on the bubble.
-//   * Selected state applies `pinSelectedScale` via a view transform and
-//     lifts z / display priority so the selected pin renders above nearby
-//     markers, as required by the PRD.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import UIKit

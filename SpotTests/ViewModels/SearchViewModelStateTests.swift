@@ -2,18 +2,7 @@
 //  SearchViewModelStateTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Pure state-transition coverage for SearchViewModel.
-//
-//  SearchViewModel is welded to `SearchService.shared` and triggers a
-//  debounced async `performSearch()` on `query`/`segment` mutations, so
-//  these tests deliberately avoid mutating those fields. They guard
-//  initial state, manual reset paths, and filter-list mutations that do
-//  not initiate network calls.
-//
-//  Updated to include search history feature tests.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

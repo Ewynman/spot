@@ -1,3 +1,10 @@
+//
+//  SpotConfirmationOverlay.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import SwiftUI
 
 /// Branded confirmation card used for destructive Spot actions (delete, block).

@@ -2,8 +2,7 @@
 //  SpotDetailSheet.swift
 //  Spot
 //
-//  Expanded map spot detail presented as a secondary sheet with a persistent
-//  Like / Save / Share action bar that never scrolls away.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

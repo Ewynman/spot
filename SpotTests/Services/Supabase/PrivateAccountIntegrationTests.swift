@@ -2,8 +2,7 @@
 //  PrivateAccountIntegrationTests.swift
 //  SpotTests
 //
-//  Integration tests for private account functionality.
-//  Tests the complete flow of private accounts, follow requests, and content visibility.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

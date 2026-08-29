@@ -2,7 +2,7 @@
 //  SearchDataSourceLogs.swift
 //  Spot
 //
-//  Log definitions for SpotSearchDataSource.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

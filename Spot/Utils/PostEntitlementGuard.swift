@@ -1,3 +1,10 @@
+//
+//  PostEntitlementGuard.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Client-side post publish entitlement messages aligned with server RPC limits.

@@ -2,12 +2,7 @@
 //  TermsAgreementCheckboxView.swift
 //  Spot
 //
-//  Reusable Terms of Use / Privacy Policy agreement checkbox shown on the
-//  Welcome screen so authentication actions (Apple Sign-In, Get Started,
-//  Log in) can be gated until the user opts in.
-//
-//  Required by Apple Guideline 1.2 (User-Generated Content) — Apple Review
-//  must see the agreement before login or registration.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

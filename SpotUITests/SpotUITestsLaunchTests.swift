@@ -4,10 +4,6 @@
 //
 //  Created by Edward Wynman on 7/10/25.
 //
-//  Launch-only smoke tests. These guard the bare minimum: the app boots,
-//  doesn't crash on cold start, and renders some interactive surface. They
-//  also capture a launch screenshot useful for visual regression review.
-//
 
 import XCTest
 

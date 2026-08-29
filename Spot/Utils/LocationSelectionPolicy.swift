@@ -1,3 +1,10 @@
+//
+//  LocationSelectionPolicy.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import CoreLocation
 
 /// Pure policies for post-flow location pin movement and name resolution.

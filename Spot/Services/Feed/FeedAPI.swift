@@ -2,10 +2,7 @@
 //  FeedAPI.swift
 //  Spot
 //
-//  Supabase RPC client for the v2 home feed pipeline (`get_home_feed_v1`,
-//  `get_home_feed_status_v1`, `get_map_spots_v1`). The server returns final,
-//  filtered, ranked feed rows; the iOS app only signs the primary image for
-//  each returned row, leaving full image arrays for the detail view.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

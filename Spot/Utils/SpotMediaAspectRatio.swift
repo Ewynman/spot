@@ -2,7 +2,7 @@
 //  SpotMediaAspectRatio.swift
 //  Spot
 //
-//  Centralized width/height ratio math for Spot media shells (PRD: 0.80–1.91).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreGraphics

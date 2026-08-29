@@ -2,14 +2,7 @@
 //  MapMarkerImageCacheTests.swift
 //  SpotTests
 //
-//  Unit tests for `MapMarkerImageCache`: the bounded, downsampling image
-//  store that backs Concept 3 photo preview pins.
-//
-//  These tests avoid the network entirely by installing a synthetic
-//  `dataProvider` on a fresh cache instance. That mirrors what
-//  `MapAvatarImageCache` does elsewhere for the user-location avatar: keep
-//  cache logic testable without paying the cost of `URLSession`, and never
-//  depend on Firebase / Supabase reachability from `SpotTests`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

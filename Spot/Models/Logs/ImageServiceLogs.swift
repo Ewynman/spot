@@ -2,7 +2,7 @@
 //  ImageServiceLogs.swift
 //  Spot
 //
-//  Log definitions for ImageService.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

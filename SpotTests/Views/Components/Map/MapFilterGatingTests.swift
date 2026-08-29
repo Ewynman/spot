@@ -2,9 +2,7 @@
 //  MapFilterGatingTests.swift
 //  SpotTests
 //
-//  The PRD calls out (Eddie's call) that the filter button row is hidden
-//  entirely for non-Pro users. These tests pin the gating logic so a
-//  future regression can't accidentally surface filter UI to free users.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Testing

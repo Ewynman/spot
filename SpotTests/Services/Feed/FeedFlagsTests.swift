@@ -2,10 +2,7 @@
 //  FeedFlagsTests.swift
 //  SpotTests
 //
-//  Smoke-tests the production defaults for `FeedFlags`. If any of these flip
-//  to a non-production-ready value (e.g. v2 RPC disabled, primary-image
-//  hydration off, debug logging on globally) CI will fail loudly so a
-//  reviewer catches it before merge.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Testing

@@ -1,3 +1,10 @@
+//
+//  PaywallPurchaseUIState.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Derives paywall button / status copy from StoreKit loading flags (no StoreKit types).

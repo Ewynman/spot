@@ -2,14 +2,7 @@
 //  MapOverlapResolver.swift
 //  Spot
 //
-//  Resolves overlapping spot pins by quantizing coordinates into small
-//  buckets and applying deterministic radial offsets to bucket members.
-//  This is what keeps "the same place" from rendering as a single
-//  unstackable bullseye.
-//
-//  The output is just per-spot coordinate offsets. The annotation views
-//  apply them when assigning their `coordinate`. Pure logic — testable
-//  without MapKit.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

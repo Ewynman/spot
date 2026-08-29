@@ -2,7 +2,7 @@
 //  SearchHistoryManagerTests.swift
 //  SpotTests
 //
-//  Comprehensive unit tests for SearchHistoryManager.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,13 +2,7 @@
 //  MapMarkerFeatureFlags.swift
 //  Spot
 //
-//  Runtime toggles for the map marker subsystem. Flags here are static
-//  Swift vars so QA can flip them in DEBUG builds without a codegen step,
-//  and unit tests can mutate them via `withValue(_:body:)` to lock in the
-//  legacy behavior while exercising the new photo pin path.
-//
-//  Only additive gates belong here; anything with a data-plane impact
-//  should live behind a remote flag instead.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

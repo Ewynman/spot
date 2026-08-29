@@ -2,10 +2,7 @@
 //  MapMarkerFeatureFlagsTests.swift
 //  SpotTests
 //
-//  Verifies `MapMarkerFeatureFlags.withPhotoPinMarkers(_:body:)` restores
-//  the flag even when the body throws — the contract the rest of the
-//  suite relies on to keep tests isolated from each other's side effects
-//  when they need to force the legacy pin path.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

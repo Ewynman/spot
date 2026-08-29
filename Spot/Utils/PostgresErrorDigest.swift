@@ -2,8 +2,7 @@
 //  PostgresErrorDigest.swift
 //  Spot
 //
-//  Lightweight classification of common Postgres / PostgREST errors for
-//  idempotent client writes (e.g. duplicate follow).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,7 +2,7 @@
 //  SupabaseEnvironmentConfigurationTests.swift
 //  SpotTests
 //
-//  Created by Cloud Agent on 7/6/2026.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import XCTest

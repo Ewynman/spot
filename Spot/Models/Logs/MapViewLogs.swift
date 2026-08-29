@@ -2,9 +2,7 @@
 //  MapViewLogs.swift
 //  Spot
 //
-//  Log definitions for MapView (discovery map) and the shared map screen
-//  lifecycle. Covers map appear/disappear, panel open/close + height
-//  clamping, recenter taps, and entry/initial-fit instrumentation.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

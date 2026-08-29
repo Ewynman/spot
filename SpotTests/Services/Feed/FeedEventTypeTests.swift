@@ -2,10 +2,7 @@
 //  FeedEventTypeTests.swift
 //  SpotTests
 //
-//  Locks in the wire-format contract between iOS `FeedEventType` raw values
-//  and the server-side `public.feed_event_weight_v1` weighting table. If the
-//  iOS rawValue and the server weight key drift, events silently log with
-//  weight 0 and personalization breaks — these tests catch that at CI time.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Testing

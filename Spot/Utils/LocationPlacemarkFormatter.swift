@@ -1,3 +1,10 @@
+//
+//  LocationPlacemarkFormatter.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Formats MapKit / CLPlacemark fields into display strings and LocationData inputs.

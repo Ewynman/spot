@@ -2,9 +2,7 @@
 //  CameraPermissionView.swift
 //  Spot
 //
-//  Custom pre-permission screen for the Camera. Apple App Review
-//  (Guideline 5.1.1) requires neutral wording — `Continue`, never
-//  `Allow Camera` / `Enable Camera` / `Maybe Later`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

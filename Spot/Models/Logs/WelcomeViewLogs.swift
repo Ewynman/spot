@@ -2,7 +2,7 @@
 //  WelcomeViewLogs.swift
 //  Spot
 //
-//  Log definitions for WelcomeView.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

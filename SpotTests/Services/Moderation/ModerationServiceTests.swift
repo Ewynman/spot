@@ -2,11 +2,7 @@
 //  ModerationServiceTests.swift
 //  SpotTests
 //
-//  Unit tests for the deterministic, networking-free pieces of the new
-//  moderation surface: enum stability, log severity, and Swift→backend reason
-//  mapping. Networked RPC calls are exercised in higher-level integration
-//  tests; this suite enforces invariants App Review reviewers (and the
-//  `priority_for_report_reason` SQL helper) rely on.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

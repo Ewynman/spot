@@ -2,7 +2,7 @@
 //  BottomTabNavigationView.swift
 //  Spot
 //
-//  Created By Wynman, Edward (Current date)
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

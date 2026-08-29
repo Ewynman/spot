@@ -2,13 +2,7 @@
 //  SpotFirstRunOnboardingManagerTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Behavior contract for the redesigned first-run onboarding manager.
-//  Covers eligibility gating, step progression, persistence keys, legacy
-//  HomeTourManager migration, and the map-tab handoff used by
-//  BottomTabNavigationView.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

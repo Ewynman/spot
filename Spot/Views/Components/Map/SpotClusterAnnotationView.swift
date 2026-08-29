@@ -2,8 +2,7 @@
 //  SpotClusterAnnotationView.swift
 //  Spot
 //
-//  Branded MapKit cluster annotation: circular marker with a count label.
-//  Discrete sizes for 1–9 / 10–99 / 100+ (not proportional scaling).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import UIKit

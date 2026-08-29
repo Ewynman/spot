@@ -2,9 +2,7 @@
 //  SoftClusterAnnotationView.swift
 //  Spot
 //
-//  Legacy soft-cluster annotation (pre–MapKit clustering). Kept for unit
-//  tests / `MapSoftClusterBuilder` helpers. Runtime maps use
-//  `SpotClusterAnnotationView` + `MKClusterAnnotation` instead.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import UIKit

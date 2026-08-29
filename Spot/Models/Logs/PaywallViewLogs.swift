@@ -2,7 +2,7 @@
 //  PaywallViewLogs.swift
 //  Spot
 //
-//  Log definitions for PaywallView.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

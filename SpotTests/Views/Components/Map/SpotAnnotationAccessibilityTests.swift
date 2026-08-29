@@ -2,13 +2,7 @@
 //  SpotAnnotationAccessibilityTests.swift
 //  SpotTests
 //
-//  Locks down the accessible label composed for photo preview markers.
-//  Photo pins are decorative from an assistive-technology perspective: the
-//  image itself never conveys meaning to VoiceOver, so the annotation
-//  label must always include the author + place text derived from the
-//  `Spot` payload and never surface literal "nil" values.
-//
-//  These are pure-string assertions that run without MapKit or UIKit.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

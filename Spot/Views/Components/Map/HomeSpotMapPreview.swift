@@ -1,3 +1,10 @@
+//
+//  HomeSpotMapPreview.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import SwiftUI
 
 /// Non-interactive, cached MapKit snapshot used by the back of a Home card.

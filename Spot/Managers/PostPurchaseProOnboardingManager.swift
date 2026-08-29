@@ -1,6 +1,8 @@
 //
-// Created By: Wynman, Edward
-// Date: 04/06/2026
+//  PostPurchaseProOnboardingManager.swift
+//  Spot
+//
+//  Created by Edward Wynman on 4/6/26.
 //
 
 import SwiftUI

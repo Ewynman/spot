@@ -2,11 +2,7 @@
 //  SpotPhotoPinSourceTests.swift
 //  SpotTests
 //
-//  Locks down the image-URL resolution rule the photo preview marker
-//  relies on: prefer `thumbnailURL`, fall back to `imageURL`, ignore
-//  whitespace-only strings, and never crash on malformed input. This is
-//  the seam that decides whether a spot renders as a photo pin or falls
-//  back to the branded teardrop, so its contract is critical.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

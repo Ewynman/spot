@@ -2,25 +2,7 @@
 //  MapMarkerImageCache.swift
 //  Spot
 //
-//  Bounded, downsampling in-memory cache for photo pin marker thumbnails.
-//
-//  The map can render up to ~250 spots per viewport; each photo pin needs a
-//  tiny circular thumbnail (~44 pt / 132 px @3x). Loading original signed
-//  media into `UIImage` would blow the map's memory budget, so we:
-//
-//   * Downsample decoded bytes to a marker-sized `UIImage` via
-//     `CGImageSourceCreateThumbnailAtIndex` (never fully decode the source).
-//   * Cache the small `UIImage` in `NSCache` with count + byte-cost limits.
-//   * Deduplicate concurrent fetches for the same URL so pan/zoom bursts do
-//     not fan out into hundreds of redundant network requests.
-//   * Allow callers to cancel their interest in a request (via `Handle`)
-//     without cancelling shared work; the underlying request completes and
-//     seeds the cache for future callers.
-//
-//  The cache is intentionally separate from `RemoteImagePipeline` (feed
-//  cards) and `MapAvatarImageCache` (user-location avatar). Marker
-//  thumbnails have very different sizing/lifetime characteristics and
-//  should not evict full-size feed thumbnails, or vice-versa.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import UIKit

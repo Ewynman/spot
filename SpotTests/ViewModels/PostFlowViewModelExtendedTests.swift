@@ -2,11 +2,7 @@
 //  PostFlowViewModelExtendedTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  Extended coverage for PostFlowViewModel state machine: draft readiness,
-//  submit gating, toast plumbing, and current-step boundary handling.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import CoreLocation

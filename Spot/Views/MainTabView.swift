@@ -2,7 +2,7 @@
 //  MainTabView.swift
 //  Spot
 //
-//  Created By Wynman, Edward 03/02/2026
+//  Created by Edward Wynman on 3/2/26.
 //
 
 import SwiftUI

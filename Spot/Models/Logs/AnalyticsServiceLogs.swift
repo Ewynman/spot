@@ -2,7 +2,7 @@
 //  AnalyticsServiceLogs.swift
 //  Spot
 //
-//  Log definitions for AnalyticsService.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

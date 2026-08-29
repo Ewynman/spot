@@ -1,3 +1,10 @@
+//
+//  MapRecenterVisibility.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import CoreLocation
 
 /// Whether the map recenter control should be visible for a permission + fix combo.

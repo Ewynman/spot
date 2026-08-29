@@ -2,17 +2,7 @@
 //  SharedSpotMap.swift
 //  Spot
 //
-//  The single, reusable `MKMapView` host that powers both the discovery
-//  map and the profile map.
-//
-//  Memory / behavior rules:
-//   * Force light mode; no POIs, no traffic, flat elevation.
-//   * Reuse `SpotAnnotationView`, `SpotClusterAnnotationView`,
-//     `UserLocationAnnotationView` via stable identifiers.
-//   * Diff annotations by spot id (never wholesale remove+add).
-//   * Camera moves are explicit via `cameraIntent`.
-//   * Density uses MapKit clustering (`clusteringIdentifier`).
-//   * `dismantleUIView` releases delegate, annotations, overlays.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

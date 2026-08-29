@@ -2,9 +2,7 @@
 //  AuthProfileSetupGate.swift
 //  Spot
 //
-//  Decides whether the post-auth “complete profile” flow should run for the
-//  current session. Email/password signups already collect username + photo
-//  in onboarding; Apple sign-in may not have both persisted yet.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Auth

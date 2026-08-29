@@ -2,7 +2,7 @@
 //  Supabase.swift
 //  Spot
 //
-//  Created By Edward Wynman on 4/19/2026.
+//  Created by Edward Wynman on 4/19/26.
 //
 
 import Foundation

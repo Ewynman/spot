@@ -2,14 +2,7 @@
 //  MapLocationPermissionStatusTests.swift
 //  SpotTests
 //
-//  Tests that verify the map correctly checks location permission status
-//  from PermissionManager (which is refreshed from the system) rather than
-//  from LocationManager's potentially stale @Published property.
-//
-//  Context: Bug fix for recenter button always showing permission prompt.
-//  The recenterOnUser() function must check permissionManager.locationStatus
-//  after calling permissionManager.updatePermissionStatuses(), not the
-//  potentially stale locationManager.authorizationStatus.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import AVFoundation

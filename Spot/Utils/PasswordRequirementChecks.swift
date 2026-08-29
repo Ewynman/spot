@@ -1,3 +1,10 @@
+//
+//  PasswordRequirementChecks.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Signup password checklist rows shown under the password field.

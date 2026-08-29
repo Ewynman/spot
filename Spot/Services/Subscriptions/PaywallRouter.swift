@@ -1,3 +1,10 @@
+//
+//  PaywallRouter.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Main-tab notification values (matches `BottomTabNavigationView` cases: 0 Home … 4 Profile).

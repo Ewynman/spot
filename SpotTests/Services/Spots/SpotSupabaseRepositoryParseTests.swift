@@ -2,14 +2,7 @@
 //  SpotSupabaseRepositoryParseTests.swift
 //  SpotTests
 //
-//  Created By: Wynman, Edward
-//  Date: 04/27/2026
-//
-//  `SpotSupabaseRepository.parseTimestamptz` is the single source of truth
-//  for converting Postgres `timestamptz` strings into `Date`. Several
-//  decoders (FeedAPI, BookmarksCollectionsService, AuthViewModel proUntil
-//  comparison) depend on it, so we cover the format variations Postgres
-//  actually emits.
+//  Created by Edward Wynman on 4/27/26.
 //
 
 import Foundation

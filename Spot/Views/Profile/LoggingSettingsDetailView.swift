@@ -2,7 +2,7 @@
 //  LoggingSettingsDetailView.swift
 //  Spot
 //
-//  DEBUG-only root logging profile control.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

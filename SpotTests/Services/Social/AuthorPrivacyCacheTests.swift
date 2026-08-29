@@ -2,8 +2,7 @@
 //  AuthorPrivacyCacheTests.swift
 //  SpotTests
 //
-//  Comprehensive test suite for AuthorPrivacyCache functionality.
-//  Tests privacy filtering, follow state, blocked users, and cache behavior.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

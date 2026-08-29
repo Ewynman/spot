@@ -2,10 +2,7 @@
 //  MapDefaultsTests.swift
 //  SpotTests
 //
-//  Locks down the App Review-mandated continental United States fallback
-//  region used by the discovery map when CoreLocation cannot give us a
-//  real fix (denied / restricted / disabled / unavailable). See
-//  `Spot/Utils/MapDefaults.swift`.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import CoreLocation

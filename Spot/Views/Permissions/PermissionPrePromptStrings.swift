@@ -2,21 +2,7 @@
 //  PermissionPrePromptStrings.swift
 //  Spot
 //
-//  Single source of truth for user-facing strings on Spot’s custom screens
-//  shown immediately before Apple’s system permission dialogs.
-//  Centralizing them lets us:
-//
-//   * Verify neutral, App Review-safe wording via a regression test suite
-//     (`PermissionPrePromptStringsTests`).
-//   * Re-use the same text from Settings-adjacent flows and contextual
-//     feature entry points (map, composer, profile, etc.).
-//
-//  Apple App Review (Guideline 5.1.1 / 5.1.5 / 4.5.4) requires:
-//   * Primary buttons must be neutral (`Continue`, never `Enable...`).
-//   * Secondary actions must let the user proceed without granting the
-//     permission (e.g. `Continue Without Photos`).
-//   * No `Maybe Later` immediately before the native permission prompt.
-//   * Denied state must keep the app usable.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

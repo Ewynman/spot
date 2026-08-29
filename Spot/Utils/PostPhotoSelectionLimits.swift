@@ -1,3 +1,10 @@
+//
+//  PostPhotoSelectionLimits.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Composer-time photo count limits and capacity copy (separate from publish entitlement).

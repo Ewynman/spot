@@ -1,3 +1,10 @@
+//
+//  SpotMapFilterStateTransitions.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import Foundation
 
 /// Pure filter-state transitions for map filter pills / vibe sheet.

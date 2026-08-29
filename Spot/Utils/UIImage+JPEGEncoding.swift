@@ -2,9 +2,7 @@
 //  UIImage+JPEGEncoding.swift
 //  Spot
 //
-//  JPEG is opaque; encoding UIImage bitmaps that still carry an alpha format
-//  triggers ImageIO warnings (e.g. writeImageAtIndex opaque + AlphaPremulLast)
-//  and wastes space. Flatten to an opaque bitmap before jpegData.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import UIKit

@@ -2,7 +2,7 @@
 //  SpotSupabaseRepository.swift
 //  Spot
 //
-//  Reads / deletes spots stored in Postgres (public.spots + spot_images + vibe_tags).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

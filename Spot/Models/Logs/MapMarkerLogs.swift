@@ -2,8 +2,7 @@
 //  MapMarkerLogs.swift
 //  Spot
 //
-//  Log definitions for the shared map marker subsystem (spot annotations,
-//  user-location avatar marker, soft clusters, animation batches).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

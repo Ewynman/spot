@@ -2,9 +2,7 @@
 //  MapView.swift
 //  Spot
 //
-//  Discovery map. Uses shared `MapExperience` for markers, clustering,
-//  compact preview, and detail sheet. Owns viewport loading, location,
-//  and Pro filter chrome.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

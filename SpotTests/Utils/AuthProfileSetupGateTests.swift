@@ -2,6 +2,8 @@
 //  AuthProfileSetupGateTests.swift
 //  SpotTests
 //
+//  Created by Edward Wynman on 8/28/26.
+//
 
 import Auth
 import Foundation

@@ -2,9 +2,7 @@
 //  FeedRepository.swift
 //  Spot
 //
-//  Home feed: `get_home_feed_v1` RPC (Postgres) for candidates, privacy,
-//  blocking, dedupe via `feed_impressions`, ranking, and pagination. The
-//  client calls the RPC, signs primary images, and surfaces load state.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

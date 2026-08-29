@@ -1,3 +1,10 @@
+//
+//  PhotoSelectionView.swift
+//  Spot
+//
+//  Created by Edward Wynman on 8/28/26.
+//
+
 import AVFoundation
 import Photos
 import PhotosUI

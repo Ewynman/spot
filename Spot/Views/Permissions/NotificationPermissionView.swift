@@ -2,15 +2,7 @@
 //  NotificationPermissionView.swift
 //  Spot
 //
-//  Custom pre-permission screen for Push Notifications. Apple App Review
-//  (Guidelines 4.5.4 / 5.1.1) requires:
-//   * Notifications must be optional.
-//   * No `Enable Notifications` / `Turn On Notifications` wording.
-//   * No `Maybe Later` immediately before the native iOS permission prompt.
-//
-//  This view is no longer a hard gate in onboarding. It is presented only
-//  when the user explicitly opts into a notification-related feature, and
-//  always offers a `Continue Without Notifications` escape hatch.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import SwiftUI

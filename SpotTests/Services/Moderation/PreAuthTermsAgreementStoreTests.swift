@@ -2,9 +2,7 @@
 //  PreAuthTermsAgreementStoreTests.swift
 //  SpotTests
 //
-//  Verifies the pre-auth Terms / Privacy gate state machine the Welcome screen
-//  relies on. The store is intentionally transient (cold-launch resets the
-//  agreement) so App Review reviewers consistently see the unchecked state.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

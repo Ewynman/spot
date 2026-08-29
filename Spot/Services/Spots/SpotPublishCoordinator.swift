@@ -2,7 +2,7 @@
 //  SpotPublishCoordinator.swift
 //  Spot
 //
-//  Background spot publish: Supabase Storage + Postgres (`spots` / `spot_images` / `vibe_tags`).
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation

@@ -2,7 +2,7 @@
 //  InputValidation.swift
 //  Spot
 //
-//  Centralized input validation to prevent malformed data from reaching the database.
+//  Created by Edward Wynman on 8/28/26.
 //
 
 import Foundation
